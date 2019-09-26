@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<feature
+      id="com.oracle.jmc.feature.console"
+      label="%name"
+      version="6.0.0.173920"
+      provider-name="%provider">
+
+   <description url="%descriptionUrl">
+      %description
+   </description>
+
+   <copyright>
+      %copyright
+   </copyright>
+
+   <license url="%licenseUrl">
+      %license
+   </license>
+
+   <requires>
+      <import feature="com.oracle.jmc.feature.core" match="equivalent"/>
+   </requires>
+
+   <plugin
+         id="com.oracle.jmc.alert"
+         download-size="0"
+         install-size="0"
+         version="6.0.0.173920"
+         unpack="false"/>
+
+   <plugin
+         id="com.oracle.jmc.console.ui"
+         download-size="0"
+         install-size="0"
+         version="6.0.0.173920"
+         unpack="false"/>
+
+   <plugin
+         id="com.oracle.jmc.console.ui.notification"
+         download-size="0"
+         install-size="0"
+         version="6.0.0.173920"/>
+
+   <plugin
+         id="com.oracle.jmc.console.persistence"
+         download-size="0"
+         install-size="0"
+         version="6.0.0.173920"
+         unpack="false"/>
+
+   <plugin
+         id="com.oracle.jmc.console.ui.mbeanbrowser"
+         download-size="0"
+         install-size="0"
+         version="6.0.0.173920"
+         unpack="false"/>
+
+   <plugin
+         id="com.oracle.jmc.console.ui.diagnostic"
+         download-size="0"
+         install-size="0"
+         version="6.0.0.173920"
+         unpack="false"/>
+
+</feature>

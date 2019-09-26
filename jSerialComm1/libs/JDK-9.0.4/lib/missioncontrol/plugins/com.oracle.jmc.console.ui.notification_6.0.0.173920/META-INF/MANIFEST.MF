@@ -1,0 +1,32 @@
+Manifest-Version: 1.0
+Ant-Version: Apache Ant 1.9.2
+Created-By: 1.8.0_40-b27 (Oracle Corporation)
+Bundle-SymbolicName: com.oracle.jmc.console.ui.notification; singleton
+ :=true
+Require-Bundle: com.oracle.jmc.core;bundle-version="[6.0.0,7.0.0)",com
+ .oracle.jmc.ui;bundle-version="[6.0.0,7.0.0)",com.oracle.jmc.console.
+ ui;bundle-version="[6.0.0,7.0.0)",org.eclipse.ui;bundle-version="[3.1
+ 07.0,4.0.0)",org.eclipse.core.runtime;bundle-version="[3.11.0,4.0.0)"
+ ,org.eclipse.ui.forms;bundle-version="[3.6.0,4.0.0)",com.oracle.jmc.r
+ jmx;visibility:="reexport";bundle-version="[6.0.0,7.0.0)",com.oracle.
+ jmc.rjmx.ui;bundle-version="[6.0.0,7.0.0)",com.oracle.jmc.alert;bundl
+ e-version="[6.0.0,7.0.0)",com.oracle.jmc.flightrecorder.controlpanel.
+ ui;bundle-version="[6.0.0,7.0.0)",com.oracle.jmc.flightrecorder.contr
+ olpanel.ui.configuration;bundle-version="[6.0.0,7.0.0)",com.oracle.jm
+ c.flightrecorder.configuration;bundle-version="[6.0.0,7.0.0)"
+Bundle-ManifestVersion: 2
+Bundle-RequiredExecutionEnvironment: JavaSE-1.8
+Bundle-ActivationPolicy: lazy
+Bundle-Vendor: Oracle
+Import-Package: com.oracle.jmc.rjmx.services.jfr
+Export-Package: com.oracle.jmc.console.ui.notification,com.oracle.jmc.
+ console.ui.notification.tab,com.oracle.jmc.console.ui.notification.ui
+ components,com.oracle.jmc.console.ui.notification.widget,com.oracle.j
+ mc.console.ui.notification.wizard
+Bundle-Name: Console Notification Plug-in
+Bundle-Version: 6.0.0.173920
+Bundle-Localization: plugin
+Bundle-ClassPath: notification_plugin.jar
+Bundle-Activator: com.oracle.jmc.console.ui.notification.NotificationP
+ lugin
+

@@ -22,4 +22,4 @@ target_link_libraries(
 
         ${log-lib}
 )
-#include_directories(src/main/cpp/include/)
+include_directories(src/main/cpp/include/)

@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<feature
+      id="com.oracle.jmc.rcp.product"
+      label="%name"
+      version="6.0.0.173920"
+      provider-name="Oracle">
+
+   <description url="%descriptionUrl">
+      %description
+   </description>
+
+   <copyright>
+      %copyright
+   </copyright>
+
+   <license url="%licenseUrl">
+      %license
+   </license>
+
+   <includes
+         id="com.oracle.jmc.feature.rcp"
+         version="6.0.0.173920"/>
+
+   <includes
+         id="com.oracle.jmc.feature.rcp.update"
+         version="6.0.0.173920"/>
+
+</feature>

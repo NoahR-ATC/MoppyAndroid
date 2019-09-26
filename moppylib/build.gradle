@@ -1,0 +1,12 @@
+apply plugin: 'java-library'
+
+dependencies {
+    compileOnly 'org.projectlombok:lombok:1.18.10'
+    annotationProcessor 'org.projectlombok:lombok:1.18.10'
+    implementation fileTree(dir: 'libs', include: ['*.jar'])
+    implementation project(path: ':JavaxSound')
+    implementation project(path: ':jSerialComm')
+}
+
+sourceCompatibility = "8"
+targetCompatibility = "8"

@@ -1,0 +1,140 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<feature
+      id="com.oracle.jmc.feature.core"
+      label="%name"
+      version="6.0.0.173920"
+      provider-name="%provider"
+      plugin="com.oracle.jmc.ui">
+
+   <description url="%descriptionUrl">
+      %description
+   </description>
+
+   <copyright>
+      %copyright
+   </copyright>
+
+   <license url="%licenseUrl">
+      %license
+   </license>
+
+   <requires>
+      <import plugin="org.eclipse.ui"/>
+      <import plugin="org.eclipse.core.runtime"/>
+      <import plugin="org.eclipse.ui.forms"/>
+      <import plugin="org.eclipse.ui.views"/>
+      <import plugin="org.eclipse.help"/>
+      <import plugin="org.eclipse.help.ui"/>
+      <import plugin="org.eclipse.help.webapp"/>
+      <import plugin="org.eclipse.osgi"/>
+      <import plugin="org.apache.commons.codec"/>
+      <import plugin="org.eclipse.e4.core.di"/>
+      <import plugin="org.eclipse.e4.core.contexts"/>
+   </requires>
+
+   <plugin
+         id="com.oracle.jmc.attach"
+         download-size="0"
+         install-size="0"
+         version="6.0.0.173920"
+         unpack="false"/>
+
+   <plugin
+         id="com.oracle.jmc.browser"
+         download-size="0"
+         install-size="0"
+         version="6.0.0.173920"
+         unpack="false"/>
+
+   <plugin
+         id="com.oracle.jmc.common"
+         download-size="0"
+         install-size="0"
+         version="6.0.0.173920"
+         unpack="false"/>
+
+   <plugin
+         id="com.oracle.jmc.common.internal"
+         download-size="0"
+         install-size="0"
+         version="6.0.0.173920"
+         unpack="false"/>
+
+   <plugin
+         id="com.oracle.jmc.ui"
+         download-size="0"
+         install-size="0"
+         version="6.0.0.173920"
+         unpack="false"/>
+
+   <plugin
+         id="com.oracle.jmc.docs"
+         download-size="0"
+         install-size="0"
+         version="6.0.0.173920"
+         unpack="false"/>
+
+   <plugin
+         id="com.oracle.jmc.jdp"
+         download-size="0"
+         install-size="0"
+         version="6.0.0.173920"
+         unpack="false"/>
+
+   <plugin
+         id="com.oracle.jmc.rjmx"
+         download-size="0"
+         install-size="0"
+         version="6.0.0.173920"/>
+
+   <plugin
+         id="com.oracle.jmc.greychartplugin"
+         download-size="0"
+         install-size="0"
+         version="6.0.0.173920"
+         unpack="false"/>
+
+   <plugin
+         id="com.oracle.jmc.browser.jdp"
+         download-size="0"
+         install-size="0"
+         version="6.0.0.173920"
+         unpack="false"/>
+
+   <plugin
+         id="com.oracle.jmc.browser.attach"
+         download-size="0"
+         install-size="0"
+         version="6.0.0.173920"
+         unpack="false"/>
+
+   <plugin
+         id="com.oracle.jmc.rjmx.ui"
+         download-size="0"
+         install-size="0"
+         version="6.0.0.173920"
+         unpack="false"/>
+
+   <plugin
+         id="com.oracle.jmc.commands"
+         download-size="0"
+         install-size="0"
+         version="6.0.0.173920"
+         unpack="false"/>
+
+   <plugin
+         id="com.oracle.jmc.core"
+         download-size="0"
+         install-size="0"
+         version="6.0.0.173920"
+         unpack="false"/>
+
+   <plugin
+         id="com.oracle.jmc.rjmx.ext"
+         download-size="0"
+         install-size="0"
+         version="6.0.0.173920"
+         fragment="true"
+         unpack="false"/>
+
+</feature>

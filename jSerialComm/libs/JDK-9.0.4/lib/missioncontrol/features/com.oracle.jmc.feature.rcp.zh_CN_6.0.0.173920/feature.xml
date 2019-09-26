@@ -1,0 +1,168 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<feature
+      id="com.oracle.jmc.feature.rcp.zh_CN"
+      label="%name"
+      version="6.0.0.173920"
+      provider-name="%provider">
+
+   <description url="%descriptionUrl">
+      %description
+   </description>
+
+   <copyright>
+      %copyright
+   </copyright>
+
+   <license url="%licenseUrl">
+      %license
+   </license>
+
+   <requires>
+      <import feature="com.oracle.jmc.feature.core" match="equivalent"/>
+   </requires>
+
+   <plugin
+         id="com.oracle.jmc.alert.zh_CN"
+         download-size="0"
+         install-size="0"
+         version="6.0.0.173920"
+         fragment="true"
+         unpack="false"/>
+
+   <plugin
+         id="com.oracle.jmc.browser.attach.zh_CN"
+         download-size="0"
+         install-size="0"
+         version="6.0.0.173920"
+         fragment="true"
+         unpack="false"/>
+
+   <plugin
+         id="com.oracle.jmc.browser.jdp.zh_CN"
+         download-size="0"
+         install-size="0"
+         version="6.0.0.173920"
+         fragment="true"
+         unpack="false"/>
+
+   <plugin
+         id="com.oracle.jmc.browser.zh_CN"
+         download-size="0"
+         install-size="0"
+         version="6.0.0.173920"
+         fragment="true"
+         unpack="false"/>
+
+   <plugin
+         id="com.oracle.jmc.console.persistence.zh_CN"
+         download-size="0"
+         install-size="0"
+         version="6.0.0.173920"
+         fragment="true"
+         unpack="false"/>
+
+   <plugin
+         id="com.oracle.jmc.console.ui.zh_CN"
+         download-size="0"
+         install-size="0"
+         version="6.0.0.173920"
+         fragment="true"
+         unpack="false"/>
+
+   <plugin
+         id="com.oracle.jmc.console.ui.mbeanbrowser.zh_CN"
+         download-size="0"
+         install-size="0"
+         version="6.0.0.173920"
+         fragment="true"
+         unpack="false"/>
+
+   <plugin
+         id="com.oracle.jmc.console.ui.notification.zh_CN"
+         download-size="0"
+         install-size="0"
+         version="6.0.0.173920"
+         fragment="true"
+         unpack="false"/>
+
+   <plugin
+         id="com.oracle.jmc.ui.zh_CN"
+         download-size="0"
+         install-size="0"
+         version="6.0.0.173920"
+         fragment="true"
+         unpack="false"/>
+
+   <plugin
+         id="com.oracle.jmc.docs.zh_CN"
+         download-size="0"
+         install-size="0"
+         version="6.0.0.173920"
+         fragment="true"
+         unpack="false"/>
+
+   <plugin
+         id="com.oracle.jmc.flightrecorder.ui.zh_CN"
+         download-size="0"
+         install-size="0"
+         version="6.0.0.173920"
+         fragment="true"
+         unpack="false"/>
+
+   <plugin
+         id="com.oracle.jmc.flightrecorder.controlpanel.ui.zh_CN"
+         download-size="0"
+         install-size="0"
+         version="6.0.0.173920"
+         fragment="true"
+         unpack="false"/>
+
+   <plugin
+         id="com.oracle.jmc.greychart.ui.zh_CN"
+         download-size="0"
+         install-size="0"
+         version="6.0.0.173920"
+         fragment="true"
+         unpack="false"/>
+
+   <plugin
+         id="com.oracle.jmc.rcp.application.zh_CN"
+         download-size="0"
+         install-size="0"
+         version="6.0.0.173920"
+         fragment="true"
+         unpack="false"/>
+
+   <plugin
+         id="com.oracle.jmc.rcp.intro.zh_CN"
+         download-size="0"
+         install-size="0"
+         version="6.0.0.173920"
+         fragment="true"
+         unpack="false"/>
+
+   <plugin
+         id="com.oracle.jmc.rjmx.zh_CN"
+         download-size="0"
+         install-size="0"
+         version="6.0.0.173920"
+         fragment="true"
+         unpack="false"/>
+
+   <plugin
+         id="com.oracle.jmc.rjmx.ui.zh_CN"
+         download-size="0"
+         install-size="0"
+         version="6.0.0.173920"
+         fragment="true"
+         unpack="false"/>
+
+   <plugin
+         id="com.oracle.jmc.console.ui.diagnostic.zh_CN"
+         download-size="0"
+         install-size="0"
+         version="6.0.0.173920"
+         fragment="true"
+         unpack="false"/>
+
+</feature>

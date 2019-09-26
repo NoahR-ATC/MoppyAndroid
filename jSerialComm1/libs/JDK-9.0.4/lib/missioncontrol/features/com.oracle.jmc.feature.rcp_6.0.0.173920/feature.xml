@@ -1,0 +1,157 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<feature
+      id="com.oracle.jmc.feature.rcp"
+      label="%name"
+      version="6.0.0.173920"
+      provider-name="%provider">
+
+   <description url="%descriptionUrl">
+      %description
+   </description>
+
+   <copyright>
+      %copyright
+   </copyright>
+
+   <license url="%licenseUrl">
+      %license
+   </license>
+
+   <includes
+         id="com.oracle.jmc.feature.console"
+         version="6.0.0.173920"/>
+
+   <includes
+         id="com.oracle.jmc.feature.rcp.ja"
+         version="6.0.0.173920"/>
+
+   <includes
+         id="com.oracle.jmc.feature.core"
+         version="6.0.0.173920"/>
+
+   <includes
+         id="com.oracle.jmc.feature.rcp.zh_CN"
+         version="6.0.0.173920"/>
+
+   <includes
+         id="com.oracle.jmc.feature.flightrecorder"
+         version="6.0.0.173920"/>
+
+   <requires>
+      <import feature="org.eclipse.rcp" version="3.8.0" match="greaterOrEqual"/>
+      <import feature="org.eclipse.help" version="1.4.0" match="greaterOrEqual"/>
+      <import feature="org.eclipse.equinox.p2.rcp.feature" version="1.1.0" match="greaterOrEqual"/>
+      <import plugin="org.eclipse.core.resources"/>
+      <import plugin="org.eclipse.jface.text"/>
+      <import plugin="org.eclipse.ui"/>
+      <import plugin="org.eclipse.ui.forms"/>
+      <import plugin="org.eclipse.ui.views"/>
+      <import plugin="org.eclipse.core.filesystem"/>
+      <import plugin="org.eclipse.osgi.services"/>
+      <import plugin="org.eclipse.text"/>
+      <import plugin="org.eclipse.core.net"/>
+      <import plugin="org.eclipse.equinox.security"/>
+      <import plugin="org.eclipse.ui.intro"/>
+      <import plugin="org.eclipse.ui.net"/>
+      <import plugin="org.eclipse.equinox.event"/>
+      <import plugin="javax.el"/>
+      <import plugin="org.eclipse.equinox.p2.director.app"/>
+   </requires>
+
+   <plugin
+         id="com.oracle.jmc.rcp.application"
+         download-size="0"
+         install-size="0"
+         version="6.0.0.173920"
+         unpack="false"/>
+
+   <plugin
+         id="com.oracle.jmc.rcp.application.ja"
+         nl="ja_JP,ja"
+         download-size="0"
+         install-size="0"
+         version="6.0.0.173920"
+         fragment="true"
+         unpack="false"/>
+
+   <plugin
+         id="com.oracle.jmc.rcp.application.zh_CN"
+         nl="zh_CN"
+         download-size="0"
+         install-size="0"
+         version="6.0.0.173920"
+         fragment="true"
+         unpack="false"/>
+
+   <plugin
+         id="com.oracle.jmc.rcp.intro"
+         download-size="0"
+         install-size="0"
+         version="6.0.0.173920"
+         unpack="false"/>
+
+   <plugin
+         id="com.oracle.jmc.commands"
+         download-size="0"
+         install-size="0"
+         version="6.0.0.173920"
+         unpack="false"/>
+
+   <plugin
+         id="org.eclipse.equinox.simpleconfigurator"
+         download-size="0"
+         install-size="0"
+         version="1.1.100.v20150423-1455"
+         unpack="false"/>
+
+   <plugin
+         id="org.eclipse.update.configurator"
+         download-size="0"
+         install-size="0"
+         version="3.3.300.v20140518-1928"
+         unpack="false"/>
+
+   <plugin
+         id="org.eclipse.equinox.launcher"
+         download-size="0"
+         install-size="0"
+         version="1.3.200.v20160318-1642"
+         unpack="false"/>
+
+   <plugin
+         id="org.eclipse.core.runtime"
+         download-size="0"
+         install-size="0"
+         version="3.11.0.v20150405-1723"
+         unpack="false"/>
+
+   <plugin
+         id="org.eclipse.equinox.common"
+         download-size="0"
+         install-size="0"
+         version="3.7.0.v20150402-1709"
+         unpack="false"/>
+
+   <plugin
+         id="org.eclipse.equinox.ds"
+         download-size="0"
+         install-size="0"
+         version="1.4.300.v20150423-1356"
+         unpack="false"/>
+
+   <plugin
+         id="org.eclipse.equinox.p2.reconciler.dropins"
+         download-size="0"
+         install-size="0"
+         version="1.1.300.v20150423-1455"
+         unpack="false"/>
+
+   <plugin
+         id="com.oracle.jmc.p2.ui.overridden"
+         download-size="0"
+         install-size="0"
+         version="5.5.0.173920"
+         fragment="true"
+         unpack="false"/>
+
+</feature>
