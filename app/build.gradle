@@ -1,6 +1,10 @@
 apply plugin: 'com.android.application'
 
 android {
+    compileOptions {
+        sourceCompatibility 1.8
+        targetCompatibility 1.8
+    }
     compileSdkVersion 29
     buildToolsVersion "29.0.2"
     defaultConfig {
@@ -17,15 +21,21 @@ android {
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
     }
+    /*externalNativeBuild {
+        cmake {
+//            arguments '-DANDROID_TOOLCHAIN=clang' --> gcc
+            path file('CMakeLists.txt')
+        }
+    }*/
     externalNativeBuild {
         cmake {
             path file('CMakeLists.txt')
         }
-//        ndkBuild {
-//            path "src/main/c/Android/jni/Android.mk"
-//        }
+        ndkBuild {
+            path "../jSerialComm/src/main/c/Android/jni/Android.mk"
+        }
     }
-
+    jniLibs.srcDirs = ['libs']
 }
 
 dependencies {
