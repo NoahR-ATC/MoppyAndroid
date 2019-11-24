@@ -1,2 +1,2 @@
-include ':app', ':MoppyLib', ':JavaxSound', ':jSerialComm'
+include ':app', ':moppylib', ':javaxsound'
 rootProject.name='MoppyAndriod'

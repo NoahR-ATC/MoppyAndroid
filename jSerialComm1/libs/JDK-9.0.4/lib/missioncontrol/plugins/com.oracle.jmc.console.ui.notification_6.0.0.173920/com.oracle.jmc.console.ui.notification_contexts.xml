@@ -1,8 +1,0 @@
-<?xml version='1.0' encoding='UTF-8'?>
-<?NLS TYPE="org.eclipse.help.contexts"?>
-<contexts>
-	<context id="TriggerTab" title="Triggers Tab">
-		<description>The Triggers tab allows you to manage rules that trigger events when a certain condition is met.</description>
-		<topic href="PLUGINS_ROOT/com.oracle.jmc.docs/html/GUID-DAB13FDA-9430-4457-BFF3-04F9DC0E3977.htm" label="Using the Triggers Tab"/>
-	</context>
-</contexts>

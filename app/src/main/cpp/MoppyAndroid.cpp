@@ -51,7 +51,4 @@ jstring GetStringEdited (JNIEnv* env, jobject thiz, jstring str){
 JNIPrefix(jstring) Java_com_moppyandroid_main_MainActivity_GetString(JNIEnv *env, jobject thiz)
     { return GetString(env, thiz); }
 JNIPrefix(jstring) Java_com_moppyandroid_main_MainActivity_GetStringEdited(JNIEnv *env, jobject thiz, jstring str)
-    { return GetStringEdited(env, thiz, str); }extern "C"
-    JNIEXPORT jobjectArray JNICALL
-    Java_com_fazecast_jSerialComm_SerialPort_getCommPorts(JNIEnv *env, jclass clazz) {
-        Java_com_fazecast_jSerialComm_SerialPort_getCommPorts(env, clazz);    }
+    { return GetStringEdited(env, thiz, str); }
