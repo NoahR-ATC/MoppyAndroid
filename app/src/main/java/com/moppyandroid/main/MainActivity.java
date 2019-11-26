@@ -2,17 +2,33 @@ package com.moppyandroid.main;
 
 //import com.moppy.*;
 
+import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.viewpager.widget.ViewPager;
 
+import android.app.AlertDialog;
+import android.app.PendingIntent;
 import android.app.usage.NetworkStatsManager;
+import android.content.BroadcastReceiver;
 import android.content.Context;
+import android.content.Intent;
+import android.content.IntentFilter;
+import android.hardware.usb.UsbAccessory;
+import android.hardware.usb.UsbDevice;
+import android.hardware.usb.UsbManager;
+import android.os.Environment;
 import android.widget.ArrayAdapter;
 import android.widget.TextView;
 import android.widget.ListView;
 import android.os.Bundle;
 
+import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileWriter;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.logging.Logger;
 
 import com.moppyandroid.BridgeSerial;
 import com.moppyandroid.com.moppy.core.events.mapper.MapperCollection;
@@ -32,15 +48,96 @@ public class MainActivity extends AppCompatActivity {
         System.loadLibrary("MoppyAndroidLib");
     }
 
-    private void init() throws java.io.IOException, MidiUnavailableException
-    {
+    public static final String ACTION_USB_PERMISSION = "com.moppyandroid.USB_PERMISSION";
+
+    // Define the receiver to process relevant intent messages
+    private BroadcastReceiver broadcastReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) throws NullPointerException {
+            // Ensure intent action is not null
+            if (intent.getAction() != null) {
+                // Determine action and process accordingly
+                if (intent.getAction().equals(ACTION_USB_PERMISSION)) { // Pass on to BridgeSerial
+                    BridgeSerial.onActionUsbPermission(context, intent);
+                } // End if(ACTION_USB_PERMISSION)
+                else if (intent.getAction().equals(UsbManager.ACTION_USB_DEVICE_DETACHED)) {
+                    {
+                        AlertDialog.Builder b = new AlertDialog.Builder(context);
+                        b.setTitle("MoppyAndroid");
+                        b.setCancelable(false);
+                        b.setMessage("ACTION_USB_DEVICE_DETACHED - BridgeSerial");
+                        b.setPositiveButton("OK", null);
+                        b.create().show();
+                    }
+
+                    /*try {
+                        close();
+                    } catch (IOException e) { // Ignore exception
+                    }*/
+                    {
+                        {
+                            AlertDialog.Builder b = new AlertDialog.Builder(context);
+                            b.setTitle("MoppyAndroid");
+                            b.setCancelable(false);
+                            b.setMessage("USB device unplugged - BridgeSerial");
+                            b.setPositiveButton("OK", null);
+                            b.create().show();
+                        }
+                    }
+                } // End if(ACTION_USB_DEVICE_DETACHED)
+            } // End if(intent !null)
+        } // End onReceive method
+    }; // End new BroadcastReceiver
+
+    private void init() throws java.io.IOException, MidiUnavailableException {
         BridgeSerial.init(this);
+        IntentFilter intentFilter = new IntentFilter();
+        intentFilter.addAction(ACTION_USB_PERMISSION);
+        intentFilter.addAction(UsbManager.ACTION_USB_DEVICE_DETACHED);
+        registerReceiver(broadcastReceiver, intentFilter);
         statusBus = new StatusBus();
         mappers = new MapperCollection<>();
         netManager = new NetworkManager(statusBus);
         netManager.start();
         receiverSender = new MoppyMIDIReceiverSender(mappers, postProcessor, netManager.getPrimaryBridge());
         seq = new MoppyMIDISequencer(statusBus, receiverSender);
+        usbManager = (UsbManager) getSystemService(USB_SERVICE);
+    }
+
+    private void RequestPermission(UsbDevice device) {
+        Intent intent = new Intent(ACTION_USB_PERMISSION);
+        BridgeSerial.ParcelableObject syncObject = new BridgeSerial.ParcelableObject();
+
+        intent.putExtra("syncObject", syncObject);
+        PendingIntent pendingIntent = PendingIntent.getBroadcast(this, 0, new Intent(ACTION_USB_PERMISSION), 0);
+        usbManager.requestPermission(device, pendingIntent);
+        {
+            AlertDialog.Builder b = new AlertDialog.Builder(this);
+            b.setTitle("MoppyAndroid");
+            b.setCancelable(false);
+            b.setMessage("Awaiting permission");
+            b.setPositiveButton("OK", null);
+            b.create().show();
+        }
+
+        // Wait for the message to be processed
+        synchronized (syncObject) {
+            try {
+                syncObject.wait();
+            } catch (InterruptedException e) { // Notify called
+            }
+        }
+
+        // Check if permission was granted
+        if (!usbManager.hasPermission(device)) {
+            AlertDialog.Builder alert = new AlertDialog.Builder(this);
+            alert.setTitle("MoppyAndroid");
+            alert.setCancelable(false);
+            alert.setMessage("Permission is required to connect to the device");
+            alert.setPositiveButton("OK", null);
+            alert.setNegativeButton("Cancel", null);
+            alert.create().show();
+        }
     }
 
     @Override
@@ -52,15 +149,53 @@ public class MainActivity extends AppCompatActivity {
         ListView listView = findViewById(R.id.listView);
         textView.setText(GetStringEdited("Hello!"));
 
-        try { init(); }
-        catch (Exception e) {  }
-
+        try {
+            init();
+        } catch (Exception e) {
+        }
+        UsbManager m = (UsbManager) getSystemService(USB_SERVICE);
         ArrayList<String> arrayList = new ArrayList<>(BridgeSerial.getAvailableSerials());
-        ArrayAdapter adapter = new ArrayAdapter<>(this,android.R.layout.simple_list_item_1,arrayList);
+        for (int i = 0; i < arrayList.size(); i++) {
+            String element = arrayList.get(i);
+            if (m != null) {
+                if (m.getDeviceList() != null) {
+                    UsbDevice dev = m.getDeviceList().get(element);
+                    element = element.concat(", ");
+                    if (dev != null) {
+                        if (dev.getProductName() != null) {
+                            element = element.concat(dev.getProductName() + ", ");
+                        }
+                        element = element.concat(dev.getManufacturerName() + ", ");
+                        element = element.concat(dev.getVendorId() + "/" + dev.getProductId() + ", ");
+                    }
+                    arrayList.set(i, element);
+                }
+            }
+        }
+        ArrayAdapter adapter = new ArrayAdapter<>(this, android.R.layout.simple_list_item_1, arrayList);
         listView.setAdapter(adapter);
+
+        {
+            AlertDialog.Builder b = new AlertDialog.Builder(this);
+            b.setTitle("MoppyAndroid");
+            b.setCancelable(false);
+            b.setMessage("Creating BridgeSerial");
+            b.setPositiveButton("OK", null);
+            b.create().show();
+        }
+
+        {
+            AlertDialog.Builder b = new AlertDialog.Builder(this);
+            b.setTitle("MoppyAndroid");
+            b.setCancelable(false);
+            b.setMessage("App initialized");
+            b.setPositiveButton("OK", null);
+            b.create().show();
+        }
     }
 
     public native String GetString();
+
     public native String GetStringEdited(String str);
 
     private MoppyMIDISequencer seq;
@@ -69,5 +204,8 @@ public class MainActivity extends AppCompatActivity {
     private MapperCollection<MidiMessage> mappers;
     private NetworkManager netManager;
     private MessagePostProcessor postProcessor;
+    private UsbManager usbManager;
 
 }
+
+

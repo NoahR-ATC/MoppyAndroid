@@ -16,4 +16,4 @@ public:
     static int Int(jint j, int& n) { n = (int)j; return n; }
 };
 
-#endif //MOPPYANDRIOD_JNICONVERTER_H
+#endif // End MOPPYANDRIOD_JNICONVERTER_H
