@@ -1,2 +1,2 @@
 include ':app', ':moppylib'
-rootProject.name='MoppyAndriod'
+rootProject.name='MoppyAndroid'

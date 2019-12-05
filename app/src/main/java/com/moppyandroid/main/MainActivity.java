@@ -4,6 +4,7 @@ package com.moppyandroid.main;
 
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.viewpager.widget.PagerAdapter;
 import androidx.viewpager.widget.ViewPager;
 
 import android.app.AlertDialog;
@@ -22,14 +23,9 @@ import android.widget.TextView;
 import android.widget.ListView;
 import android.os.Bundle;
 
-import java.io.BufferedWriter;
-import java.io.File;
-import java.io.FileWriter;
-import java.io.IOException;
 import java.util.ArrayList;
-import java.util.List;
-import java.util.logging.Logger;
 
+import com.moppyandroid.R;
 import com.moppyandroid.BridgeSerial;
 import com.moppyandroid.com.moppy.core.events.mapper.MapperCollection;
 import com.moppyandroid.com.moppy.core.events.postprocessor.MessagePostProcessor;
@@ -37,8 +33,6 @@ import com.moppyandroid.com.moppy.core.midi.MoppyMIDIReceiverSender;
 import com.moppyandroid.com.moppy.core.midi.MoppyMIDISequencer;
 import com.moppyandroid.com.moppy.core.status.StatusBus;
 import com.moppyandroid.com.moppy.control.NetworkManager;
-
-import com.moppyandriod.R;
 
 import jp.kshoji.javax.sound.midi.MidiMessage;
 import jp.kshoji.javax.sound.midi.MidiUnavailableException;
@@ -49,6 +43,9 @@ public class MainActivity extends AppCompatActivity {
     }
 
     public static final String ACTION_USB_PERMISSION = "com.moppyandroid.USB_PERMISSION";
+
+    private ViewPager pager;
+    private PagerAdapter adapter;
 
     // Define the receiver to process relevant intent messages
     private BroadcastReceiver broadcastReceiver = new BroadcastReceiver() {
@@ -145,11 +142,15 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
+        pager=findViewById(R.id.pager);
+        adapter=new FragmentCollectionAdapter(getSupportFragmentManager());
+        pager.setAdapter(adapter);
+
         TextView textView = findViewById(R.id.text_view);
         ListView listView = findViewById(R.id.listView);
         textView.setText(GetStringEdited("Hello!"));
 
-        try {
+        /*try {
             init();
         } catch (Exception e) {
         }
@@ -191,7 +192,7 @@ public class MainActivity extends AppCompatActivity {
             b.setMessage("App initialized");
             b.setPositiveButton("OK", null);
             b.create().show();
-        }
+        }*/
     }
 
     public native String GetString();

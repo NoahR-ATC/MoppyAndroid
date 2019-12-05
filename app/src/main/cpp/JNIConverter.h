@@ -3,8 +3,8 @@
 // This header defines a class used to cast between JNIObjects and native objects
 //
 
-#ifndef MOPPYANDRIOD_JNICONVERTER_H
-#define MOPPYANDRIOD_JNICONVERTER_H
+#ifndef MOPPYAndroid_JNICONVERTER_H
+#define MOPPYAndroid_JNICONVERTER_H
 
 #ifndef JNI_H_
 #include <jni.h>
@@ -16,4 +16,4 @@ public:
     static int Int(jint j, int& n) { n = (int)j; return n; }
 };
 
-#endif // End MOPPYANDRIOD_JNICONVERTER_H
+#endif // End MOPPYAndroid_JNICONVERTER_H

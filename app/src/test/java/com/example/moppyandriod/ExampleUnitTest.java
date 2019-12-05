@@ -1,4 +1,4 @@
-package com.example.moppyandriod;
+package com.example.moppyandroid;
 
 import org.junit.Test;
 
