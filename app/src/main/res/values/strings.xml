@@ -3,4 +3,5 @@
 
     <!-- TODO: Remove or change this placeholder text -->
     <string name="sequencer_fragment_txt">Sequencer fragment</string>
+    <string name="slide_text">I\'m a slider!</string>
 </resources>

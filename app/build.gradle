@@ -41,6 +41,7 @@ android {
 dependencies {
     implementation fileTree(include: ['*.jar'], dir: 'libs')
 
+    implementation 'com.sothree.slidinguppanel:library:3.4.0'
     implementation 'jp.kshoji:javax-sound-midi:0.0.3:@aar'
     implementation 'androidx.appcompat:appcompat:1.1.0'
     implementation 'androidx.constraintlayout:constraintlayout:1.1.3'

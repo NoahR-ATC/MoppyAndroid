@@ -44,9 +44,6 @@ public class MainActivity extends AppCompatActivity {
 
     public static final String ACTION_USB_PERMISSION = "com.moppyandroid.USB_PERMISSION";
 
-    private ViewPager pager;
-    private PagerAdapter adapter;
-
     // Define the receiver to process relevant intent messages
     private BroadcastReceiver broadcastReceiver = new BroadcastReceiver() {
         @Override
@@ -141,10 +138,6 @@ public class MainActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-
-        pager=findViewById(R.id.pager);
-        adapter=new FragmentCollectionAdapter(getSupportFragmentManager());
-        pager.setAdapter(adapter);
 
         TextView textView = findViewById(R.id.text_view);
         ListView listView = findViewById(R.id.listView);
