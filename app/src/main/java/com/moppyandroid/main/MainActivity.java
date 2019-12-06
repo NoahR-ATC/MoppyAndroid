@@ -33,6 +33,7 @@ import com.moppyandroid.com.moppy.core.midi.MoppyMIDIReceiverSender;
 import com.moppyandroid.com.moppy.core.midi.MoppyMIDISequencer;
 import com.moppyandroid.com.moppy.core.status.StatusBus;
 import com.moppyandroid.com.moppy.control.NetworkManager;
+import com.sothree.slidinguppanel.SlidingUpPanelLayout;
 
 import jp.kshoji.javax.sound.midi.MidiMessage;
 import jp.kshoji.javax.sound.midi.MidiUnavailableException;
@@ -140,10 +141,13 @@ public class MainActivity extends AppCompatActivity {
         setContentView(R.layout.activity_main);
 
         TextView textView = findViewById(R.id.text_view);
-        ListView listView = findViewById(R.id.listView);
         textView.setText(GetStringEdited("Hello!"));
 
-        /*try {
+        SlidingUpPanelLayout panelLayout = findViewById(R.id.sliding_panel_layout);
+
+        /*
+        ListView listView = findViewById(R.id.listView);
+        try {
             init();
         } catch (Exception e) {
         }

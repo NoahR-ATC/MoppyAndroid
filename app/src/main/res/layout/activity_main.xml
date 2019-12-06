@@ -10,22 +10,23 @@
     android:gravity="bottom">
 
     <FrameLayout
+        android:id="@+id/main_frame"
         android:layout_width="match_parent"
         android:layout_height="match_parent">
 
         <ListView
-                android:id="@+id/listView"
-                android:layout_width="409dp"
-                android:layout_height="354dp"
-                android:layout_marginStart="1dp"
-                android:layout_marginTop="2dp"
-                android:layout_marginEnd="1dp"
-                app:layout_constraintBottom_toTopOf="@+id/text_view"
-                app:layout_constraintEnd_toEndOf="parent"
-                app:layout_constraintStart_toStartOf="parent"
-                app:layout_constraintTop_toTopOf="parent">
+            android:id="@+id/listView"
+            android:layout_width="409dp"
+            android:layout_height="354dp"
+            android:layout_marginStart="1dp"
+            android:layout_marginTop="2dp"
+            android:layout_marginEnd="1dp"
+            app:layout_constraintBottom_toTopOf="@+id/text_view"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent">
 
-            </ListView>
+        </ListView>
 
         <TextView
             android:id="@+id/text_view"
@@ -40,6 +41,7 @@
     </FrameLayout>
 
     <LinearLayout
+        android:id="@+id/sliding_frame"
         android:layout_width="match_parent"
         android:layout_height="match_parent">
 
