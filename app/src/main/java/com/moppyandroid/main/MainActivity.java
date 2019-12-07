@@ -18,7 +18,10 @@ import android.hardware.usb.UsbAccessory;
 import android.hardware.usb.UsbDevice;
 import android.hardware.usb.UsbManager;
 import android.os.Environment;
+import android.view.View;
+import android.view.ViewGroup;
 import android.widget.ArrayAdapter;
+import android.widget.RelativeLayout;
 import android.widget.TextView;
 import android.widget.ListView;
 import android.os.Bundle;
@@ -142,8 +145,14 @@ public class MainActivity extends AppCompatActivity {
 
         TextView textView = findViewById(R.id.text_view);
         textView.setText(GetStringEdited("Hello!"));
+        findViewById(R.id.slideTextView).setSelected(true);
 
         SlidingUpPanelLayout panelLayout = findViewById(R.id.sliding_panel_layout);
+        RelativeLayout toolbarLayout = findViewById(R.id.toolbarLayout);
+        panelLayout.setDragView(R.id.toolbarLayout);
+        toolbarLayout.measure(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        panelLayout.setPanelHeight(toolbarLayout.getMeasuredHeight());
+        textView.setText(GetStringEdited(String.valueOf(toolbarLayout.getHeight())));
 
         /*
         ListView listView = findViewById(R.id.listView);
