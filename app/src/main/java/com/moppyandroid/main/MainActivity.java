@@ -28,7 +28,7 @@ import android.os.Bundle;
 
 import java.util.ArrayList;
 
-import com.moppyandroid.R;
+import com.moppyandroid.main.R;
 import com.moppyandroid.BridgeSerial;
 import com.moppyandroid.com.moppy.core.events.mapper.MapperCollection;
 import com.moppyandroid.com.moppy.core.events.postprocessor.MessagePostProcessor;
@@ -145,11 +145,11 @@ public class MainActivity extends AppCompatActivity {
 
         TextView textView = findViewById(R.id.text_view);
         textView.setText(GetStringEdited("Hello!"));
-        findViewById(R.id.slideTextView).setSelected(true);
+        findViewById(R.id.slide_text_view).setSelected(true);
 
         SlidingUpPanelLayout panelLayout = findViewById(R.id.sliding_panel_layout);
-        RelativeLayout toolbarLayout = findViewById(R.id.toolbarLayout);
-        panelLayout.setDragView(R.id.toolbarLayout);
+        RelativeLayout toolbarLayout = findViewById(R.id.toolbar_layout);
+        panelLayout.setDragView(R.id.toolbar_layout);
         toolbarLayout.measure(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
         panelLayout.setPanelHeight(toolbarLayout.getMeasuredHeight());
         textView.setText(GetStringEdited(String.valueOf(toolbarLayout.getHeight())));
