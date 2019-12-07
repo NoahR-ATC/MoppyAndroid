@@ -37,6 +37,7 @@ import com.moppyandroid.com.moppy.core.midi.MoppyMIDISequencer;
 import com.moppyandroid.com.moppy.core.status.StatusBus;
 import com.moppyandroid.com.moppy.control.NetworkManager;
 import com.sothree.slidinguppanel.SlidingUpPanelLayout;
+import com.sothree.slidinguppanel.SlidingUpPanelLayout.PanelState;
 
 import jp.kshoji.javax.sound.midi.MidiMessage;
 import jp.kshoji.javax.sound.midi.MidiUnavailableException;
@@ -147,7 +148,7 @@ public class MainActivity extends AppCompatActivity {
         textView.setText(GetStringEdited("Hello!"));
         findViewById(R.id.slide_text_view).setSelected(true);
 
-        SlidingUpPanelLayout panelLayout = findViewById(R.id.sliding_panel_layout);
+        panelLayout = findViewById(R.id.sliding_panel_layout);
         RelativeLayout toolbarLayout = findViewById(R.id.toolbar_layout);
         panelLayout.setDragView(R.id.toolbar_layout);
         toolbarLayout.measure(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
@@ -201,6 +202,17 @@ public class MainActivity extends AppCompatActivity {
         }*/
     }
 
+    // Taken from AndroidSlidingUpPanel demo application located at https://github.com/umano/AndroidSlidingUpPanel/tree/master/demo
+    @Override
+    public void onBackPressed() {
+        if (panelLayout != null &&
+                (panelLayout.getPanelState() == PanelState.EXPANDED || panelLayout.getPanelState() == PanelState.ANCHORED)) {
+            panelLayout.setPanelState(SlidingUpPanelLayout.PanelState.COLLAPSED);
+        } else {
+            super.onBackPressed();
+        }
+    }
+
     public native String GetString();
 
     public native String GetStringEdited(String str);
@@ -212,6 +224,7 @@ public class MainActivity extends AppCompatActivity {
     private NetworkManager netManager;
     private MessagePostProcessor postProcessor;
     private UsbManager usbManager;
+    private SlidingUpPanelLayout panelLayout;
 
 }
 
