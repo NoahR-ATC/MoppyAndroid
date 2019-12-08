@@ -12,7 +12,7 @@
         android:layout_width="match_parent"
         android:layout_height="@dimen/toolbar_button_height"
         android:layout_gravity="bottom"
-        android:background="@android:color/background_light">
+        android:background="?attr/colorBackgroundFloating">
 
         <ImageButton
             android:id="@+id/pause_button"
