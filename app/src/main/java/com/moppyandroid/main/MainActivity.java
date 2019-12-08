@@ -21,6 +21,7 @@ import android.os.Environment;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ArrayAdapter;
+import android.widget.FrameLayout;
 import android.widget.RelativeLayout;
 import android.widget.TextView;
 import android.widget.ListView;
@@ -154,7 +155,8 @@ public class MainActivity extends AppCompatActivity {
         toolbarLayout.measure(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
         panelLayout.setPanelHeight(toolbarLayout.getMeasuredHeight());
         textView.setText(GetStringEdited(String.valueOf(toolbarLayout.getHeight())));
-
+        FrameLayout songTitleBar = findViewById(R.id.song_title_bar);
+        songTitleBar.setLayoutParams(new RelativeLayout.LayoutParams(toolbarLayout.getMeasuredWidth(), toolbarLayout.getMeasuredHeight()));
         /*
         ListView listView = findViewById(R.id.listView);
         try {

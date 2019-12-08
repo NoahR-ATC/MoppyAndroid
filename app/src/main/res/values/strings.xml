@@ -6,4 +6,5 @@
     <string name="slide_text">I\'m a slider! How long can I go? It seems that nobody knows. Perhaps I can go indefinitely. Regardless, I can support very long file names</string>
     <string name="play_button">Play button</string>
     <string name="pause_button">Pause button</string>
+    <string name="song_title">No song loaded</string>
 </resources>

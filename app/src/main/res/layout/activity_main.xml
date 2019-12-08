@@ -5,11 +5,14 @@
     android:layout_height="match_parent"
     android:orientation="vertical">
 
+    <include layout="@layout/slider_root_layout" />
+
     <RelativeLayout
         android:id="@+id/toolbar_layout"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_gravity="bottom">
+        android:layout_gravity="bottom"
+        android:background="@android:color/background_light">
 
         <ImageButton
             android:id="@+id/pause_button"
@@ -43,6 +46,4 @@
             app:srcCompat="@android:drawable/ic_media_play" />
 
     </RelativeLayout>
-
-    <include layout="@layout/slider_root_layout" />
 </FrameLayout>
