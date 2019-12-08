@@ -1,19 +1,23 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:app="http://schemas.android.com/apk/res-auto"
-    android:orientation="vertical"
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
-    android:layout_height="match_parent">
+    android:layout_height="match_parent"
+    android:orientation="vertical">
+
+    <Button
+        android:id="@+id/edit_devices_button"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="@string/edit_devices_button" />
 
     <TextView
-        android:id="@+id/text_view"
-        android:layout_width="match_parent"
+        android:id="@+id/devices_box_label"
+        android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Hello World!"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintLeft_toLeftOf="parent"
-        app:layout_constraintRight_toRightOf="parent"
-        app:layout_constraintTop_toTopOf="parent" />
+        android:layout_below="@id/edit_devices_button"
+        android:fontFamily="sans-serif-black"
+        android:text="@string/devices_box_label"
+        android:textSize="18sp" />
 
     <ListView
         android:id="@+id/listView"
@@ -21,11 +25,15 @@
         android:layout_height="match_parent"
         android:layout_marginStart="1dp"
         android:layout_marginTop="2dp"
-        android:layout_marginEnd="1dp"
-        app:layout_constraintBottom_toTopOf="@+id/text_view"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent">
+        android:layout_marginEnd="1dp">
 
     </ListView>
-</LinearLayout>
+
+    <FrameLayout
+        android:id="@+id/toolbar_layout_placeholder_main"
+        android:layout_width="match_parent"
+        android:layout_height="@dimen/toolbar_button_height"
+        android:layout_alignParentBottom="true">
+
+    </FrameLayout>
+</RelativeLayout>

@@ -36,13 +36,13 @@
         android:id="@+id/seekBar"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_above="@id/toolbar_layout_placeholder"
+        android:layout_above="@id/toolbar_layout_placeholder_slide"
         android:layout_alignParentStart="true"
         android:layout_alignParentEnd="true"
-        android:layout_marginBottom=" " />
+        android:layout_marginBottom="10dp" />
 
     <FrameLayout
-        android:id="@+id/toolbar_layout_placeholder"
+        android:id="@+id/toolbar_layout_placeholder_slide"
         android:layout_width="match_parent"
         android:layout_height="@dimen/toolbar_button_height"
         android:layout_alignParentBottom="true">

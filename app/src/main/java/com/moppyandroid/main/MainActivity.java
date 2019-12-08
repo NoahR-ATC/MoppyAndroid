@@ -132,8 +132,8 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        TextView textView = findViewById(R.id.text_view);
-        textView.setText(GetStringEdited("Hello!"));
+        TextView textView = findViewById(R.id.devices_box_label);
+        textView.setText(GetStringEdited(textView.getText().toString()));
         findViewById(R.id.toolbar_song_title).setSelected(true);
 
         panelLayout = findViewById(R.id.sliding_panel_layout);
@@ -141,7 +141,6 @@ public class MainActivity extends AppCompatActivity {
         panelLayout.setDragView(R.id.toolbar_layout);
         toolbarLayout.measure(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
         panelLayout.setPanelHeight(toolbarLayout.getMeasuredHeight());
-        textView.setText(GetStringEdited(String.valueOf(toolbarLayout.getHeight())));
         /*
         ListView listView = findViewById(R.id.listView);
         try {
