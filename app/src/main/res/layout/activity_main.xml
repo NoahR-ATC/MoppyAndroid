@@ -24,17 +24,32 @@
             app:srcCompat="@android:drawable/ic_media_pause" />
 
         <TextView
-            android:id="@+id/slide_text_view"
+            android:id="@+id/toolbar_song_title"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_centerVertical="true"
+            android:layout_alignTop="@id/pause_button"
+            android:layout_marginTop="6dp"
             android:layout_toStartOf="@id/play_button"
             android:layout_toEndOf="@id/pause_button"
             android:ellipsize="marquee"
             android:marqueeRepeatLimit="marquee_forever"
             android:scrollHorizontally="true"
             android:singleLine="true"
-            android:text="@string/slide_text" />
+            android:text="@string/song_title" />
+
+        <TextView
+            android:id="@+id/textView2"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_alignBottom="@id/pause_button"
+            android:layout_marginBottom="6dp"
+            android:layout_toStartOf="@id/play_button"
+            android:layout_toEndOf="@id/pause_button"
+            android:ellipsize="marquee"
+            android:marqueeRepeatLimit="marquee_forever"
+            android:scrollHorizontally="true"
+            android:singleLine="true"
+            android:text="@string/song_length" />
 
         <ImageButton
             android:id="@+id/play_button"

@@ -2,35 +2,21 @@ package com.moppyandroid.main;
 
 //import com.moppy.*;
 
-import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.viewpager.widget.PagerAdapter;
-import androidx.viewpager.widget.ViewPager;
 
 import android.app.AlertDialog;
 import android.app.PendingIntent;
-import android.app.usage.NetworkStatsManager;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
-import android.hardware.usb.UsbAccessory;
 import android.hardware.usb.UsbDevice;
 import android.hardware.usb.UsbManager;
-import android.os.Environment;
-import android.view.View;
 import android.view.ViewGroup;
-import android.widget.ArrayAdapter;
-import android.widget.FrameLayout;
 import android.widget.RelativeLayout;
-import android.widget.TableRow;
 import android.widget.TextView;
-import android.widget.ListView;
 import android.os.Bundle;
 
-import java.util.ArrayList;
-
-import com.moppyandroid.main.R;
 import com.moppyandroid.BridgeSerial;
 import com.moppyandroid.com.moppy.core.events.mapper.MapperCollection;
 import com.moppyandroid.com.moppy.core.events.postprocessor.MessagePostProcessor;
@@ -148,7 +134,7 @@ public class MainActivity extends AppCompatActivity {
 
         TextView textView = findViewById(R.id.text_view);
         textView.setText(GetStringEdited("Hello!"));
-        findViewById(R.id.slide_text_view).setSelected(true);
+        findViewById(R.id.toolbar_song_title).setSelected(true);
 
         panelLayout = findViewById(R.id.sliding_panel_layout);
         RelativeLayout toolbarLayout = findViewById(R.id.toolbar_layout);

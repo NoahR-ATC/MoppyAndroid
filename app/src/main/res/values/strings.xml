@@ -3,8 +3,8 @@
 
     <!-- TODO: Remove or change this placeholder text -->
     <string name="sequencer_fragment_txt">Sequencer fragment</string>
-    <string name="slide_text">I\'m a slider! How long can I go? It seems that nobody knows. Perhaps I can go indefinitely. Regardless, I can support very long file names</string>
     <string name="play_button">Play button</string>
     <string name="pause_button">Pause button</string>
     <string name="song_title">No song loaded</string>
+    <string name="song_length">0:00:00/0:00:00</string>
 </resources>
