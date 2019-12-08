@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <dimen name="toolbar_button_height">51dp</dimen>
+    <dimen name="song_titlebar_height">49dp
+    </dimen> <!-- 2dp less so that shadow doesn't blend with toolbar-->
+</resources>

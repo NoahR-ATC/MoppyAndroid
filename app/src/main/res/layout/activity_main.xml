@@ -10,14 +10,14 @@
     <RelativeLayout
         android:id="@+id/toolbar_layout"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
+        android:layout_height="@dimen/toolbar_button_height"
         android:layout_gravity="bottom"
         android:background="@android:color/background_light">
 
         <ImageButton
             android:id="@+id/pause_button"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
+            android:layout_width="@dimen/toolbar_button_height"
+            android:layout_height="@dimen/toolbar_button_height"
             android:layout_alignParentStart="true"
             android:layout_alignParentTop="true"
             android:contentDescription="@string/pause_button"
@@ -38,8 +38,8 @@
 
         <ImageButton
             android:id="@+id/play_button"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
+            android:layout_width="@dimen/toolbar_button_height"
+            android:layout_height="@dimen/toolbar_button_height"
             android:layout_alignParentTop="true"
             android:layout_alignParentEnd="true"
             android:contentDescription="@string/play_button"
