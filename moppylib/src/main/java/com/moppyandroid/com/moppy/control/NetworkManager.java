@@ -85,7 +85,7 @@ public class NetworkManager implements NetworkMessageConsumer {
         // recentlySeenDevices with the time it was last seen
         if (networkMessage.isSystemMessage() && networkMessage.getMessageCommandByte() == MoppyMessage.CommandByte.SYS_PONG) {
             DeviceDescriptor dd = DeviceDescriptor.builder()
-                    .networkAddress(String.format("%s - %s",networkMessage.getNetworkIdentifier(),networkMessage.getRemoteIdentifier()))
+                    .networkAddress(String.format("%s - %s", networkMessage.getNetworkIdentifier(), networkMessage.getRemoteIdentifier()))
                     .deviceAddress(networkMessage.getMessageCommandPayload()[0])
                     .minSubAddress(networkMessage.getMessageCommandPayload()[1])
                     .maxSubAddress(networkMessage.getMessageCommandPayload()[2])
@@ -101,6 +101,7 @@ public class NetworkManager implements NetworkMessageConsumer {
 
     /**
      * Returns a Map of unique network bridge identifiers and their current connection state
+     *
      * @return
      */
     public Map<String, Boolean> getAvailableNetworkBridges() {
@@ -110,10 +111,15 @@ public class NetworkManager implements NetworkMessageConsumer {
 
     /**
      * Returns a Set of DeviceDescriptors for devices for who we recently received a pong.
+     *
      * @return
      */
     public Set<DeviceDescriptor> getRecentlySeenDevices() {
         return recentlySeenDevices.keySet();
+    }
+
+    public Set<String> getDeviceList() {
+        return networkBridges.keySet();
     }
 
     public void connectBridge(String bridgeIdentifier) throws IOException {

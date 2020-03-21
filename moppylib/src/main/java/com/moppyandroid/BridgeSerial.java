@@ -11,6 +11,7 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.IntentFilter;
 import android.hardware.usb.UsbAccessory;
+import android.hardware.usb.UsbDeviceConnection;
 import android.hardware.usb.UsbManager;
 import android.hardware.usb.UsbDevice;
 import android.content.Intent;
@@ -49,12 +50,22 @@ public class BridgeSerial extends NetworkBridge {
     private UsbSerialDevice serialPort;
     private Thread listenerThread = null;
 
-    // Define the method to assign static variables
+    /* Deprecated, will be removed in the next commit
+    static {
+        permissionSyncList = new HashMap<>();
+    }
+     */
+
+    /**
+     * The method to assign static variables. Must be called before use of BridgeSerial objects.
+     *
+     * @param passedContext the context used to retrieve Android system resources
+     * @author Noah Reeder
+     */
     public static void init(Context passedContext) {
         // Assign static variables
         context = passedContext;
         usbManager = (UsbManager) context.getSystemService(Context.USB_SERVICE);
-
         {
             AlertDialog.Builder b = new AlertDialog.Builder(context);
             b.setTitle("MoppyAndroid");
@@ -66,15 +77,37 @@ public class BridgeSerial extends NetworkBridge {
     }
 
     public BridgeSerial(String serialPortName) {
+        // Get the USB device attached to the specified port and ensure it is valid
         device = usbManager.getDeviceList().get(serialPortName);
-        {
-            AlertDialog.Builder b = new AlertDialog.Builder(context);
-            b.setTitle("MoppyAndroid");
-            b.setCancelable(false);
-            b.setMessage("Device created - BridgeSerial");
-            b.setPositiveButton("OK", null);
-            b.create().show();
+        if (device == null) {
+            {
+                AlertDialog.Builder b = new AlertDialog.Builder(context);
+                b.setTitle("MoppyAndroid");
+                b.setCancelable(false);
+                b.setMessage("Device doesn't exist - BridgeSerial");
+                b.setPositiveButton("OK", null);
+                b.create().show();
+            }
+            return;
         }
+
+        // Create the serial port and ensure it is valid
+        serialPort = UsbSerialDevice.createUsbSerialDevice(device, usbManager.openDevice(device));
+        if (serialPort == null) {
+            //throw new IOException("serialPort is null");
+            {
+                AlertDialog.Builder b = new AlertDialog.Builder(context);
+                b.setTitle("MoppyAndroid");
+                b.setCancelable(false);
+                b.setMessage("serialPort is null - BridgeSerial");
+                b.setPositiveButton("OK", null);
+                b.create().show();
+            }
+            return;
+        }
+
+        // Set the friendly name of the serial port
+        serialPort.setPortName(serialPortName);
     }
 
     public static List<String> getAvailableSerials() {
@@ -82,6 +115,45 @@ public class BridgeSerial extends NetworkBridge {
         serialList.addAll(usbManager.getDeviceList().keySet());
         return serialList;
     }
+
+    /* Deprecated, will be removed in the next commit
+    private void requestPermission(UsbDevice device) {
+        Intent intent = new Intent(ACTION_USB_PERMISSION);
+        //BridgeSerial.ParcelableObject syncObject = new BridgeSerial.ParcelableObject();
+
+        int pos = getPermissionSyncIndex();
+
+        intent.putExtra("syncObject", pos);
+        PendingIntent pendingIntent = PendingIntent.getBroadcast(context, 0, intent, 0);
+        usbManager.requestPermission(device, pendingIntent);
+        {
+            AlertDialog.Builder b = new AlertDialog.Builder(context);
+            b.setTitle("MoppyAndroid");
+            b.setCancelable(false);
+            b.setMessage("Awaiting permission");
+            b.setPositiveButton("OK", null);
+            b.create().show();
+        }
+
+        // Wait for the message to be processed
+        try {
+            getPermissionSyncer(pos).wait();
+        } catch (InterruptedException e) { // Notify called
+        }
+
+
+        // Check if permission was granted
+        if (!usbManager.hasPermission(device)) {
+            AlertDialog.Builder alert = new AlertDialog.Builder(context);
+            alert.setTitle("MoppyAndroid");
+            alert.setCancelable(false);
+            alert.setMessage("Permission is required to connect to the device");
+            alert.setPositiveButton("OK", null);
+            alert.setNegativeButton("Cancel", null);
+            alert.create().show();
+        }
+    }
+
 
     public static void onActionUsbPermission(Context context, @org.jetbrains.annotations.NotNull Intent intent) {
         {
@@ -109,59 +181,35 @@ public class BridgeSerial extends NetworkBridge {
             } // End if(permissionIntentValues ∈ PermissionIntentValues)
         } // End if(intent.getExtras)
     } // End onActionUsbPermission method
+     */
 
     @Override
     public void connect() throws IOException {
-        {
-            AlertDialog.Builder b = new AlertDialog.Builder(context);
-            b.setTitle("MoppyAndroid");
-            b.setCancelable(false);
-            b.setMessage("Broadcast thing acquired- BridgeSerial");
-            b.setPositiveButton("OK", null);
-            b.create().show();
-        }
-
-        if (!usbManager.hasPermission(device)) {
-            throw new IOException("permission not granted");
-        }
-
-        serialPort = UsbSerialDevice.createUsbSerialDevice(device, usbManager.openDevice(device));
-        // Ensure serial connection was created successfully
-        if (serialPort != null) {
-            // Attempt to open the connection, assigning options if successful
-            if (serialPort.syncOpen()) {
-                serialPort.setPortName(device.getDeviceName());
-                serialPort.setBaudRate(57600);
-                serialPort.setDataBits(UsbSerialDevice.DATA_BITS_8);
-                serialPort.setStopBits(UsbSerialDevice.STOP_BITS_1);
-                serialPort.setFlowControl(UsbSerialDevice.FLOW_CONTROL_OFF);
-                serialPort.setParity(UsbSerialDevice.PARITY_NONE);
-            } // End if(serialPort.syncOpen)
-            else {
-                throw new IOException("serialPort did not open");
-            } // End if(serialPort.syncOpen) else
-        } // End if(serialPort !null)
+        // Attempt to open the connection, assigning options if successful
+        if (serialPort.syncOpen()) {
+            serialPort.setPortName(device.getDeviceName());
+            serialPort.setBaudRate(57600);
+            serialPort.setDataBits(UsbSerialDevice.DATA_BITS_8);
+            serialPort.setStopBits(UsbSerialDevice.STOP_BITS_1);
+            serialPort.setFlowControl(UsbSerialDevice.FLOW_CONTROL_OFF);
+            serialPort.setParity(UsbSerialDevice.PARITY_NONE);
+        } // End if(serialPort.syncOpen)
         else {
-            throw new IOException("serialPort is null");
-        } // End if(serialPort !null) else
+            throw new IOException("serialPort did not open");
+        } // End if(serialPort.syncOpen) else
 
-        // ****DEPRECATED****
+        /* ***********DEPRECATED************
+        Part of original BridgeSerial implementation, preserved for completeness and clarity
+
         // Set to semiblocking mode (will wait for up to 100 milliseconds before returning nothing from a read)
         // On a very slow connection this could maaaybe cause some messages to be dropped / corrupted, but for
         // serial connections it should be a minor risk
-        //serialPort.setComPortTimeouts(SerialPort.TIMEOUT_READ_SEMI_BLOCKING, 100, 0);
-        // ******************
-        // When replacing jSerialComm with usbserial, the new library did not support this "semiblocking" mode
-        // After analyzing the dependant code I made the decision to switch to synchronous operation
+        serialPort.setComPortTimeouts(SerialPort.TIMEOUT_READ_SEMI_BLOCKING, 100, 0);
 
-        {
-            AlertDialog.Builder b = new AlertDialog.Builder(context);
-            b.setTitle("MoppyAndroid");
-            b.setCancelable(false);
-            b.setMessage("Starting listener - BridgeSerial");
-            b.setPositiveButton("OK", null);
-            b.create().show();
-        }
+        ************************************
+        When replacing jSerialComm with UsbSerial, the new library did not support this "semiblocking" mode
+        After analyzing the dependant code I made the decision to switch to synchronous operation
+         */
 
         // Create and start listener thread
         SerialListener listener = new SerialListener(serialPort, this);
@@ -182,6 +230,24 @@ public class BridgeSerial extends NetworkBridge {
             sendMessage(MoppyMessage.SYS_STOP); // Send a stop message before closing to prevent sticking
         } finally {
             serialPort.syncClose();
+
+            // Calling syncClose closes the UsbDeviceConnection, so now we need to recreate the device
+            String portName = serialPort.getPortName();
+            serialPort = UsbSerialDevice.createUsbSerialDevice(device, usbManager.openDevice(device));
+            // Ensure serial connection was created successfully
+            if (serialPort == null) {
+                //throw new IOException("serialPort is null");
+                { // TODO: Throw exception instead
+                    AlertDialog.Builder b = new AlertDialog.Builder(context);
+                    b.setTitle("MoppyAndroid");
+                    b.setCancelable(false);
+                    b.setMessage("serialPort is null - BridgeSerial");
+                    b.setPositiveButton("OK", null);
+                    b.create().show();
+                }
+            }
+            serialPort.setPortName(portName);
+
             // Stop and cleanup listener thread
             listenerThread.interrupt();
             listenerThread = null;
@@ -207,14 +273,13 @@ public class BridgeSerial extends NetworkBridge {
         private final UsbSerialDevice serialPort;
         private final NetworkMessageConsumer messageConsumer;
 
-        public SerialListener(UsbSerialDevice serialPort, NetworkMessageConsumer messageConsumer) {
+        SerialListener(UsbSerialDevice serialPort, NetworkMessageConsumer messageConsumer) {
             this.serialPort = serialPort;
             this.messageConsumer = messageConsumer;
         }
 
         @Override
         public void run() {
-
             // MoppyMessages can't be longer than 259 bytes (SOM, DEVADDR, SUBADDR, LEN, [0-255 body bytes])
             // Longer messages will be truncated, but we don't care about them anyway
             byte[] buffer = new byte[259];
@@ -249,10 +314,11 @@ public class BridgeSerial extends NetworkBridge {
 
     }
 
+    /* Deprecated, will be removed in the next commit
     /**
      * A class that can be passed with the permission intent in order to retrieve
      * values necessary to finish creation of the BridgeSerial object.
-     */
+
     public static class ParcelableObject implements Parcelable {
         public ParcelableObject() {
         } // End ParcelableObject method
@@ -279,4 +345,17 @@ public class BridgeSerial extends NetworkBridge {
         public void writeToParcel(Parcel parcel, int flags) {
         } // End writeToParcel method
     } // End BridgeSerial.ParcelableObject class
+
+    static public int getPermissionSyncIndex() {
+        int x = permissionSyncList.size();
+        permissionSyncList.put(x, new Object());
+        return x;
+    }
+
+    static public Object getPermissionSyncer(int index) {
+        return permissionSyncList.get(index);
+    }
+
+    static private HashMap<Integer, Object> permissionSyncList;
+     */
 } // End BridgeSerial class

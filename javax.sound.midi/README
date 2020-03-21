@@ -1,0 +1,8 @@
+Original author: K.Shoji
+README and MoppyAndroid author: Noah Reeder
+
+I have pulled this code from the master branch of https://github.com/kshoji/javax.sound.midi-for-Android on 2020-03-19
+because I was having issues with the develop branch, as well as needing to be able to view object status mid-operation
+with breakpoints. There have been no major modifications to code operation, however I have updated the build.gradle to
+be compatible with my project. The only modification to source code has been updating the annotations to be compatible
+with a modern Android SDK.

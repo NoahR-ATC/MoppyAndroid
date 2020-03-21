@@ -21,7 +21,8 @@ allprojects {
         google()
         jcenter()
         maven { url 'https://jitpack.io' }
-        maven { url 'https://github.com/kshoji/javax.sound.midi-for-Android/raw/master/javax.sound.midi/repository' }
+        //maven { url 'https://github.com/kshoji/javax.sound.midi-for-Android/raw/master/javax.sound.midi/repository' }
+        //maven { url 'https://github.com/KyoSherlock/MidiDriver/raw/master/MidiDriver/repository'}
     }
 }
 

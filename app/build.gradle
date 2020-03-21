@@ -21,28 +21,14 @@ android {
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
     }
-    /*externalNativeBuild {
-        cmake {
-//            arguments '-DANDROID_TOOLCHAIN=clang' --> gcc
-            path file('CMakeLists.txt')
-        }
-    }*/
-    externalNativeBuild {
-        cmake {
-            path file('CMakeLists.txt')
-        }
-        /*ndkBuild {
-            path "../jSerialComm/src/main/c/Android/jni/Android.mk"
-        }*/
-    }
-
 }
 
 dependencies {
     implementation fileTree(include: ['*.jar'], dir: 'libs')
 
     implementation 'com.sothree.slidinguppanel:library:3.4.0'
-    implementation 'jp.kshoji:javax-sound-midi:0.0.3:@aar'
+    //implementation 'jp.kshoji:javax-sound-midi:0.0.3:@aar'
+    //implementation 'com.github.kyosherlock:mididriver:master'
     implementation 'androidx.appcompat:appcompat:1.1.0'
     implementation 'androidx.constraintlayout:constraintlayout:1.1.3'
     implementation 'androidx.legacy:legacy-support-v4:1.0.0'
@@ -50,4 +36,6 @@ dependencies {
     androidTestImplementation 'androidx.test:runner:1.2.0'
     androidTestImplementation 'androidx.test.espresso:espresso-core:3.2.0'
     implementation project(path: ':moppylib')
+    implementation project(path: ':sherlockmidi')
+    implementation project(path: ':javax.sound.midi')
 }

@@ -3,11 +3,13 @@ package com.moppyandroid.com.moppy.core.midi;
 
 import com.moppyandroid.com.moppy.core.status.StatusBus;
 import com.moppyandroid.com.moppy.core.status.StatusUpdate;
+
 import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Logger;
+
 import jp.kshoji.javax.sound.midi.InvalidMidiDataException;
 import jp.kshoji.javax.sound.midi.MetaEventListener;
 import jp.kshoji.javax.sound.midi.MetaMessage;
@@ -15,10 +17,11 @@ import jp.kshoji.javax.sound.midi.MidiSystem;
 import jp.kshoji.javax.sound.midi.MidiUnavailableException;
 import jp.kshoji.javax.sound.midi.Sequence;
 import jp.kshoji.javax.sound.midi.Sequencer;
+import jp.kshoji.javax.sound.midi.Transmitter;
 
 /**
  * Wrapper around the Java MIDI sequencer for playing MIDI files.
- *
+ * <p>
  * Additionally provides feedback to listeners about the current state of the sequencer.
  */
 public class MoppyMIDISequencer implements MetaEventListener, Closeable {
@@ -32,7 +35,10 @@ public class MoppyMIDISequencer implements MetaEventListener, Closeable {
         this.statusBus.registerConsumer(receiverSender); // Register receiverSender to send seq messages to network
         seq = MidiSystem.getSequencer(false);
         seq.open();
-        seq.getTransmitter().setReceiver(receiverSender);
+        // TODO: Probably needs to be fixed in order for proper operation
+        // Since there is no Gervill on Android, we are having trouble getting a default transmitter to register MIDI events with
+        //Transmitter x = seq.getTransmitter();
+        //x.setReceiver(receiverSender);
         seq.addMetaEventListener(this);
     }
 
@@ -53,13 +59,14 @@ public class MoppyMIDISequencer implements MetaEventListener, Closeable {
             uSecondsPerQN |= meta.getData()[2] & 255;
             int newTempo = 60000000 / uSecondsPerQN;
             setTempo(newTempo);
-        } else 
-        // Handle end-of-track events
-        if (meta.getType() == 47) {
-            seq.setTickPosition(0); // Reset sequencer so we can press "play" again right away
-            //MrSolidSnake745: Exposing end of sequence event to status consumers
-            statusBus.receiveUpdate(StatusUpdate.sequenceEnd(autoReset));
         }
+        else
+            // Handle end-of-track events
+            if (meta.getType() == 47) {
+                seq.setTickPosition(0); // Reset sequencer so we can press "play" again right away
+                //MrSolidSnake745: Exposing end of sequence event to status consumers
+                statusBus.receiveUpdate(StatusUpdate.sequenceEnd(autoReset));
+            }
     }
 
     public void play() {
@@ -82,11 +89,8 @@ public class MoppyMIDISequencer implements MetaEventListener, Closeable {
         return seq.isRunning();
     }
 
-    public void loadSequence(File sequenceFile) throws IOException, InvalidMidiDataException {
-        if (!sequenceFile.isFile()) {
-            throw new IOException(String.format("File \'%s\' not found, or isn\'t a file", sequenceFile.getAbsolutePath()));
-        }
-        Sequence sequenceToLoad = MidiSystem.getSequence(sequenceFile);
+    // TODO: mark changed
+    public void loadSequence(Sequence sequenceToLoad) throws InvalidMidiDataException {
         seq.setSequence(sequenceToLoad);
         statusBus.receiveUpdate(StatusUpdate.sequenceLoaded(sequenceToLoad));
         LOG.info(String.format("Loaded sequence with %s tracks", sequenceToLoad.getTracks().length - 1)); // -1 for system track?

@@ -4,30 +4,27 @@
     android:layout_height="match_parent"
     android:orientation="vertical">
 
-    <Button
-        android:id="@+id/edit_devices_button"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="@string/edit_devices_button" />
-
     <TextView
         android:id="@+id/devices_box_label"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_below="@id/edit_devices_button"
+        android:layout_alignParentTop="true"
         android:fontFamily="sans-serif-black"
         android:text="@string/devices_box_label"
         android:textSize="18sp" />
 
-    <ListView
-        android:id="@+id/listView"
+    <Spinner
+        android:id="@+id/device_box"
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:layout_marginStart="1dp"
-        android:layout_marginTop="2dp"
-        android:layout_marginEnd="1dp">
+        android:layout_height="wrap_content"
+        android:layout_below="@id/devices_box_label" />
 
-    </ListView>
+    <Button
+        android:id="@+id/load_button"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_below="@id/device_box"
+        android:text="@string/load_button" />
 
     <FrameLayout
         android:id="@+id/toolbar_layout_placeholder_main"
