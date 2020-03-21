@@ -479,27 +479,6 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         intent.putExtra("deviceIndex", index);
         PendingIntent pendingIntent = PendingIntent.getBroadcast(this, 0, intent, PendingIntent.FLAG_UPDATE_CURRENT);
         usbManager.requestPermission(device, pendingIntent);
-
-        /* Deprecated, will be removed in the next commit
-        // Wait for the message to be processed
-        synchronized ((pos)) {
-            try {
-                syncObject.wait();
-            } catch (InterruptedException e) { // Notify called
-            }
-        }
-
-        // Check if permission was granted
-        if (!usbManager.hasPermission(device)) {
-            AlertDialog.Builder alert = new AlertDialog.Builder(context);
-            alert.setTitle("MoppyAndroid");
-            alert.setCancelable(false);
-            alert.setMessage("Permission is required to connect to the device");
-            alert.setPositiveButton("OK", null);
-            alert.setNegativeButton("Cancel", null);
-            alert.create().show();
-        }
-        */
     } // End requestPermission method
 
     // The code constants for requests sent with startActivityForResult
