@@ -2,6 +2,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.moppyandroid.main">
     <uses-feature android:name="android.hardware.usb.host" />
+    <uses-feature android:name="android.software.midi" />
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"/>
     <application
         android:allowBackup="true"

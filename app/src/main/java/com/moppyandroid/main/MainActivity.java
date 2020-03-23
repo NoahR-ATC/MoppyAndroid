@@ -5,6 +5,7 @@ Author: Noah Reeder, noahreederatc@gmail.com
 
 Known bugs:
     - TODO: Investigate issues with restarting app (force stopping first works)
+    - TODO: Gracefully close BridgeSerial connection on application close
 
 
 Known problems:
@@ -20,6 +21,9 @@ Scope creep is getting really bad... let's make a list of nice-to-have-but-out-o
 Miscellaneous Notes:
     - MoppyMIDIReceiverSender used for MIDI I/O, not necessarily needed
         * We can still use it for MIDI in, but as of writing I have disabled output
+        https://github.com/bluenote10/gervill/blob/master/src/main/java/com/sun/media/sound/RealTimeSequencer.java
+        https://github.com/frohoff/jdk8u-dev-jdk/blob/master/src/share/classes/com/sun/media/sound/AbstractMidiDevice.java
+           ^ createTransmitter
 
 
 Regexes:
@@ -62,14 +66,17 @@ import com.moppyandroid.com.moppy.core.events.mapper.MIDIEventMapper;
 import com.moppyandroid.com.moppy.core.events.mapper.MapperCollection;
 import com.moppyandroid.com.moppy.core.events.postprocessor.MessagePostProcessor;
 import com.moppyandroid.com.moppy.core.midi.MoppyMIDIReceiverSender;
-import com.moppyandroid.com.moppy.core.midi.MoppyMIDISequencer;
+import com.moppyandroid.MoppyMIDISequencer;
 import com.moppyandroid.com.moppy.core.status.StatusBus;
 import com.moppyandroid.com.moppy.control.NetworkManager;
 import com.sothree.slidinguppanel.SlidingUpPanelLayout;
 import com.sothree.slidinguppanel.SlidingUpPanelLayout.PanelState;
+import com.sun.media.sound.RealTimeSequencerProvider;
 
 import jp.kshoji.javax.sound.midi.InvalidMidiDataException;
+import jp.kshoji.javax.sound.midi.MidiDevice;
 import jp.kshoji.javax.sound.midi.MidiMessage;
+import jp.kshoji.javax.sound.midi.MidiSystem;
 import jp.kshoji.javax.sound.midi.MidiUnavailableException;
 import jp.kshoji.javax.sound.midi.io.StandardMidiFileReader;
 import jp.kshoji.javax.sound.midi.spi.MidiFileReader;
@@ -206,11 +213,14 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         spinnerHashMap = new HashMap<>();
         usbManager = (UsbManager) getSystemService(USB_SERVICE);
 
+/*        // Create sequencer to use for MIDI transmitting
+        RealTimeSequencerProvider s = new RealTimeSequencerProvider();
+        MidiDevice m = s.getDevice(null);
+        try { m.getTransmitter(); } catch (MidiUnavailableException ignored) {}
+        MidiSystem.addMidiDevice(m);
+*/
         // Initialize BridgeSerial
         BridgeSerial.init(this);
-
-        // Create synthesizer to use for MIDI transmitting
-        //MidiSystem.addSynthesizer(new SoftSynthesizer());
 
         // Request permission to access all attached USB devices
         requestPermissionForAllDevices();
@@ -222,7 +232,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         // Initialize Moppy objects
         statusBus = new StatusBus();
         mappers = new MapperCollection<>();
-        mappers.addMapper(MIDIEventMapper.defaultMapper((byte) 0x00));
+        mappers.addMapper(MIDIEventMapper.defaultMapper((byte) 0x01));
         netManager = new NetworkManager(statusBus);
         receiverSender = new MoppyMIDIReceiverSender(mappers, MessagePostProcessor.PASS_THROUGH, netManager.getPrimaryBridge());
         seq = new MoppyMIDISequencer(statusBus, receiverSender);

@@ -1,2 +1,2 @@
-include ':app', ':moppylib', ':javax.sound.midi', ':sherlockmidi'
+include ':app', ':moppylib', ':javax.sound.midi', ':realtimesequencer', ':sherlockmidi'
 rootProject.name='MoppyAndroid'
