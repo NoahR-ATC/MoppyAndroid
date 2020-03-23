@@ -1,3 +1,5 @@
+// Originally written by Sam Archer https://github.com/SammyIAm/Moppy2, modified to be compatible with Android by Noah Reeder
+
 /*
  * To change this license header, choose License Headers in Project Properties.
  * To change this template file, choose Tools | Templates
