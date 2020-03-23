@@ -1,9 +1,10 @@
-package com.moppyandroid.com.moppy.control;
+// Originally written by Sam Archer https://github.com/SammyIAm/Moppy2, refreshSerialDevices method added by Noah Reeder
+
+package com.moppyandroid;
 
 import com.moppyandroid.com.moppy.core.comms.MoppyMessage;
 import com.moppyandroid.com.moppy.core.comms.NetworkMessageConsumer;
 import com.moppyandroid.com.moppy.core.comms.NetworkReceivedMessage;
-import com.moppyandroid.BridgeSerial;
 import com.moppyandroid.com.moppy.core.comms.bridge.BridgeUDP;
 import com.moppyandroid.com.moppy.core.comms.bridge.MultiBridge;
 import com.moppyandroid.com.moppy.core.comms.bridge.NetworkBridge;
@@ -140,6 +141,17 @@ public class NetworkManager implements NetworkMessageConsumer {
         } finally {
             statusBus.receiveUpdate(StatusUpdate.NET_STATUS_CHANGED);
         }
+    }
+
+    /**
+     * Refreshes the list of available serial bridges
+     */
+    public void refreshSerialDevices() {
+        BridgeSerial.getAvailableSerials()
+                .forEach(serial -> {
+                    BridgeSerial serialBridge = new BridgeSerial(serial);
+                    networkBridges.put(serialBridge.getNetworkIdentifier(), serialBridge);
+                });
     }
 
     /**

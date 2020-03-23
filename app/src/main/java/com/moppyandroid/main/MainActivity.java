@@ -6,16 +6,19 @@ Author: Noah Reeder, noahreederatc@gmail.com
 Known bugs:
     - TODO: Investigate issues with restarting app (force stopping first works)
     - TODO: Gracefully close BridgeSerial connection on application close
-
+    - TODO: Bug likely exists with refreshing devices while playing
 
 Known problems:
     - Hard to use track slider in slide menu (adjust slide menu sensitivity?)
+    - Must connect to device, disconnect, and connect again for connection to work
 
 
-Scope creep is getting really bad... let's make a list of nice-to-have-but-out-of-scope features:
-    - Some sort of loopmidi-like program, perhaps using Tobias Erichsen's virtualMIDI lib
+Features to implement:
+    - MIDI I/O
+
+
+Scope creep is getting really bad... let's make a list of nice-to-have-but-slightly-out-of-scope features:
     - Sigh... Another port of MIDISplitter
-    - Proper MIDI I/O -> likely need to implement MIDI-through device to use for Transmitter instance
 
 
 Miscellaneous Notes:
@@ -68,15 +71,13 @@ import com.moppyandroid.com.moppy.core.events.postprocessor.MessagePostProcessor
 import com.moppyandroid.com.moppy.core.midi.MoppyMIDIReceiverSender;
 import com.moppyandroid.MoppyMIDISequencer;
 import com.moppyandroid.com.moppy.core.status.StatusBus;
-import com.moppyandroid.com.moppy.control.NetworkManager;
+import com.moppyandroid.NetworkManager;
+
 import com.sothree.slidinguppanel.SlidingUpPanelLayout;
 import com.sothree.slidinguppanel.SlidingUpPanelLayout.PanelState;
-import com.sun.media.sound.RealTimeSequencerProvider;
 
 import jp.kshoji.javax.sound.midi.InvalidMidiDataException;
-import jp.kshoji.javax.sound.midi.MidiDevice;
 import jp.kshoji.javax.sound.midi.MidiMessage;
-import jp.kshoji.javax.sound.midi.MidiSystem;
 import jp.kshoji.javax.sound.midi.MidiUnavailableException;
 import jp.kshoji.javax.sound.midi.io.StandardMidiFileReader;
 import jp.kshoji.javax.sound.midi.spi.MidiFileReader;
@@ -112,6 +113,9 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
             // Determine action and process accordingly
             switch (intent.getAction()) {
                 case UsbManager.ACTION_USB_DEVICE_ATTACHED: {
+                    int index;
+                    UsbDevice device;
+
                     {
                         AlertDialog.Builder b = new AlertDialog.Builder(context);
                         b.setTitle("MoppyAndroid");
@@ -121,14 +125,15 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
                         b.create().show();
                     }
 
-                    // Refresh device lists
-                    refreshDevices();
+                    index = devices.size();
+                    device = intent.getParcelableExtra(UsbManager.EXTRA_DEVICE);
+                    devices.put(index, device);
+                    permissionStatuses.put(index, false);
+                    requestPermission(device, index);
+
                     break;
                 } // End case ACTION_USB_DEVICE_ATTACHED
                 case ACTION_USB_PERMISSION: {
-                    // Disabled: Pass on to BridgeSerial
-                    //BridgeSerial.onActionUsbPermission(context, intent);
-
                     // Exit processing if the current device index wasn't included or deviceIndex ∉ Integer
                     if (intent.getExtras() == null) { return; }
                     if (!(intent.getExtras().get("deviceIndex") instanceof Integer)) { return; }
@@ -136,9 +141,6 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
                     // Retrieve the current device index from the intent and exit processing if it is null
                     Integer pos = (Integer) intent.getExtras().get("deviceIndex");
                     if (pos == null) { return; }
-
-                    // Disabled: Notify the connect() method that the message processing is complete
-                    //BridgeSerial.getPermissionSyncer(pos).notify();
 
                     // Ensure permission was granted
                     if (intent.getBooleanExtra(UsbManager.EXTRA_PERMISSION_GRANTED, false)) {
@@ -159,14 +161,23 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
                         requestPermission(devices.get(pos), pos);
                     } // End if(EXTRA_PERMISSION_GRANTED) {} else
 
-                    // Check if all permission requests have been satisfied, initializing the Moppy objects if so
+                    // Check if all permission requests have been satisfied, and initialize objects if applicable
                     if (!permissionStatuses.values().contains(false)) {
-                        // TODO: More elegant handling?
-                        try { initMoppy(); }
-                        catch (Exception e) {
-                            e.printStackTrace();
-                        } // End try {initMoppy} catch(Exception)
-                    } // End if(permissionStatuses.allTrue)
+                        // Check if Moppy objects are uninitialized
+                        if (netManager == null) {
+                            // TODO: More elegant handling?
+                            try { initMoppy(); }
+                            catch (Exception e) {
+                                e.printStackTrace();
+                            } // End try {initMoppy} catch(Exception)
+                        } // End if(netManager == null)
+                        else {
+                            // If objects have already been initialized, refresh them
+                            netManager.refreshSerialDevices();
+                            refreshDevices();
+                        } // End if(permissionStatuses.allTrue)
+                    }
+
                     break;
                 } // End case ACTION_USB_PERMISSION
                 case UsbManager.ACTION_USB_DEVICE_DETACHED: {
@@ -180,6 +191,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
                     }
 
                     // Refresh the device lists
+                    netManager.refreshSerialDevices();
                     refreshDevices();
                     break;
                 } // End case ACTION_USB_DEVICE_DETACHED
@@ -192,7 +204,20 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         // Exit method if either the USB manager or the device list is invalid
         if (usbManager == null || usbManager.getDeviceList() == null) { return; }
 
+        // Skip requesting permission and initialize Moppy objects if there are no devices
+        if (usbManager.getDeviceList().size() == 0) {
+            // TODO: More elegant handling?
+            try { initMoppy(); }
+            catch (Exception e) {
+                e.printStackTrace();
+            } // End try {initMoppy} catch(Exception)
+            return;
+        }
+
         // Get the list of all USB devices and iterate over it
+        // TODO: Synchronize access?
+        permissionStatuses.clear();
+        devices.clear();
         ArrayList<UsbDevice> usbDevices = new ArrayList<>(usbManager.getDeviceList().values());
         for (int i = 0; i < usbDevices.size(); ++i) {
             // Add an entry for the device in the permission status list, add it to the device list
@@ -213,12 +238,6 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         spinnerHashMap = new HashMap<>();
         usbManager = (UsbManager) getSystemService(USB_SERVICE);
 
-/*        // Create sequencer to use for MIDI transmitting
-        RealTimeSequencerProvider s = new RealTimeSequencerProvider();
-        MidiDevice m = s.getDevice(null);
-        try { m.getTransmitter(); } catch (MidiUnavailableException ignored) {}
-        MidiSystem.addMidiDevice(m);
-*/
         // Initialize BridgeSerial
         BridgeSerial.init(this);
 
@@ -259,9 +278,6 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         intentFilter.addAction(UsbManager.ACTION_USB_DEVICE_ATTACHED);
         intentFilter.addAction(UsbManager.ACTION_USB_DEVICE_DETACHED);
         registerReceiver(broadcastReceiver, intentFilter);
-
-        // Disabled: Don't remember why I put this here, seems to work fine without it. Will be removed next commit
-        //findViewById(R.id.toolbar_song_title).setSelected(true);
 
         // Configure the sliding panel and toolbar
         panelLayout = findViewById(R.id.sliding_panel_layout);
