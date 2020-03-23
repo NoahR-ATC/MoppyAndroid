@@ -15,6 +15,7 @@ Known problems:
 
 Features to implement:
     - MIDI I/O
+    - Playlist
 
 
 Scope creep is getting really bad... let's make a list of nice-to-have-but-slightly-out-of-scope features:
@@ -52,9 +53,11 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.database.Cursor;
 import android.hardware.usb.UsbDevice;
 import android.hardware.usb.UsbManager;
 import android.net.Uri;
+import android.provider.OpenableColumns;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.AdapterView;
@@ -389,6 +392,8 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
 
         // Check if the request was a load file request made by us
         if (requestCode == RequestCodes.LOAD_FILE) {
+            String midiFileName;
+
             // Check if the request went through without issues (e.g. wasn't cancelled)
             if (resultCode == Activity.RESULT_OK) {
                 // Exit method if the result data is invalid
@@ -399,6 +404,16 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
 
                 // Exit method if the file's URI is invalid
                 if (midiFileUri == null || midiFileUri.getPath() == null) { return; }
+
+                // Query the URI for the name of the MIDI file
+                Cursor midiFileQueryCursor = getContentResolver().query(midiFileUri, null, null, null, null);
+                if (midiFileQueryCursor != null) {
+                    int index = midiFileQueryCursor.getColumnIndex(OpenableColumns.DISPLAY_NAME);
+                    midiFileQueryCursor.moveToFirst();
+                    midiFileName = midiFileQueryCursor.getString(index);
+                    midiFileQueryCursor.close();
+                }
+                else { midiFileName = ""; }
 
                 // Attempt to load the file
                 try {
@@ -420,7 +435,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
                         AlertDialog.Builder b = new AlertDialog.Builder(this);
                         b.setTitle("MoppyAndroid");
                         b.setCancelable(false);
-                        b.setMessage("Unable to load file: " + midiFileUri.getPath());
+                        b.setMessage("Unable to load file" + (midiFileName.equals("") ? "" : ": " + midiFileName));
                         b.setPositiveButton("OK", null);
                         b.create().show();
                     }
@@ -432,7 +447,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
                         AlertDialog.Builder b = new AlertDialog.Builder(this);
                         b.setTitle("MoppyAndroid");
                         b.setCancelable(false);
-                        b.setMessage(midiFileUri.getLastPathSegment() + " is not a valid MIDI file");
+                        b.setMessage((midiFileName.equals("") ? "Selected file" : midiFileName) + " is not a valid MIDI file");
                         b.setPositiveButton("OK", null);
                         b.create().show();
                     }
@@ -440,7 +455,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
                 } // End try {loadSequence} catch(IOException)
 
                 // If an exception wasn't raised (in which case control would have returned), set the song title
-                ((TextView) findViewById(R.id.toolbar_song_title)).setText(midiFileUri.getLastPathSegment());
+                setSongName(midiFileName);
             } // End if(result == OK)
         } // End if(request == LOAD_FILE)
     } // End onActivityResult method
@@ -506,6 +521,11 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         PendingIntent pendingIntent = PendingIntent.getBroadcast(this, 0, intent, PendingIntent.FLAG_UPDATE_CURRENT);
         usbManager.requestPermission(device, pendingIntent);
     } // End requestPermission method
+
+    private void setSongName(String songName) {
+        ((TextView) findViewById(R.id.toolbar_song_title)).setText(songName);
+        ((TextView) findViewById(R.id.song_title)).setText(songName);
+    }
 
     // The code constants for requests sent with startActivityForResult
     static final public class RequestCodes {
