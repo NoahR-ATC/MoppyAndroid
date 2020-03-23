@@ -22,7 +22,8 @@
             android:ellipsize="marquee"
             android:marqueeRepeatLimit="marquee_forever"
             android:singleLine="true"
-            android:text="@string/song_title" />
+            android:text="@string/song_title"
+            android:textColor="@android:color/white" />
     </FrameLayout>
 
     <ImageView
