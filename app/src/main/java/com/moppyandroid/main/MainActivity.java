@@ -62,7 +62,6 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
-import android.widget.Button;
 import android.widget.ImageButton;
 import android.widget.RelativeLayout;
 import android.widget.Spinner;
@@ -70,13 +69,13 @@ import android.widget.TextView;
 import android.os.Bundle;
 
 import com.moppyandroid.BridgeSerial;
+import com.moppyandroid.MoppyMIDISequencer;
+import com.moppyandroid.NetworkManager;
 import com.moppyandroid.com.moppy.core.events.mapper.MIDIEventMapper;
 import com.moppyandroid.com.moppy.core.events.mapper.MapperCollection;
 import com.moppyandroid.com.moppy.core.events.postprocessor.MessagePostProcessor;
 import com.moppyandroid.com.moppy.core.midi.MoppyMIDIReceiverSender;
-import com.moppyandroid.MoppyMIDISequencer;
 import com.moppyandroid.com.moppy.core.status.StatusBus;
-import com.moppyandroid.NetworkManager;
 
 import com.sothree.slidinguppanel.SlidingUpPanelLayout;
 import com.sothree.slidinguppanel.SlidingUpPanelLayout.PanelState;
@@ -137,9 +136,6 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
     // Method triggered upon activity creation
     @Override
     protected void onCreate(Bundle savedInstanceState) {
-        ImageButton playButton;
-        ImageButton pauseButton;
-
         // Forward to onCreate method of superclass
         super.onCreate(savedInstanceState);
 
@@ -178,7 +174,8 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
     // demo application located at https://github.com/umano/AndroidSlidingUpPanel/tree/master/demo
     @Override
     public void onBackPressed() {
-        if (panelLayout == null) { return; }
+        // If the sliding menu is defined and open collapse it, otherwise do the default action
+        if (panelLayout == null ) { super.onBackPressed(); }
         if (panelLayout.getPanelState() == PanelState.EXPANDED || panelLayout.getPanelState() == PanelState.ANCHORED) {
             panelLayout.setPanelState(SlidingUpPanelLayout.PanelState.COLLAPSED);
         } // End if(panelLayout.state == EXPANDED || panelLayout.state == ANCHORED)
