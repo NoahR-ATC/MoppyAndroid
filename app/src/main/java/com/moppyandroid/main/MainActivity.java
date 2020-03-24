@@ -62,6 +62,8 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
+import android.widget.Button;
+import android.widget.ImageButton;
 import android.widget.RelativeLayout;
 import android.widget.Spinner;
 import android.widget.TextView;
@@ -103,6 +105,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
     private HashMap<Integer, UsbDevice> devices;
     private HashMap<Integer, Boolean> permissionStatuses;
     private SlidingUpPanelLayout panelLayout;
+    private boolean sequenceLoaded;
 
     public static final String ACTION_USB_PERMISSION = "com.moppyandroid.USB_PERMISSION";
 
@@ -116,15 +119,15 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
             // Determine action and process accordingly
             switch (intent.getAction()) {
                 case ACTION_USB_PERMISSION: {
-                    onUsbPermission(intent);
+                    onUsbPermissionIntent(intent);
                     break;
                 } // End case ACTION_USB_PERMISSION
                 case UsbManager.ACTION_USB_DEVICE_ATTACHED: {
-                    onUsbDeviceAttached(intent);
+                    onUsbDeviceAttachedIntent(intent);
                     break;
                 } // End case ACTION_USB_DEVICE_ATTACHED
                 case UsbManager.ACTION_USB_DEVICE_DETACHED: {
-                    onUsbDeviceDetached();
+                    onUsbDeviceDetachedIntent();
                     break;
                 } // End case ACTION_USB_DEVICE_DETACHED
             } // End switch(intent.action)
@@ -134,11 +137,16 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
     // Method triggered upon activity creation
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        ImageButton playButton;
+        ImageButton pauseButton;
+
         // Forward to onCreate method of superclass
         super.onCreate(savedInstanceState);
 
-        // Set the initial view
+        // Set the initial view and disable the pause and play buttons
         setContentView(R.layout.activity_main);
+        enablePlayButton(false);
+        enablePauseButton(false);
 
         // Create the filter describing which intents to process and register it
         IntentFilter intentFilter = new IntentFilter();
@@ -251,6 +259,12 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
 
                 // If an exception wasn't raised (in which case control would have returned), set the song title
                 setSongName(midiFileName);
+
+                // Mark that a sequence has been loaded and enable the play button if necessary
+                sequenceLoaded = true;
+                if (currentBridgeIdentifier != null && !findViewById(R.id.play_button).isEnabled()) {
+                    enablePlayButton(true);
+                } // End if(bridgeConnected && !playButton.enabled)
             } // End if(result == OK)
         } // End if(request == LOAD_FILE)
     } // End onActivityResult method
@@ -274,6 +288,10 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
                 String bridgeIdentifier = spinnerHashMap.get((String) parent.getItemAtPosition(position));
                 netManager.connectBridge(bridgeIdentifier);
                 currentBridgeIdentifier = bridgeIdentifier; // Updated here in case connectBridge throws exception
+
+                // Enable the stop and play buttons as necessary
+                enablePauseButton(true);
+                if(sequenceLoaded) { enablePlayButton(true); }
             } // End try {connectBridge}
             catch (IOException e) {
                 {
@@ -290,6 +308,10 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
             } // end try {connectBridge} catch(IOException)
         } // End if(position != 0)
         else { // "NONE" selected
+            // Set the buttons to be disabled
+            enablePlayButton(false);
+            enablePauseButton(false);
+
             // Return if there isn't a bridge to close
             if (currentBridgeIdentifier == null) { return; }
 
@@ -312,7 +334,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
     } // End onNothingSelected method
 
     // Method triggered when a USB permission dialog completes
-    private void onUsbPermission(Intent intent) {
+    private void onUsbPermissionIntent(Intent intent) {
         // Exit processing if the current device index wasn't included or deviceIndex ∉ Integer
         if (intent.getExtras() == null) { return; }
         if (!(intent.getExtras().get("deviceIndex") instanceof Integer)) { return; }
@@ -356,10 +378,10 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
                 refreshDevices();
             } // End if(permissionStatuses.allTrue)
         }
-    } // End onUsbPermission method
+    } // End onUsbPermissionIntent method
 
     // Method triggered when a USB device is attached
-    private void onUsbDeviceAttached(Intent intent) {
+    private void onUsbDeviceAttachedIntent(Intent intent) {
         int index;
         UsbDevice device;
 
@@ -377,10 +399,10 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         devices.put(index, device);
         permissionStatuses.put(index, false);
         requestPermission(device, index);
-    } // End onUsbDeviceAttached method
+    } // End onUsbDeviceAttachedIntent method
 
     // Method triggered when a USB device is detached
-    private void onUsbDeviceDetached() {
+    private void onUsbDeviceDetachedIntent() {
         {
             AlertDialog.Builder b = new AlertDialog.Builder(this);
             b.setTitle("MoppyAndroid");
@@ -393,7 +415,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         // Refresh the device lists
         netManager.refreshSerialDevices();
         refreshDevices();
-    } // End onUsbDeviceDetached method
+    } // End onUsbDeviceDetachedIntent method
 
     // Method triggered when load button pressed
     private void onLoadButton() {
@@ -407,11 +429,15 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
     // Method triggered when play button pressed
     private void onPlayButton() {
         seq.play();
+        ((ImageButton) findViewById(R.id.pause_button)).setImageResource(R.drawable.ic_pause);
     } // End onPlayButton method
 
     // Method triggered when pause/stop button pressed
     private void onPauseButton() {
-        if (seq.isPlaying()) { seq.pause(); }
+        if (seq.isPlaying()) {
+            seq.pause();
+            ((ImageButton) findViewById(R.id.pause_button)).setImageResource(R.drawable.ic_stop);
+        }
         else { seq.stop(); }
     } // End onPauseButton method
 
@@ -474,6 +500,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         permissionStatuses = new HashMap<>();
         spinnerHashMap = new HashMap<>();
         usbManager = (UsbManager) getSystemService(USB_SERVICE);
+        sequenceLoaded = false;
 
         // Initialize BridgeSerial
         BridgeSerial.init(this);
@@ -538,6 +565,30 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         PendingIntent pendingIntent = PendingIntent.getBroadcast(this, 0, intent, PendingIntent.FLAG_UPDATE_CURRENT);
         usbManager.requestPermission(device, pendingIntent);
     } // End requestPermission method
+
+    private void enablePlayButton(boolean enabled){
+        ImageButton playButton = findViewById(R.id.play_button);
+        if (enabled) {
+            playButton.setEnabled(true);
+            playButton.setAlpha(1f);
+        }
+        else {
+            playButton.setEnabled(false);
+            playButton.setAlpha(0.5f);
+        }
+    }
+
+    private void enablePauseButton(boolean enabled) {
+        ImageButton pauseButton = findViewById(R.id.pause_button);
+        if (enabled) {
+            pauseButton.setEnabled(true);
+            pauseButton.setAlpha(1f);
+        }
+        else {
+            pauseButton.setEnabled(false);
+            pauseButton.setAlpha(0.5f);
+        }
+    }
 
     private void setSongName(String songName) {
         ((TextView) findViewById(R.id.toolbar_song_title)).setText(songName);
