@@ -115,156 +115,21 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
 
             // Determine action and process accordingly
             switch (intent.getAction()) {
-                case UsbManager.ACTION_USB_DEVICE_ATTACHED: {
-                    int index;
-                    UsbDevice device;
-
-                    {
-                        AlertDialog.Builder b = new AlertDialog.Builder(context);
-                        b.setTitle("MoppyAndroid");
-                        b.setCancelable(false);
-                        b.setMessage("USB device plugged in");
-                        b.setPositiveButton("OK", null);
-                        b.create().show();
-                    }
-
-                    index = devices.size();
-                    device = intent.getParcelableExtra(UsbManager.EXTRA_DEVICE);
-                    devices.put(index, device);
-                    permissionStatuses.put(index, false);
-                    requestPermission(device, index);
-
-                    break;
-                } // End case ACTION_USB_DEVICE_ATTACHED
                 case ACTION_USB_PERMISSION: {
-                    // Exit processing if the current device index wasn't included or deviceIndex ∉ Integer
-                    if (intent.getExtras() == null) { return; }
-                    if (!(intent.getExtras().get("deviceIndex") instanceof Integer)) { return; }
-
-                    // Retrieve the current device index from the intent and exit processing if it is null
-                    Integer pos = (Integer) intent.getExtras().get("deviceIndex");
-                    if (pos == null) { return; }
-
-                    // Ensure permission was granted
-                    if (intent.getBooleanExtra(UsbManager.EXTRA_PERMISSION_GRANTED, false)) {
-                        // Mark that the permission for this device has been granted
-                        permissionStatuses.replace(pos, true);
-                    } // End if(EXTRA_PERMISSION_GRANTED)
-                    else {
-                        // Permission not granted, give a message box and request again
-                        // TODO: Permission window shows over top of alert
-                        {
-                            AlertDialog.Builder b = new AlertDialog.Builder(context);
-                            b.setTitle("MoppyAndroid");
-                            b.setCancelable(false);
-                            b.setMessage("Permission to access all USB devices is required for operation, please grant it this time");
-                            b.setPositiveButton("OK", null);
-                            b.create().show();
-                        }
-                        requestPermission(devices.get(pos), pos);
-                    } // End if(EXTRA_PERMISSION_GRANTED) {} else
-
-                    // Check if all permission requests have been satisfied, and initialize objects if applicable
-                    if (!permissionStatuses.values().contains(false)) {
-                        // Check if Moppy objects are uninitialized
-                        if (netManager == null) {
-                            // TODO: More elegant handling?
-                            try { initMoppy(); }
-                            catch (Exception e) {
-                                e.printStackTrace();
-                            } // End try {initMoppy} catch(Exception)
-                        } // End if(netManager == null)
-                        else {
-                            // If objects have already been initialized, refresh them
-                            netManager.refreshSerialDevices();
-                            refreshDevices();
-                        } // End if(permissionStatuses.allTrue)
-                    }
-
+                    onUsbPermission(intent);
                     break;
                 } // End case ACTION_USB_PERMISSION
+                case UsbManager.ACTION_USB_DEVICE_ATTACHED: {
+                    onUsbDeviceAttached(intent);
+                    break;
+                } // End case ACTION_USB_DEVICE_ATTACHED
                 case UsbManager.ACTION_USB_DEVICE_DETACHED: {
-                    {
-                        AlertDialog.Builder b = new AlertDialog.Builder(context);
-                        b.setTitle("MoppyAndroid");
-                        b.setCancelable(false);
-                        b.setMessage("USB device unplugged");
-                        b.setPositiveButton("OK", null);
-                        b.create().show();
-                    }
-
-                    // Refresh the device lists
-                    netManager.refreshSerialDevices();
-                    refreshDevices();
+                    onUsbDeviceDetached();
                     break;
                 } // End case ACTION_USB_DEVICE_DETACHED
             } // End switch(intent.action)
         } // End onReceive method
     }; // End new BroadcastReceiver
-
-    // Method to request permission to access all attached USB devices
-    private void requestPermissionForAllDevices() {
-        // Exit method if either the USB manager or the device list is invalid
-        if (usbManager == null || usbManager.getDeviceList() == null) { return; }
-
-        // Skip requesting permission and initialize Moppy objects if there are no devices
-        if (usbManager.getDeviceList().size() == 0) {
-            // TODO: More elegant handling?
-            try { initMoppy(); }
-            catch (Exception e) {
-                e.printStackTrace();
-            } // End try {initMoppy} catch(Exception)
-            return;
-        }
-
-        // Get the list of all USB devices and iterate over it
-        // TODO: Synchronize access?
-        permissionStatuses.clear();
-        devices.clear();
-        ArrayList<UsbDevice> usbDevices = new ArrayList<>(usbManager.getDeviceList().values());
-        for (int i = 0; i < usbDevices.size(); ++i) {
-            // Add an entry for the device in the permission status list, add it to the device list
-            permissionStatuses.put(i, false);
-            devices.put(i, usbDevices.get(i));
-
-            // Request permission to access the device
-            requestPermission(devices.get(i), i);
-        } // End for(i < usbDevices.size)
-    } // End requestPermissionForAllDevices method
-
-    // Initialize non-MoppyLib objects of the class
-    @SuppressLint("UseSparseArrays")
-    private void init() {
-        // Initialize objects
-        devices = new HashMap<>();
-        permissionStatuses = new HashMap<>();
-        spinnerHashMap = new HashMap<>();
-        usbManager = (UsbManager) getSystemService(USB_SERVICE);
-
-        // Initialize BridgeSerial
-        BridgeSerial.init(this);
-
-        // Request permission to access all attached USB devices
-        requestPermissionForAllDevices();
-    } // End init method
-
-    // Initialize all MoppyLib objects of the class
-    // Note: Separate from init because these cannot be initialized before permission to access USB devices is awarded
-    private void initMoppy() throws java.io.IOException, MidiUnavailableException {
-        // Initialize Moppy objects
-        statusBus = new StatusBus();
-        mappers = new MapperCollection<>();
-        mappers.addMapper(MIDIEventMapper.defaultMapper((byte) 0x01));
-        netManager = new NetworkManager(statusBus);
-        receiverSender = new MoppyMIDIReceiverSender(mappers, MessagePostProcessor.PASS_THROUGH, netManager.getPrimaryBridge());
-        seq = new MoppyMIDISequencer(statusBus, receiverSender);
-
-        // Start the network manager
-        netManager.start();
-
-        // Refresh the device lists
-        refreshDevices();
-    } // End initMoppy method
 
     // Method triggered upon activity creation
     @Override
@@ -295,24 +160,10 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         // Set this activity to be called when the spinner for choosing the Moppy device has a selection event
         ((Spinner) findViewById(R.id.device_box)).setOnItemSelectedListener(this);
 
-        // Define the listener lambda for when the load button is clicked
-        findViewById(R.id.load_button).setOnClickListener((View v) -> {
-            Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
-            intent.addCategory(Intent.CATEGORY_OPENABLE);
-            intent.setType("audio/midi");
-            startActivityForResult(intent, RequestCodes.LOAD_FILE);
-        }); // End load_button.clickListener lambda
-
-        // Define the listener lambda for when the play button is clicked
-        findViewById(R.id.play_button).setOnClickListener((View v) -> {
-            seq.play();
-        }); // End play_button.clickListener lambda
-
-        // Define the listener lambda for when the pause/stop button is clicked
-        findViewById(R.id.pause_button).setOnClickListener((View v) -> {
-            if (seq.isPlaying()) { seq.pause(); }
-            else { seq.stop(); }
-        }); // End pause_button.clickListener lambda
+        // Define the listener lambdas for the load, play, and stop buttons
+        findViewById(R.id.load_button).setOnClickListener((View v) -> onLoadButton());
+        findViewById(R.id.play_button).setOnClickListener((View v) -> onPlayButton());
+        findViewById(R.id.pause_button).setOnClickListener((View v) -> onPauseButton());
     } // End onCreate method
 
     // Method triggered when the back event is raised (e.g. back button pressed). Taken from AndroidSlidingUpPanel
@@ -327,62 +178,6 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
             super.onBackPressed();
         } // End if(panelLayout.state == EXPANDED || panelLayout.state == ANCHORED) {} else
     } // End onBackPressed method
-
-    // Method triggered when an item in a spinner is selected
-    public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
-        // Ensure the event is regarding the device selection box, exiting if not so
-        if (parent.getId() != R.id.device_box) { return; }
-
-        // Check that the selected entry isn't "NONE" (index 0)
-        if (position != 0) {
-            // Attempt to start a connection to the selected device/bridge
-            try {
-                // If necessary, close the current connection
-                if (currentBridgeIdentifier != null) {
-                    netManager.closeBridge(currentBridgeIdentifier);
-                    currentBridgeIdentifier = null;
-                } // End if(currentBridgeIdentifier != null)
-
-                // Get the bridge to connect to and do so, recording the new bridge as the current bridge if successful
-                String bridgeIdentifier = spinnerHashMap.get((String) parent.getItemAtPosition(position));
-                netManager.connectBridge(bridgeIdentifier);
-                currentBridgeIdentifier = bridgeIdentifier; // Updated here in case connectBridge throws exception
-            } // End try {connectBridge}
-            catch (IOException e) {
-                {
-                    AlertDialog.Builder b = new AlertDialog.Builder(this);
-                    b.setTitle("MoppyAndroid");
-                    b.setCancelable(false);
-                    b.setMessage("Unable to connect to " + parent.getItemAtPosition(position));
-                    b.setPositiveButton("OK", null);
-                    b.create().show();
-                }
-
-                // Set the selection to "NONE"
-                parent.setSelection(0);
-            } // end try {connectBridge} catch(IOException)
-        } // End if(position != 0)
-        else { // "NONE" selected
-            // Return if there isn't a bridge to close
-            if (currentBridgeIdentifier == null) { return; }
-
-            // Attempt to close the current bridge
-            try {
-                netManager.closeBridge(currentBridgeIdentifier);
-                currentBridgeIdentifier = null;
-            } // End try {closeBridge}
-            catch (IOException e) {
-                // TODO: More elegant handling
-                // Print out the stack trace
-                e.printStackTrace();
-            } // End try {closeBridge} catch(IOException e)
-        } // End if(position != 0) {} else
-    } // End onItemSelected method
-
-    // Method triggered when a spinner is closed without selecting something
-    public void onNothingSelected(AdapterView<?> parent) {
-        // Don't care, but we need have to implement it
-    } // End onNothingSelected method
 
     // Method triggered when a spawned activity exits
     @Override
@@ -460,6 +255,166 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         } // End if(request == LOAD_FILE)
     } // End onActivityResult method
 
+    // Method triggered when an item in a spinner is selected
+    public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+        // Ensure the event is regarding the device selection box, exiting if not so
+        if (parent.getId() != R.id.device_box) { return; }
+
+        // Check that the selected entry isn't "NONE" (index 0)
+        if (position != 0) {
+            // Attempt to start a connection to the selected device/bridge
+            try {
+                // If necessary, close the current connection
+                if (currentBridgeIdentifier != null) {
+                    netManager.closeBridge(currentBridgeIdentifier);
+                    currentBridgeIdentifier = null;
+                } // End if(currentBridgeIdentifier != null)
+
+                // Get the bridge to connect to and do so, recording the new bridge as the current bridge if successful
+                String bridgeIdentifier = spinnerHashMap.get((String) parent.getItemAtPosition(position));
+                netManager.connectBridge(bridgeIdentifier);
+                currentBridgeIdentifier = bridgeIdentifier; // Updated here in case connectBridge throws exception
+            } // End try {connectBridge}
+            catch (IOException e) {
+                {
+                    AlertDialog.Builder b = new AlertDialog.Builder(this);
+                    b.setTitle("MoppyAndroid");
+                    b.setCancelable(false);
+                    b.setMessage("Unable to connect to " + parent.getItemAtPosition(position));
+                    b.setPositiveButton("OK", null);
+                    b.create().show();
+                }
+
+                // Set the selection to "NONE"
+                parent.setSelection(0);
+            } // end try {connectBridge} catch(IOException)
+        } // End if(position != 0)
+        else { // "NONE" selected
+            // Return if there isn't a bridge to close
+            if (currentBridgeIdentifier == null) { return; }
+
+            // Attempt to close the current bridge
+            try {
+                netManager.closeBridge(currentBridgeIdentifier);
+                currentBridgeIdentifier = null;
+            } // End try {closeBridge}
+            catch (IOException e) {
+                // TODO: More elegant handling
+                // Print out the stack trace
+                e.printStackTrace();
+            } // End try {closeBridge} catch(IOException e)
+        } // End if(position != 0) {} else
+    } // End onItemSelected method
+
+    // Method triggered when a spinner is closed without selecting something
+    public void onNothingSelected(AdapterView<?> parent) {
+        // Don't care, but we need have to implement it
+    } // End onNothingSelected method
+
+    // Method triggered when a USB permission dialog completes
+    private void onUsbPermission(Intent intent) {
+        // Exit processing if the current device index wasn't included or deviceIndex ∉ Integer
+        if (intent.getExtras() == null) { return; }
+        if (!(intent.getExtras().get("deviceIndex") instanceof Integer)) { return; }
+
+        // Retrieve the current device index from the intent and exit processing if it is null
+        Integer pos = (Integer) intent.getExtras().get("deviceIndex");
+        if (pos == null) { return; }
+
+        // Ensure permission was granted
+        if (intent.getBooleanExtra(UsbManager.EXTRA_PERMISSION_GRANTED, false)) {
+            // Mark that the permission for this device has been granted
+            permissionStatuses.replace(pos, true);
+        } // End if(EXTRA_PERMISSION_GRANTED)
+        else {
+            // Permission not granted, give a message box and request again
+            // TODO: Permission window shows over top of alert
+            {
+                AlertDialog.Builder b = new AlertDialog.Builder(this);
+                b.setTitle("MoppyAndroid");
+                b.setCancelable(false);
+                b.setMessage("Permission to access all USB devices is required for operation, please grant it this time");
+                b.setPositiveButton("OK", null);
+                b.create().show();
+            }
+            requestPermission(devices.get(pos), pos);
+        } // End if(EXTRA_PERMISSION_GRANTED) {} else
+
+        // Check if all permission requests have been satisfied, and initialize objects if applicable
+        if (!permissionStatuses.values().contains(false)) {
+            // Check if Moppy objects are uninitialized
+            if (netManager == null) {
+                // TODO: More elegant handling?
+                try { initMoppy(); }
+                catch (Exception e) {
+                    e.printStackTrace();
+                } // End try {initMoppy} catch(Exception)
+            } // End if(netManager == null)
+            else {
+                // If objects have already been initialized, refresh them
+                netManager.refreshSerialDevices();
+                refreshDevices();
+            } // End if(permissionStatuses.allTrue)
+        }
+    } // End onUsbPermission method
+
+    // Method triggered when a USB device is attached
+    private void onUsbDeviceAttached(Intent intent) {
+        int index;
+        UsbDevice device;
+
+        {
+            AlertDialog.Builder b = new AlertDialog.Builder(this);
+            b.setTitle("MoppyAndroid");
+            b.setCancelable(false);
+            b.setMessage("USB device plugged in");
+            b.setPositiveButton("OK", null);
+            b.create().show();
+        }
+
+        index = devices.size();
+        device = intent.getParcelableExtra(UsbManager.EXTRA_DEVICE);
+        devices.put(index, device);
+        permissionStatuses.put(index, false);
+        requestPermission(device, index);
+    } // End onUsbDeviceAttached method
+
+    // Method triggered when a USB device is detached
+    private void onUsbDeviceDetached() {
+        {
+            AlertDialog.Builder b = new AlertDialog.Builder(this);
+            b.setTitle("MoppyAndroid");
+            b.setCancelable(false);
+            b.setMessage("USB device unplugged");
+            b.setPositiveButton("OK", null);
+            b.create().show();
+        }
+
+        // Refresh the device lists
+        netManager.refreshSerialDevices();
+        refreshDevices();
+    } // End onUsbDeviceDetached method
+
+    // Method triggered when load button pressed
+    private void onLoadButton() {
+        // Trigger the open document dialog of the Android system, looking for MIDI files
+        Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+        intent.addCategory(Intent.CATEGORY_OPENABLE);
+        intent.setType("audio/midi");
+        startActivityForResult(intent, RequestCodes.LOAD_FILE);
+    } // End onLoadButton method
+
+    // Method triggered when play button pressed
+    private void onPlayButton() {
+        seq.play();
+    } // End onPlayButton method
+
+    // Method triggered when pause/stop button pressed
+    private void onPauseButton() {
+        if (seq.isPlaying()) { seq.pause(); }
+        else { seq.stop(); }
+    } // End onPauseButton method
+
     // Refresh the device box and related lists
     private void refreshDevices() {
         // Retrieve the device box spinner and clear the hashmap
@@ -511,6 +466,68 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         spinner.setAdapter(adapter);
     } // End refreshDeviceLists method
 
+    // Initialize non-MoppyLib objects of the class and start the Moppy initialization chain
+    @SuppressLint("UseSparseArrays")
+    private void init() {
+        // Initialize objects
+        devices = new HashMap<>();
+        permissionStatuses = new HashMap<>();
+        spinnerHashMap = new HashMap<>();
+        usbManager = (UsbManager) getSystemService(USB_SERVICE);
+
+        // Initialize BridgeSerial
+        BridgeSerial.init(this);
+
+        // Request permission to access all attached USB devices (also initializes Moppy on completion)
+        requestPermissionForAllDevices();
+    } // End init method
+
+    // Initialize all MoppyLib objects of the class
+    // Note: Separate from init because these cannot be initialized before permission to access USB devices is awarded
+    private void initMoppy() throws java.io.IOException, MidiUnavailableException {
+        // Initialize Moppy objects
+        statusBus = new StatusBus();
+        mappers = new MapperCollection<>();
+        mappers.addMapper(MIDIEventMapper.defaultMapper((byte) 0x01));
+        netManager = new NetworkManager(statusBus);
+        receiverSender = new MoppyMIDIReceiverSender(mappers, MessagePostProcessor.PASS_THROUGH, netManager.getPrimaryBridge());
+        seq = new MoppyMIDISequencer(statusBus, receiverSender);
+
+        // Start the network manager and refresh the device lists
+        netManager.start();
+        refreshDevices();
+    } // End initMoppy method
+
+    // Requests permission to access all attached USB devices
+    private void requestPermissionForAllDevices() {
+        // Exit method if either the USB manager or the device list is invalid
+        if (usbManager == null || usbManager.getDeviceList() == null) { return; }
+
+        // Skip requesting permission and initialize Moppy objects if there are no devices
+        if (usbManager.getDeviceList().size() == 0) {
+            // TODO: More elegant handling?
+            try { initMoppy(); }
+            catch (Exception e) {
+                e.printStackTrace();
+            } // End try {initMoppy} catch(Exception)
+            return;
+        }
+
+        // Get the list of all USB devices and iterate over it
+        // TODO: Synchronize access?
+        permissionStatuses.clear();
+        devices.clear();
+        ArrayList<UsbDevice> usbDevices = new ArrayList<>(usbManager.getDeviceList().values());
+        for (int i = 0; i < usbDevices.size(); ++i) {
+            // Add an entry for the device in the permission status list, add it to the device list
+            permissionStatuses.put(i, false);
+            devices.put(i, usbDevices.get(i));
+
+            // Request permission to access the device
+            requestPermission(devices.get(i), i);
+        } // End for(i < usbDevices.size)
+    } // End requestPermissionForAllDevices method
+
     // Request permission to access a specific attached USB device, specifying the index of the permissionStatuses entry for it
     private void requestPermission(UsbDevice device, int index) {
         // Create an intent message for the USB permission request
@@ -525,7 +542,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
     private void setSongName(String songName) {
         ((TextView) findViewById(R.id.toolbar_song_title)).setText(songName);
         ((TextView) findViewById(R.id.song_title)).setText(songName);
-    }
+    } // End setSongName method
 
     // The code constants for requests sent with startActivityForResult
     static final public class RequestCodes {
