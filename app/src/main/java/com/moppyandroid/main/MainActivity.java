@@ -54,6 +54,7 @@ import android.hardware.usb.UsbManager;
 import android.net.Uri;
 import android.os.Handler;
 import android.provider.OpenableColumns;
+import android.util.Log;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.AdapterView;
@@ -93,6 +94,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Timer;
 import java.util.TimerTask;
+import java.util.logging.Logger;
 
 public class MainActivity extends AppCompatActivity implements AdapterView.OnItemSelectedListener, StatusConsumer, SeekBar.OnSeekBarChangeListener {
     private MoppyMIDISequencer seq;
@@ -234,9 +236,15 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
                     seq.loadSequence(reader.getSequence(stream));
                 } // End try {loadSequence}
                 catch (FileNotFoundException e) {
-                    // Print the stack trace and exit method
-                    // TODO: More elegant handling
-                    e.printStackTrace();
+                    // Show a message box and exit method
+                    {
+                        AlertDialog.Builder b = new AlertDialog.Builder(this);
+                        b.setTitle("MoppyAndroid");
+                        b.setCancelable(false);
+                        b.setMessage("File" + (midiFileName.equals("") ? "" : " " + midiFileName) + " not found");
+                        b.setPositiveButton("OK", null);
+                        b.create().show();
+                    }
                     return;
                 } // End try {loadSequence} catch(FileNotFoundException)
                 catch (IOException e) {
@@ -410,8 +418,8 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
                 currentBridgeIdentifier = null;
             } // End try {closeBridge}
             catch (IOException e) {
-                // TODO: More elegant handling
-                // Print out the stack trace
+                // In the words of MoppyLib's author when they deal with this exception, "There's not
+                // much we can do if it fails to close (it's probably already closed). Just log it and move on"
                 e.printStackTrace();
             } // End try {closeBridge} catch(IOException e)
         } // End if(position != 0) {} else
@@ -453,18 +461,12 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         // Check if all permission requests have been satisfied, and initialize objects if applicable
         if (!permissionStatuses.containsValue(false)) {
             // Check if Moppy objects are uninitialized
-            if (netManager == null) {
-                // TODO: More elegant handling?
-                try { initMoppy(); }
-                catch (Exception e) {
-                    e.printStackTrace();
-                } // End try {initMoppy} catch(Exception)
-            } // End if(netManager == null)
+            if (netManager == null) { initMoppy(); }
             else {
                 // If objects have already been initialized, refresh them
                 netManager.refreshSerialDevices();
                 refreshDevices();
-            } // End if(permissionStatuses.allTrue)
+            } // End if(netManager == null) {} else
         } // End if(permissionStatuses.doesntContain(false))
     } // End onUsbPermissionIntent method
 
@@ -542,14 +544,29 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
 
     // Initialize all MoppyLib objects of the class
     // Note: Separate from init because these cannot be initialized before permission to access USB devices is awarded
-    private void initMoppy() throws java.io.IOException, MidiUnavailableException {
+    private void initMoppy() {
         // Initialize Moppy objects
         statusBus = new StatusBus();
         mappers = new MapperCollection<>();
         mappers.addMapper(MIDIEventMapper.defaultMapper((byte) 0x01));
         netManager = new NetworkManager(statusBus);
-        receiverSender = new MoppyMIDIReceiverSender(mappers, MessagePostProcessor.PASS_THROUGH, netManager.getPrimaryBridge());
-        seq = new MoppyMIDISequencer(statusBus, receiverSender);
+        try {
+            receiverSender = new MoppyMIDIReceiverSender(mappers, MessagePostProcessor.PASS_THROUGH, netManager.getPrimaryBridge());
+        } // End try {new MoppyMIDIReceiverSender}
+        catch (IOException ignored) {} // Not actually generated, method signature outdated
+        try { seq = new MoppyMIDISequencer(statusBus, receiverSender); }
+        catch (MidiUnavailableException e) {
+            // Log the unrecoverable error, throw up a message box, and exit the application with a non-zero value
+            Log.e("com.moppyandroid.main.MainActivity", "Unable to construct MoppyMIDISequencer", e);
+            {
+                AlertDialog.Builder b = new AlertDialog.Builder(this);
+                b.setTitle("MoppyAndroid");
+                b.setCancelable(false);
+                b.setMessage("Unrecoverable error: Unable to get MIDI resources for Moppy initialization. exiting");
+                b.setPositiveButton("OK", (dialog, which) -> System.exit(1));
+                b.create().show();
+            }
+        } // End try {new MoppyMidiSequencer} catch(MidiUnavailableException)
 
         // Register this class as a consumer of the status updates generated by the MoppyMIDISequencer
         statusBus.registerConsumer(this);
@@ -617,11 +634,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
 
         // Skip requesting permission and initialize Moppy objects if there are no devices
         if (usbManager.getDeviceList().size() == 0) {
-            // TODO: More elegant handling?
-            try { initMoppy(); }
-            catch (Exception e) {
-                e.printStackTrace();
-            } // End try {initMoppy} catch(Exception)
+            initMoppy();
             return;
         } // End if(usbManager.getDeviceList.size == 0)
 

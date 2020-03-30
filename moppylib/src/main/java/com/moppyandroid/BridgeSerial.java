@@ -1,4 +1,4 @@
-// Originally written by Sam Archer https://github.com/SammyIAm/Moppy2, modified to be compatible with Android by Noah Reeder
+// Originally written by Sam Archer https://github.com/SammyIAm/Moppy2, heavily modified to be compatible with Android by Noah Reeder
 
 /*
  * To change this license header, choose License Headers in Project Properties.
@@ -7,19 +7,9 @@
  */
 package com.moppyandroid;
 
-import android.app.AlertDialog;
-import android.app.PendingIntent;
-import android.content.BroadcastReceiver;
 import android.content.Context;
-import android.content.IntentFilter;
-import android.hardware.usb.UsbAccessory;
-import android.hardware.usb.UsbDeviceConnection;
 import android.hardware.usb.UsbManager;
 import android.hardware.usb.UsbDevice;
-import android.content.Intent;
-import android.os.Environment;
-import android.os.Parcel;
-import android.os.Parcelable;
 
 import com.felhr.usbserial.UsbSerialDevice;
 
@@ -28,19 +18,13 @@ import com.moppyandroid.com.moppy.core.comms.MoppyMessageFactory;
 import com.moppyandroid.com.moppy.core.comms.NetworkMessageConsumer;
 import com.moppyandroid.com.moppy.core.comms.bridge.NetworkBridge;
 
-import java.io.BufferedWriter;
-import java.io.File;
-import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashMap;
 import java.util.List;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import java.util.stream.Collectors;
 
 /**
  * A Serial connection for Moppy devices.
@@ -53,7 +37,7 @@ public class BridgeSerial extends NetworkBridge {
     private Thread listenerThread = null;
 
     /**
-     * The method to assign static variables. Must be called before use of BridgeSerial objects.
+     * Assigns static variables. Must be called before use of BridgeSerial objects.
      *
      * @param passedContext the context used to retrieve Android system resources
      * @author Noah Reeder
@@ -64,34 +48,29 @@ public class BridgeSerial extends NetworkBridge {
         usbManager = (UsbManager) context.getSystemService(Context.USB_SERVICE);
     }
 
+    /**
+     * Constructs a BridgeSerial object to communicate on a specific port.
+     *
+     * @param serialPortName the port to communicate on
+     * @throws IllegalArgumentException if the specified device doesn't exist
+     * @throws UnableToObtainDeviceException if the serial port representing the specified device could not be obtained
+     * @author Noah Reeder
+     */
     public BridgeSerial(String serialPortName) {
         // Get the USB device attached to the specified port and ensure it is valid
         device = usbManager.getDeviceList().get(serialPortName);
         if (device == null) {
-            {
-                AlertDialog.Builder b = new AlertDialog.Builder(context);
-                b.setTitle("MoppyAndroid");
-                b.setCancelable(false);
-                b.setMessage("Device doesn't exist - BridgeSerial");
-                b.setPositiveButton("OK", null);
-                b.create().show();
-            }
-            return;
+            // The device doesn't exist, log it and return an IllegalArgumentException
+            Logger.getLogger(BridgeSerial.class.getName()).log(Level.SEVERE, "Device at " + serialPortName + " doesn't exist");
+            throw new IllegalArgumentException("Unable to find device at " + serialPortName);
         }
 
         // Create the serial port and ensure it is valid
         serialPort = UsbSerialDevice.createUsbSerialDevice(device, usbManager.openDevice(device));
         if (serialPort == null) {
-            //throw new IOException("serialPort is null");
-            {
-                AlertDialog.Builder b = new AlertDialog.Builder(context);
-                b.setTitle("MoppyAndroid");
-                b.setCancelable(false);
-                b.setMessage("serialPort is null - BridgeSerial");
-                b.setPositiveButton("OK", null);
-                b.create().show();
-            }
-            return;
+            // There's nothing we can do about it not opening so just log it and throw a runtime exception
+            Logger.getLogger(BridgeSerial.class.getName()).log(Level.SEVERE, "Unable to open port " + serialPortName, device);
+            throw new UnableToObtainDeviceException("Unable to open " + serialPortName);
         }
 
         // Set the friendly name of the serial port
@@ -116,7 +95,7 @@ public class BridgeSerial extends NetworkBridge {
             serialPort.setParity(UsbSerialDevice.PARITY_NONE);
         } // End if(serialPort.syncOpen)
         else {
-            throw new IOException("serialPort did not open");
+            throw new IOException("UsbSerialDevice instance did not open");
         } // End if(serialPort.syncOpen) else
 
         /* ***********DEPRECATED************
@@ -145,6 +124,13 @@ public class BridgeSerial extends NetworkBridge {
         }
     }
 
+    /**
+     * Closes this BridgeSerial connection
+     * @throws IOException if unable to write the SYS_STOP message
+     * @throws UnableToObtainDeviceException if the serial port could not be recreated after closing communication
+     * @author Sam Archer
+     * @author Noah Reeder
+     */
     @Override
     public void close() throws IOException {
         try {
@@ -152,26 +138,20 @@ public class BridgeSerial extends NetworkBridge {
         } finally {
             serialPort.syncClose();
 
-            // Calling syncClose closes the UsbDeviceConnection, so now we need to recreate the device
-            String portName = serialPort.getPortName();
-            serialPort = UsbSerialDevice.createUsbSerialDevice(device, usbManager.openDevice(device));
-            // Ensure serial connection was created successfully
-            if (serialPort == null) {
-                //throw new IOException("serialPort is null");
-                { // TODO: Throw exception instead
-                    AlertDialog.Builder b = new AlertDialog.Builder(context);
-                    b.setTitle("MoppyAndroid");
-                    b.setCancelable(false);
-                    b.setMessage("serialPort is null - BridgeSerial");
-                    b.setPositiveButton("OK", null);
-                    b.create().show();
-                }
-            }
-            serialPort.setPortName(portName);
-
             // Stop and cleanup listener thread
             listenerThread.interrupt();
             listenerThread = null;
+
+            // Calling syncClose closes the UsbDeviceConnection, so now we need to recreate the device
+            String portName = serialPort.getPortName();
+            serialPort = UsbSerialDevice.createUsbSerialDevice(device, usbManager.openDevice(device));
+            if (serialPort == null) {
+                // There's nothing we can do about it not opening so just log it and throw a runtime exception
+                Logger.getLogger(BridgeSerial.class.getName()).log(Level.SEVERE, "Unable to reopen port " + portName, device);
+                //noinspection ThrowFromFinallyBlock
+                throw new UnableToObtainDeviceException("Unable to reopen " + portName);
+            }
+            serialPort.setPortName(portName);
         }
     }
 
@@ -223,15 +203,30 @@ public class BridgeSerial extends NetworkBridge {
                                     BridgeSerial.class.getName(),
                                     serialPort.getPortName(),
                                     "Serial Device")); // Serial ports don't really have a remote address
-                        } catch (IllegalArgumentException ex) {
+                        }
+                        catch (IllegalArgumentException ex) {
                             Logger.getLogger(BridgeSerial.class.getName()).log(Level.WARNING, "Exception reading network message", ex);
                         }
                     }
                 }
-            } catch (IOException ex) {
+            }
+            catch (IOException ex) {
                 Logger.getLogger(BridgeSerial.class.getName()).log(Level.WARNING, null, ex);
             }
         }
 
     }
+
+    /**
+     * Runtime exception thrown if the requested USB device could not be opened
+     */
+    public static class UnableToObtainDeviceException extends RuntimeException {
+        public UnableToObtainDeviceException() { super(); }
+
+        public UnableToObtainDeviceException(String message) { super(message); }
+
+        public UnableToObtainDeviceException(String message, Throwable cause) { super(message, cause); }
+
+        public UnableToObtainDeviceException(Throwable cause) { super(cause); }
+    } // End UnableToOpenDeviceException class
 } // End BridgeSerial class
