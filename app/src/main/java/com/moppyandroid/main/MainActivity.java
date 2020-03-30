@@ -344,6 +344,8 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
                 break;
             } // End SEQUENCE_PAUSE case
             case SEQUENCE_END: {
+                songTimerTask.pause();
+                ((ImageButton) findViewById(R.id.pause_button)).setImageResource(R.drawable.ic_stop);
                 update.getData().ifPresent(reset -> {
                     if ((boolean) reset) { updateSongProgress(); }
                 }); // End ifPresent lambda
