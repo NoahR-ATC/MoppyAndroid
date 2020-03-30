@@ -16,18 +16,12 @@ Known problems:
 Features to implement:
     - MIDI I/O
     - Playlist
+    - Multi-device selection
+    - Visualization
 
 
 Scope creep is getting really bad... let's make a list of nice-to-have-but-slightly-out-of-scope features:
     - Sigh... Another port of MIDISplitter
-
-
-Miscellaneous Notes:
-    - MoppyMIDIReceiverSender used for MIDI I/O, not necessarily needed
-        * We can still use it for MIDI in, but as of writing I have disabled output
-        https://github.com/bluenote10/gervill/blob/master/src/main/java/com/sun/media/sound/RealTimeSequencer.java
-        https://github.com/frohoff/jdk8u-dev-jdk/blob/master/src/share/classes/com/sun/media/sound/AbstractMidiDevice.java
-           ^ createTransmitter
 
 
 Regexes:
@@ -228,7 +222,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
                     midiFileQueryCursor.moveToFirst();
                     midiFileName = midiFileQueryCursor.getString(index);
                     midiFileQueryCursor.close();
-                }
+                } // End if(midiFileQueryCursor != null)
                 else { midiFileName = ""; }
 
                 // Attempt to load the file
@@ -348,11 +342,11 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
             case SEQUENCE_PAUSE: {
                 if (songTimerTask != null) { songTimerTask.pause(); }
                 break;
-            }
+            } // End SEQUENCE_PAUSE case
             case SEQUENCE_END: {
                 update.getData().ifPresent(reset -> {
                     if ((boolean) reset) { updateSongProgress(); }
-                });
+                }); // End ifPresent lambda
                 break;
             } // End SEQUENCE_PAUSE/SEQUENCE_END case
         } // End switch(update)
@@ -448,12 +442,8 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
                 b.setTitle("MoppyAndroid");
                 b.setCancelable(false);
                 b.setMessage("Permission to access all of the attached USB devices is required for operation, please grant it this time");
-                b.setPositiveButton("OK", new DialogInterface.OnClickListener() {
-                    @Override
-                    public void onClick(DialogInterface dialog, int which) {
-                        requestPermission(devices.get(pos), pos);
-                    }
-                });
+                // End onClick
+                b.setPositiveButton("OK", (dialog, which) -> requestPermission(devices.get(pos), pos));
                 b.create().show();
             }
         } // End if(EXTRA_PERMISSION_GRANTED) {} else
@@ -473,7 +463,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
                 netManager.refreshSerialDevices();
                 refreshDevices();
             } // End if(permissionStatuses.allTrue)
-        }
+        } // End if(permissionStatuses.doesntContain(false))
     } // End onUsbPermissionIntent method
 
     // Method triggered when a USB device is attached
@@ -526,7 +516,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         if (seq.isPlaying()) {
             seq.pause();
             ((ImageButton) findViewById(R.id.pause_button)).setImageResource(R.drawable.ic_stop);
-        }
+        } // End if(seq.isPlaying)
         else { seq.stop(); }
     } // End onPauseButton method
 
@@ -631,10 +621,10 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
                 e.printStackTrace();
             } // End try {initMoppy} catch(Exception)
             return;
-        }
+        } // End if(usbManager.getDeviceList.size == 0)
 
         // Get the list of all USB devices and iterate over it
-        // TODO: Synchronize access?
+        // Note: synchronization not needed because this is guaranteed to be done on the UI thread
         permissionStatuses.clear();
         devices.clear();
         ArrayList<UsbDevice> usbDevices = new ArrayList<>(usbManager.getDeviceList().values());
@@ -659,46 +649,51 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         usbManager.requestPermission(device, pendingIntent);
     } // End requestPermission method
 
+    // Enables/disables the play button
     private void enablePlayButton(boolean enabled) {
         ImageButton playButton = findViewById(R.id.play_button);
         if (enabled) {
             playButton.setEnabled(true);
             playButton.setAlpha(1f);
-        }
+        } // End if(enabled)
         else {
             playButton.setEnabled(false);
             playButton.setAlpha(0.5f);
-        }
-    }
+        } // End if(enabled) {} else
+    } // End enablePlayButton method
 
+    // Enables/disables the pause/stop button
     private void enablePauseButton(boolean enabled) {
         ImageButton pauseButton = findViewById(R.id.pause_button);
         if (enabled) {
             pauseButton.setEnabled(true);
             pauseButton.setAlpha(1f);
-        }
+        } // End if(enabled)
         else {
             pauseButton.setEnabled(false);
             pauseButton.setAlpha(0.5f);
-        }
-    }
+        } // End if(enabled) {} else
+    } // End enablePauseButton method
 
+    // Enables/disables the song position slider
     private void enableSongSlider(boolean enabled) {
         if (enabled) {
             songSlider.setEnabled(true);
             songSlider.setAlpha(1f);
-        }
+        } // End if(enabled)
         else {
             songSlider.setEnabled(false);
             songSlider.setAlpha(0.5f);
-        }
-    }
+        } // End if(enabled) {} else
+    } // End enableSongSlider method
 
+    // Assigns the passed string as the name of the loaded song
     private void setSongName(String songName) {
         ((TextView) findViewById(R.id.toolbar_song_title)).setText(songName);
         ((TextView) findViewById(R.id.song_title)).setText(songName);
     } // End setSongName method
 
+    // Updates the song position slider and textual counter
     private void updateSongProgress() {
         long currentTime = seq.getSecondsPosition();
         if (currentTime < 0 || currentTime > Integer.MAX_VALUE) {
@@ -707,8 +702,9 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         else { songSlider.setProgress((int) currentTime); }
 
         updateSongPositionText();
-    }
+    } // End updateSongProgess method
 
+    // Updates the text label representing the song position (e.g. 0:02:24/0:03:00)
     private void updateSongPositionText() {
         long currentTime = seq.getSecondsPosition();
 
@@ -730,8 +726,9 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
 
         // Ensure the text update is done on the UI thread (since this method is likely called from a TimerTask's thread)
         uiHandler.post(() -> timeTextView.setText(timeTextBuilder.toString()));
-    }
+    } // End updateSongPositionText
 
+    // Class used to update the song position slider and text every timer tick
     protected class SongTimerTask extends TimerTask {
         private boolean notPaused;
 
