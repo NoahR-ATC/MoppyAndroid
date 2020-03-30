@@ -290,22 +290,26 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
             if (fromUser) {
                 seq.setSecondsPosition(progress);
                 updateSongPositionText();
-            }
-        }
-    }
+            } // End if(fromUser)
+        } // End if(seekBar == songSlider)
+    } // End onProgressChanged method
 
     // Method triggered when the song slider begins to be moved
     @Override
     public void onStartTrackingTouch(SeekBar seekBar) {
-        // Pause the sequencer so there isn't any garbled (possibly damaging?) notes as the slider moves
-        if (seq.isPlaying()) { seq.pause(); }
-    }
+        if (seekBar == songSlider) {
+            // Pause the sequencer so there isn't any garbled (possibly damaging?) notes as the slider moves
+            if (seq.isPlaying()) { seq.pause(); }
+        } // End if(seekBar == songSlider)
+    } // End onStartTrackingTouch method
 
     // Method triggered when the song time slider finishes being moved
     @Override
     public void onStopTrackingTouch(SeekBar seekBar) {
-        if (playAfterTrackingFinished) { seq.play(); }
-    }
+        if (seekBar == songSlider) {
+            if (playAfterTrackingFinished) { seq.play(); }
+        } // End if(seekBar == songSlider)
+    } // End onStopTrackingTouch method
 
     // Method triggered when the sequencer sends a status update
     @Override
@@ -376,7 +380,10 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
 
                 // Enable the stop and play buttons as necessary
                 enablePauseButton(true);
-                if (sequenceLoaded) { enablePauseButton(true); }
+                if (sequenceLoaded) {
+                    enablePlayButton(true);
+                    enableSongSlider(true);
+                } // End if(bridgeConnected && !songSlider.enabled)
             } // End try {connectBridge}
             catch (IOException e) {
                 {
