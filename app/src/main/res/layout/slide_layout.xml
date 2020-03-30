@@ -33,7 +33,7 @@
         app:srcCompat="@color/colorPrimaryDark" />
 
     <SeekBar
-        android:id="@+id/seekBar"
+        android:id="@+id/song_slider"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_above="@id/toolbar_layout_placeholder_slide"

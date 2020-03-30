@@ -38,7 +38,7 @@
             android:text="@string/song_title" />
 
         <TextView
-            android:id="@+id/textView2"
+            android:id="@+id/song_time_text"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_alignBottom="@id/pause_button"

@@ -57,6 +57,7 @@ import android.database.Cursor;
 import android.hardware.usb.UsbDevice;
 import android.hardware.usb.UsbManager;
 import android.net.Uri;
+import android.os.Handler;
 import android.provider.OpenableColumns;
 import android.view.View;
 import android.view.ViewGroup;
@@ -64,6 +65,7 @@ import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.ImageButton;
 import android.widget.RelativeLayout;
+import android.widget.SeekBar;
 import android.widget.Spinner;
 import android.widget.TextView;
 import android.os.Bundle;
@@ -77,6 +79,8 @@ import com.moppyandroid.com.moppy.core.events.postprocessor.MessagePostProcessor
 import com.moppyandroid.com.moppy.core.midi.MoppyMIDIReceiverSender;
 import com.moppyandroid.com.moppy.core.status.StatusBus;
 
+import com.moppyandroid.com.moppy.core.status.StatusConsumer;
+import com.moppyandroid.com.moppy.core.status.StatusUpdate;
 import com.sothree.slidinguppanel.SlidingUpPanelLayout;
 import com.sothree.slidinguppanel.SlidingUpPanelLayout.PanelState;
 
@@ -89,10 +93,13 @@ import jp.kshoji.javax.sound.midi.spi.MidiFileReader;
 import java.io.FileNotFoundException;
 import java.io.InputStream;
 import java.io.IOException;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Timer;
+import java.util.TimerTask;
 
-public class MainActivity extends AppCompatActivity implements AdapterView.OnItemSelectedListener {
+public class MainActivity extends AppCompatActivity implements AdapterView.OnItemSelectedListener, StatusConsumer, SeekBar.OnSeekBarChangeListener {
     private MoppyMIDISequencer seq;
     private MoppyMIDIReceiverSender receiverSender;
     private StatusBus statusBus;
@@ -104,7 +111,12 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
     private HashMap<Integer, UsbDevice> devices;
     private HashMap<Integer, Boolean> permissionStatuses;
     private SlidingUpPanelLayout panelLayout;
+    private SeekBar songSlider;
+    private Timer songProgressTimer;
+    private SongTimerTask songTimerTask;
+    private Handler uiHandler;
     private boolean sequenceLoaded;
+    private boolean playAfterTrackingFinished;
 
     public static final String ACTION_USB_PERMISSION = "com.moppyandroid.USB_PERMISSION";
 
@@ -141,7 +153,9 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
 
         // Set the initial view and disable the pause and play buttons
         setContentView(R.layout.activity_main);
+        songSlider = findViewById(R.id.song_slider);
         enablePlayButton(false);
+        enableSongSlider(false);
         enablePauseButton(false);
 
         // Create the filter describing which intents to process and register it
@@ -161,8 +175,9 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         // Run the initializer
         init();
 
-        // Set this activity to be called when the spinner for choosing the Moppy device has a selection event
+        // Set this activity to be called when the USB device spinner or the song slider have a selection event
         ((Spinner) findViewById(R.id.device_box)).setOnItemSelectedListener(this);
+        ((SeekBar) findViewById(R.id.song_slider)).setOnSeekBarChangeListener(this);
 
         // Define the listener lambdas for the load, play, and stop buttons
         findViewById(R.id.load_button).setOnClickListener((View v) -> onLoadButton());
@@ -175,7 +190,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
     @Override
     public void onBackPressed() {
         // If the sliding menu is defined and open collapse it, otherwise do the default action
-        if (panelLayout == null ) { super.onBackPressed(); }
+        if (panelLayout == null) { super.onBackPressed(); }
         if (panelLayout.getPanelState() == PanelState.EXPANDED || panelLayout.getPanelState() == PanelState.ANCHORED) {
             panelLayout.setPanelState(SlidingUpPanelLayout.PanelState.COLLAPSED);
         } // End if(panelLayout.state == EXPANDED || panelLayout.state == ANCHORED)
@@ -257,14 +272,86 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
                 // If an exception wasn't raised (in which case control would have returned), set the song title
                 setSongName(midiFileName);
 
-                // Mark that a sequence has been loaded and enable the play button if necessary
+                // Mark that a sequence has been loaded, and enable the play button and song slider if necessary
                 sequenceLoaded = true;
-                if (currentBridgeIdentifier != null && !findViewById(R.id.play_button).isEnabled()) {
+                if (currentBridgeIdentifier != null && !songSlider.isEnabled()) {
                     enablePlayButton(true);
-                } // End if(bridgeConnected && !playButton.enabled)
+                    enableSongSlider(true);
+                } // End if(bridgeConnected && !songSlider.enabled)
             } // End if(result == OK)
         } // End if(request == LOAD_FILE)
     } // End onActivityResult method
+
+    // Method triggered when the song slider has been used
+    @Override
+    public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+        if (seekBar == songSlider) {
+            if (fromUser) {
+                seq.setSecondsPosition(progress);
+                updateSongPositionText();
+            }
+        }
+    }
+
+    // Method triggered when the song slider begins to be moved
+    @Override
+    public void onStartTrackingTouch(SeekBar seekBar) {
+        // Pause the sequencer so there isn't any garbled (possibly damaging?) notes as the slider moves
+        if (seq.isPlaying()) { seq.pause(); }
+    }
+
+    // Method triggered when the song time slider finishes being moved
+    @Override
+    public void onStopTrackingTouch(SeekBar seekBar) {
+        if (playAfterTrackingFinished) { seq.play(); }
+    }
+
+    // Method triggered when the sequencer sends a status update
+    @Override
+    public void receiveUpdate(StatusUpdate update) {
+        switch (update.getType()) {
+            case SEQUENCE_LOAD: {
+                // Start the timer, shutting it down first if it is still running, and ensure the task is paused
+                if (songTimerTask != null) { songTimerTask.cancel(); }
+                if (songProgressTimer != null) { songProgressTimer.cancel(); }
+                songTimerTask = new SongTimerTask();
+                songProgressTimer = new Timer();
+                songTimerTask.pause();
+                // Note: The timer tick is 500 so that if the timer's ticks are slightly offset from
+                // the sequencer's ticks the progress bar will still be pretty accurate
+                songProgressTimer.schedule(songTimerTask, 0, 500);
+                long songLength = seq.getSecondsLength();
+                songSlider.setMax(songLength < Integer.MAX_VALUE ? (int) songLength : Integer.MAX_VALUE);
+
+                // Set the song time text
+                StringBuilder timeTextBuilder = new StringBuilder();
+                String temp;
+                timeTextBuilder.append("0:00:00/");
+                timeTextBuilder.append(songLength / 3600);
+                timeTextBuilder.append(":");
+                temp = Long.toString((songLength % 3600) / 60);
+                timeTextBuilder.append(("00" + temp).substring(temp.length())).append(":");
+                temp = Long.toString(songLength % 60);
+                timeTextBuilder.append(("00" + temp).substring(temp.length()));
+                ((TextView) findViewById(R.id.song_time_text)).setText(timeTextBuilder.toString());
+                break;
+            } // End SEQUENCE_LOAD case
+            case SEQUENCE_START: {
+                songTimerTask.unpause();
+                break;
+            } // End SEQUENCE_START case
+            case SEQUENCE_PAUSE: {
+                if (songTimerTask != null) { songTimerTask.pause(); }
+                break;
+            }
+            case SEQUENCE_END: {
+                update.getData().ifPresent(reset -> {
+                    if ((boolean) reset) { updateSongProgress(); }
+                });
+                break;
+            } // End SEQUENCE_PAUSE/SEQUENCE_END case
+        } // End switch(update)
+    } // End receiveUpdate method
 
     // Method triggered when an item in a spinner is selected
     public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
@@ -288,7 +375,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
 
                 // Enable the stop and play buttons as necessary
                 enablePauseButton(true);
-                if(sequenceLoaded) { enablePlayButton(true); }
+                if (sequenceLoaded) { enablePauseButton(true); }
             } // End try {connectBridge}
             catch (IOException e) {
                 {
@@ -307,6 +394,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         else { // "NONE" selected
             // Set the buttons to be disabled
             enablePlayButton(false);
+            enableSongSlider(false);
             enablePauseButton(false);
 
             // Return if there isn't a bridge to close
@@ -427,16 +515,55 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
     private void onPlayButton() {
         seq.play();
         ((ImageButton) findViewById(R.id.pause_button)).setImageResource(R.drawable.ic_pause);
+        playAfterTrackingFinished = true;
     } // End onPlayButton method
 
     // Method triggered when pause/stop button pressed
     private void onPauseButton() {
+        playAfterTrackingFinished = false;
         if (seq.isPlaying()) {
             seq.pause();
             ((ImageButton) findViewById(R.id.pause_button)).setImageResource(R.drawable.ic_stop);
         }
         else { seq.stop(); }
     } // End onPauseButton method
+
+    // Initialize non-MoppyLib objects of the class and start the Moppy initialization chain
+    @SuppressLint("UseSparseArrays")
+    private void init() {
+        // Initialize objects
+        devices = new HashMap<>();
+        permissionStatuses = new HashMap<>();
+        spinnerHashMap = new HashMap<>();
+        usbManager = (UsbManager) getSystemService(USB_SERVICE);
+        uiHandler = new Handler();
+        sequenceLoaded = false;
+
+        // Initialize BridgeSerial
+        BridgeSerial.init(this);
+
+        // Request permission to access all attached USB devices (also initializes Moppy on completion)
+        requestPermissionForAllDevices();
+    } // End init method
+
+    // Initialize all MoppyLib objects of the class
+    // Note: Separate from init because these cannot be initialized before permission to access USB devices is awarded
+    private void initMoppy() throws java.io.IOException, MidiUnavailableException {
+        // Initialize Moppy objects
+        statusBus = new StatusBus();
+        mappers = new MapperCollection<>();
+        mappers.addMapper(MIDIEventMapper.defaultMapper((byte) 0x01));
+        netManager = new NetworkManager(statusBus);
+        receiverSender = new MoppyMIDIReceiverSender(mappers, MessagePostProcessor.PASS_THROUGH, netManager.getPrimaryBridge());
+        seq = new MoppyMIDISequencer(statusBus, receiverSender);
+
+        // Register this class as a consumer of the status updates generated by the MoppyMIDISequencer
+        statusBus.registerConsumer(this);
+
+        // Start the network manager and refresh the device lists
+        netManager.start();
+        refreshDevices();
+    } // End initMoppy method
 
     // Refresh the device box and related lists
     private void refreshDevices() {
@@ -489,39 +616,6 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         spinner.setAdapter(adapter);
     } // End refreshDeviceLists method
 
-    // Initialize non-MoppyLib objects of the class and start the Moppy initialization chain
-    @SuppressLint("UseSparseArrays")
-    private void init() {
-        // Initialize objects
-        devices = new HashMap<>();
-        permissionStatuses = new HashMap<>();
-        spinnerHashMap = new HashMap<>();
-        usbManager = (UsbManager) getSystemService(USB_SERVICE);
-        sequenceLoaded = false;
-
-        // Initialize BridgeSerial
-        BridgeSerial.init(this);
-
-        // Request permission to access all attached USB devices (also initializes Moppy on completion)
-        requestPermissionForAllDevices();
-    } // End init method
-
-    // Initialize all MoppyLib objects of the class
-    // Note: Separate from init because these cannot be initialized before permission to access USB devices is awarded
-    private void initMoppy() throws java.io.IOException, MidiUnavailableException {
-        // Initialize Moppy objects
-        statusBus = new StatusBus();
-        mappers = new MapperCollection<>();
-        mappers.addMapper(MIDIEventMapper.defaultMapper((byte) 0x01));
-        netManager = new NetworkManager(statusBus);
-        receiverSender = new MoppyMIDIReceiverSender(mappers, MessagePostProcessor.PASS_THROUGH, netManager.getPrimaryBridge());
-        seq = new MoppyMIDISequencer(statusBus, receiverSender);
-
-        // Start the network manager and refresh the device lists
-        netManager.start();
-        refreshDevices();
-    } // End initMoppy method
-
     // Requests permission to access all attached USB devices
     private void requestPermissionForAllDevices() {
         // Exit method if either the USB manager or the device list is invalid
@@ -563,7 +657,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         usbManager.requestPermission(device, pendingIntent);
     } // End requestPermission method
 
-    private void enablePlayButton(boolean enabled){
+    private void enablePlayButton(boolean enabled) {
         ImageButton playButton = findViewById(R.id.play_button);
         if (enabled) {
             playButton.setEnabled(true);
@@ -587,10 +681,73 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         }
     }
 
+    private void enableSongSlider(boolean enabled) {
+        if (enabled) {
+            songSlider.setEnabled(true);
+            songSlider.setAlpha(1f);
+        }
+        else {
+            songSlider.setEnabled(false);
+            songSlider.setAlpha(0.5f);
+        }
+    }
+
     private void setSongName(String songName) {
         ((TextView) findViewById(R.id.toolbar_song_title)).setText(songName);
         ((TextView) findViewById(R.id.song_title)).setText(songName);
     } // End setSongName method
+
+    private void updateSongProgress() {
+        long currentTime = seq.getSecondsPosition();
+        if (currentTime < 0 || currentTime > Integer.MAX_VALUE) {
+            songSlider.setProgress(songSlider.getMax());
+        } // End if(currentTime < 1 || currentTime > INT_MAX)
+        else { songSlider.setProgress((int) currentTime); }
+
+        updateSongPositionText();
+    }
+
+    private void updateSongPositionText() {
+        long currentTime = seq.getSecondsPosition();
+
+        // Update the textual view of the current song time, retaining the song length portion
+        // Note: A substring is taken for minutes and seconds to ensure that there is 2 digits
+        TextView timeTextView = findViewById(R.id.song_time_text);
+        StringBuilder timeTextBuilder = new StringBuilder();
+        String temp;
+        timeTextBuilder.append(currentTime / 3600);
+        timeTextBuilder.append(":");
+        temp = Long.toString((currentTime % 3600) / 60);
+        timeTextBuilder.append(("00" + temp).substring(temp.length())).append(":");
+        temp = Long.toString(currentTime % 60);
+        timeTextBuilder.append(("00" + temp).substring(temp.length()));
+        timeTextBuilder.append(timeTextView.getText().subSequence(
+                timeTextView.getText().toString().indexOf("/"),
+                timeTextView.getText().length()
+        )); // End subSequence call
+
+        // Ensure the text update is done on the UI thread (since this method is likely called from a TimerTask's thread)
+        uiHandler.post(() -> timeTextView.setText(timeTextBuilder.toString()));
+    }
+
+    protected class SongTimerTask extends TimerTask {
+        private boolean notPaused;
+
+        public SongTimerTask() { notPaused = true; }
+
+        public SongTimerTask(boolean startPaused) { notPaused = !startPaused; }
+
+        @Override
+        public void run() {
+            if (notPaused) {
+                updateSongProgress();
+            } // End if(notPaused)
+        } // End run method
+
+        public void pause() { notPaused = false; }
+
+        public void unpause() { notPaused = true; }
+    } // End SongTimerTask class
 
     // The code constants for requests sent with startActivityForResult
     static final public class RequestCodes {

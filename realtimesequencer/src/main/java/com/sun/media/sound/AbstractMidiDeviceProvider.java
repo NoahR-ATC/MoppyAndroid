@@ -29,6 +29,7 @@
 package com.sun.media.sound;
 
 import jp.kshoji.javax.sound.midi.MidiDevice;
+import com.sun.media.sound.Printer;
 import jp.kshoji.javax.sound.midi.spi.MidiDeviceProvider;
 
 

@@ -4,5 +4,7 @@ README and MoppyAndroid author: Noah Reeder
 I have pulled this code from the master branch of https://github.com/kshoji/javax.sound.midi-for-Android on 2020-03-19
 because I was having issues with the develop branch, as well as needing to be able to view object status mid-operation
 with breakpoints. There have been no major modifications to code operation, however I have updated the build.gradle to
-be compatible with my project. The only modification to source code has been updating the annotations to be compatible
-with a modern Android SDK.
+be compatible with my project. Modifications to source code area as follows:
+    - updating the annotations to be compatible with a modern Android SDK.
+    - Complete replacement of the Sequence class with the OpenJDK 8 implementation due to issues with K.Shoji's implementation.
+    - Added the OpenJDK 8 implementation of MidiUtils class and Printer class to support the OpenJDK 8 Sequence implementation.
