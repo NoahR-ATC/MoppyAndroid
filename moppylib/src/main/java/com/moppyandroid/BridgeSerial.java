@@ -62,14 +62,6 @@ public class BridgeSerial extends NetworkBridge {
         // Assign static variables
         context = passedContext;
         usbManager = (UsbManager) context.getSystemService(Context.USB_SERVICE);
-        {
-            AlertDialog.Builder b = new AlertDialog.Builder(context);
-            b.setTitle("MoppyAndroid");
-            b.setCancelable(false);
-            b.setMessage("Class Initialized - BridgeSerial");
-            b.setPositiveButton("OK", null);
-            b.create().show();
-        }
     }
 
     public BridgeSerial(String serialPortName) {

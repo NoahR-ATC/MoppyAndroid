@@ -10,7 +10,7 @@ Known bugs:
 
 Known problems:
     - Hard to use track slider in slide menu (adjust slide menu sensitivity?)
-    - Must connect to device, disconnect, and connect again for connection to work
+    - Must connect to device, disconnect, and connect again for connection to work... sometimes
 
 
 Features to implement:
@@ -51,6 +51,7 @@ import android.app.AlertDialog;
 import android.app.PendingIntent;
 import android.content.BroadcastReceiver;
 import android.content.Context;
+import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.database.Cursor;
@@ -435,20 +436,23 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         } // End if(EXTRA_PERMISSION_GRANTED)
         else {
             // Permission not granted, give a message box and request again
-            // TODO: Permission window shows over top of alert
             {
                 AlertDialog.Builder b = new AlertDialog.Builder(this);
                 b.setTitle("MoppyAndroid");
                 b.setCancelable(false);
-                b.setMessage("Permission to access all USB devices is required for operation, please grant it this time");
-                b.setPositiveButton("OK", null);
+                b.setMessage("Permission to access all of the attached USB devices is required for operation, please grant it this time");
+                b.setPositiveButton("OK", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+                        requestPermission(devices.get(pos), pos);
+                    }
+                });
                 b.create().show();
             }
-            requestPermission(devices.get(pos), pos);
         } // End if(EXTRA_PERMISSION_GRANTED) {} else
 
         // Check if all permission requests have been satisfied, and initialize objects if applicable
-        if (!permissionStatuses.values().contains(false)) {
+        if (!permissionStatuses.containsValue(false)) {
             // Check if Moppy objects are uninitialized
             if (netManager == null) {
                 // TODO: More elegant handling?
@@ -469,15 +473,6 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
     private void onUsbDeviceAttachedIntent(Intent intent) {
         int index;
         UsbDevice device;
-
-        {
-            AlertDialog.Builder b = new AlertDialog.Builder(this);
-            b.setTitle("MoppyAndroid");
-            b.setCancelable(false);
-            b.setMessage("USB device plugged in");
-            b.setPositiveButton("OK", null);
-            b.create().show();
-        }
 
         index = devices.size();
         device = intent.getParcelableExtra(UsbManager.EXTRA_DEVICE);
