@@ -34,6 +34,9 @@ Regexes:
     Find all closing braces without a comment about what they close
         (^[^{\n]*})[^//\n]*$
 
+    Find all closing parentheses on a new line without a comment about what they close
+        ^[ \t^]*\)[^//\n]*$
+
  */
 
 
@@ -74,9 +77,9 @@ import com.moppyandroid.com.moppy.core.events.mapper.MapperCollection;
 import com.moppyandroid.com.moppy.core.events.postprocessor.MessagePostProcessor;
 import com.moppyandroid.com.moppy.core.midi.MoppyMIDIReceiverSender;
 import com.moppyandroid.com.moppy.core.status.StatusBus;
-
 import com.moppyandroid.com.moppy.core.status.StatusConsumer;
 import com.moppyandroid.com.moppy.core.status.StatusUpdate;
+
 import com.sothree.slidinguppanel.SlidingUpPanelLayout;
 import com.sothree.slidinguppanel.SlidingUpPanelLayout.PanelState;
 
@@ -89,12 +92,10 @@ import jp.kshoji.javax.sound.midi.spi.MidiFileReader;
 import java.io.FileNotFoundException;
 import java.io.InputStream;
 import java.io.IOException;
-import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Timer;
 import java.util.TimerTask;
-import java.util.logging.Logger;
 
 public class MainActivity extends AppCompatActivity implements AdapterView.OnItemSelectedListener, StatusConsumer, SeekBar.OnSeekBarChangeListener {
     private MoppyMIDISequencer seq;
@@ -237,38 +238,26 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
                 } // End try {loadSequence}
                 catch (FileNotFoundException e) {
                     // Show a message box and exit method
-                    {
-                        AlertDialog.Builder b = new AlertDialog.Builder(this);
-                        b.setTitle("MoppyAndroid");
-                        b.setCancelable(false);
-                        b.setMessage("File" + (midiFileName.equals("") ? "" : " " + midiFileName) + " not found");
-                        b.setPositiveButton("OK", null);
-                        b.create().show();
-                    }
+                    showMessageDialog(
+                            "File" + (midiFileName.equals("") ? "" : " " + midiFileName) + " not found",
+                            null
+                    ); // End showMessageDialog call
                     return;
                 } // End try {loadSequence} catch(FileNotFoundException)
                 catch (IOException e) {
                     // Show a message box and exit method
-                    {
-                        AlertDialog.Builder b = new AlertDialog.Builder(this);
-                        b.setTitle("MoppyAndroid");
-                        b.setCancelable(false);
-                        b.setMessage("Unable to load file" + (midiFileName.equals("") ? "" : ": " + midiFileName));
-                        b.setPositiveButton("OK", null);
-                        b.create().show();
-                    }
+                    showMessageDialog(
+                            "Unable to load file" + (midiFileName.equals("") ? "" : ": " + midiFileName),
+                            null
+                    ); // End showMessageDialog call
                     return;
                 } // End try {loadSequence} catch(IOException)
                 catch (InvalidMidiDataException e) {
                     // Show a message box and exit method
-                    {
-                        AlertDialog.Builder b = new AlertDialog.Builder(this);
-                        b.setTitle("MoppyAndroid");
-                        b.setCancelable(false);
-                        b.setMessage((midiFileName.equals("") ? "Selected file" : midiFileName) + " is not a valid MIDI file");
-                        b.setPositiveButton("OK", null);
-                        b.create().show();
-                    }
+                    showMessageDialog(
+                            (midiFileName.equals("") ? "Selected file" : midiFileName) + " is not a valid MIDI file",
+                            null
+                    ); // End showMessageDialog call
                     return;
                 } // End try {loadSequence} catch(IOException)
 
@@ -378,7 +367,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
                 } // End if(currentBridgeIdentifier != null)
 
                 // Get the bridge to connect to and do so, recording the new bridge as the current bridge if successful
-                String bridgeIdentifier = spinnerHashMap.get((String) parent.getItemAtPosition(position));
+                String bridgeIdentifier = spinnerHashMap.get(parent.getItemAtPosition(position));
                 netManager.connectBridge(bridgeIdentifier);
                 currentBridgeIdentifier = bridgeIdentifier; // Updated here in case connectBridge throws exception
 
@@ -390,14 +379,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
                 } // End if(bridgeConnected && !songSlider.enabled)
             } // End try {connectBridge}
             catch (IOException e) {
-                {
-                    AlertDialog.Builder b = new AlertDialog.Builder(this);
-                    b.setTitle("MoppyAndroid");
-                    b.setCancelable(false);
-                    b.setMessage("Unable to connect to " + parent.getItemAtPosition(position));
-                    b.setPositiveButton("OK", null);
-                    b.create().show();
-                }
+                showMessageDialog("Unable to connect to " + parent.getItemAtPosition(position), null);
 
                 // Set the selection to "NONE"
                 parent.setSelection(0);
@@ -447,15 +429,10 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         } // End if(EXTRA_PERMISSION_GRANTED)
         else {
             // Permission not granted, give a message box and request again
-            {
-                AlertDialog.Builder b = new AlertDialog.Builder(this);
-                b.setTitle("MoppyAndroid");
-                b.setCancelable(false);
-                b.setMessage("Permission to access all of the attached USB devices is required for operation, please grant it this time");
-                // End onClick
-                b.setPositiveButton("OK", (dialog, which) -> requestPermission(devices.get(pos), pos));
-                b.create().show();
-            }
+            showMessageDialog(
+                    "Permission to access all of the attached USB devices is required for operation, please grant it this time",
+                    (dialog, which) -> requestPermission(devices.get(pos), pos)
+            ); // End showMessageDialog call
         } // End if(EXTRA_PERMISSION_GRANTED) {} else
 
         // Check if all permission requests have been satisfied, and initialize objects if applicable
@@ -484,14 +461,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
 
     // Method triggered when a USB device is detached
     private void onUsbDeviceDetachedIntent() {
-        {
-            AlertDialog.Builder b = new AlertDialog.Builder(this);
-            b.setTitle("MoppyAndroid");
-            b.setCancelable(false);
-            b.setMessage("USB device unplugged");
-            b.setPositiveButton("OK", null);
-            b.create().show();
-        }
+        showMessageDialog("USB device unplugged", null);
 
         // Refresh the device lists
         netManager.refreshSerialDevices();
@@ -558,14 +528,10 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         catch (MidiUnavailableException e) {
             // Log the unrecoverable error, throw up a message box, and exit the application with a non-zero value
             Log.e("com.moppyandroid.main.MainActivity", "Unable to construct MoppyMIDISequencer", e);
-            {
-                AlertDialog.Builder b = new AlertDialog.Builder(this);
-                b.setTitle("MoppyAndroid");
-                b.setCancelable(false);
-                b.setMessage("Unrecoverable error: Unable to get MIDI resources for Moppy initialization. exiting");
-                b.setPositiveButton("OK", (dialog, which) -> System.exit(1));
-                b.create().show();
-            }
+            showMessageDialog(
+                    "Unrecoverable error: Unable to get MIDI resources for Moppy initialization. exiting",
+                    (dialog, which) -> System.exit(1)
+            ); // End showMessageDialog call
         } // End try {new MoppyMidiSequencer} catch(MidiUnavailableException)
 
         // Register this class as a consumer of the status updates generated by the MoppyMIDISequencer
@@ -717,7 +683,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         else { songSlider.setProgress((int) currentTime); }
 
         updateSongPositionText();
-    } // End updateSongProgess method
+    } // End updateSongProgress method
 
     // Updates the text label representing the song position (e.g. 0:02:24/0:03:00)
     private void updateSongPositionText() {
@@ -743,6 +709,16 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         uiHandler.post(() -> timeTextView.setText(timeTextBuilder.toString()));
     } // End updateSongPositionText
 
+    // Shows a non-cancellable alert dialog with only an OK button
+    private void showMessageDialog(String message, DialogInterface.OnClickListener listener) {
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle("MoppyAndroid");
+        builder.setCancelable(false);
+        builder.setMessage(message);
+        builder.setPositiveButton("OK", listener);
+        builder.create().show();
+    } // End showMessageDialog method
+
     // Class used to update the song position slider and text every timer tick
     protected class SongTimerTask extends TimerTask {
         private boolean notPaused;
@@ -753,9 +729,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
 
         @Override
         public void run() {
-            if (notPaused) {
-                updateSongProgress();
-            } // End if(notPaused)
+            if (notPaused) { updateSongProgress(); }
         } // End run method
 
         public void pause() { notPaused = false; }
