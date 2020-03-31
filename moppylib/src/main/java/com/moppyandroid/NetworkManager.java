@@ -17,6 +17,7 @@ import java.net.UnknownHostException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
@@ -48,7 +49,8 @@ public class NetworkManager implements NetworkMessageConsumer {
         try {
             BridgeUDP udpBridge = new BridgeUDP();
             networkBridges.put(udpBridge.getNetworkIdentifier(), udpBridge);
-        } catch (UnknownHostException ex) {
+        }
+        catch (UnknownHostException ex) {
             Logger.getLogger(NetworkManager.class.getName()).log(Level.SEVERE, null, ex);
         }
 
@@ -145,13 +147,39 @@ public class NetworkManager implements NetworkMessageConsumer {
 
     /**
      * Refreshes the list of available serial bridges
+     *
+     * @author Noah Reeder
      */
     public void refreshSerialDevices() {
+        // Remove all serial bridges, closing them if necessary
+        Iterator<Entry<String, NetworkBridge>> itr = networkBridges.entrySet().iterator();
+        while (itr.hasNext()) {
+            Entry<String, NetworkBridge> entry = itr.next();
+            if (entry.getValue() instanceof BridgeSerial) {
+                if (entry.getValue().isConnected()) {
+                    try { entry.getValue().close(); }
+                    catch (IOException ignored) {}
+                }
+                itr.remove();
+            }
+        }
+
+        // Create serial bridges for each serial device and add them to the hashmap
         BridgeSerial.getAvailableSerials()
                 .forEach(serial -> {
                     BridgeSerial serialBridge = new BridgeSerial(serial);
                     networkBridges.put(serialBridge.getNetworkIdentifier(), serialBridge);
                 });
+    }
+
+    /**
+     * Checks if a specific bridge is connected
+     *
+     * @author Noah Reeder
+     */
+    public boolean isConnected(String bridgeIdentifier) {
+        NetworkBridge bridge = networkBridges.get(bridgeIdentifier);
+        return (bridge != null && bridge.isConnected());
     }
 
     /**
@@ -177,7 +205,8 @@ public class NetworkManager implements NetworkMessageConsumer {
                 // Send a ping
                 try {
                     bridgeToPing.sendMessage(MoppyMessage.SYS_PING);
-                } catch (IOException ex) {
+                }
+                catch (IOException ex) {
                     // If for some reason we can't send the message, just log and carry on (hopefully whatever's wrong
                     // will resolve itself again, but we don't want to kill the pinger)
                     Logger.getLogger(NetworkManager.class.getName()).log(Level.WARNING, null, ex);
@@ -186,7 +215,8 @@ public class NetworkManager implements NetworkMessageConsumer {
                 // Wait a bit for responses and because we don't need to ping constantly
                 try {
                     Thread.sleep(3000);
-                } catch (InterruptedException ex) {
+                }
+                catch (InterruptedException ex) {
                     break;
                 }
 

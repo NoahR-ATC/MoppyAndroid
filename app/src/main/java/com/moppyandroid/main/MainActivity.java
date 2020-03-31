@@ -6,7 +6,6 @@ Author: Noah Reeder, noahreederatc@gmail.com
 Known bugs:
     - TODO: Investigate issues with restarting app (force stopping first works)
     - TODO: Gracefully close BridgeSerial connection on application close
-    - TODO: Bug likely exists with refreshing devices while playing
 
 Known problems:
     - Hard to use track slider in slide menu (adjust slide menu sensitivity?)
@@ -17,11 +16,11 @@ Features to implement:
     - MIDI I/O
     - Playlist
     - Multi-device selection
-    - Visualization
 
 
 Scope creep is getting really bad... let's make a list of nice-to-have-but-slightly-out-of-scope features:
     - Sigh... Another port of MIDISplitter
+    - Visualization
 
 
 Regexes:
@@ -361,8 +360,14 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
             // Attempt to start a connection to the selected device/bridge
             try {
                 // If necessary, close the current connection
-                if (currentBridgeIdentifier != null) {
-                    netManager.closeBridge(currentBridgeIdentifier);
+                if (currentBridgeIdentifier != null && netManager.isConnected(currentBridgeIdentifier)) {
+                    // Note:
+                    try { netManager.closeBridge(currentBridgeIdentifier); }
+                    catch (IOException e) {
+                        // In the words of MoppyLib's author when they deal with this exception, "There's not
+                        // much we can do if it fails to close (it's probably already closed). Just log it and move on"
+                        Log.w("com.moppyandroid.main.MainActivity", "Unable to close bridge", e);
+                    }
                     currentBridgeIdentifier = null;
                 } // End if(currentBridgeIdentifier != null)
 
@@ -402,14 +407,14 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
             catch (IOException e) {
                 // In the words of MoppyLib's author when they deal with this exception, "There's not
                 // much we can do if it fails to close (it's probably already closed). Just log it and move on"
-                e.printStackTrace();
+                Log.w("com.moppyandroid.main.MainActivity", "Unable to close bridge", e);
             } // End try {closeBridge} catch(IOException e)
         } // End if(position != 0) {} else
     } // End onItemSelected method
 
     // Method triggered when a spinner is closed without selecting something
     public void onNothingSelected(AdapterView<?> parent) {
-        // Don't care, but we need have to implement it
+        // Don't care, but we need to implement it
     } // End onNothingSelected method
 
     // Method triggered when a USB permission dialog completes
@@ -445,6 +450,11 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
                 refreshDevices();
             } // End if(netManager == null) {} else
         } // End if(permissionStatuses.doesntContain(false))
+        else {
+            if (pos < permissionStatuses.size() - 1) {
+                requestPermission(devices.get(pos + 1), pos + 1);
+            }
+        }
     } // End onUsbPermissionIntent method
 
     // Method triggered when a USB device is attached
@@ -461,10 +471,9 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
 
     // Method triggered when a USB device is detached
     private void onUsbDeviceDetachedIntent() {
-        showMessageDialog("USB device unplugged", null);
-
-        // Refresh the device lists
+        // Refresh the netManger device lists, waiting for the message box to be acknowledged before refreshing ours
         netManager.refreshSerialDevices();
+        currentBridgeIdentifier = null;
         refreshDevices();
     } // End onUsbDeviceDetachedIntent method
 
@@ -544,8 +553,14 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
 
     // Refresh the device box and related lists
     private void refreshDevices() {
-        // Retrieve the device box spinner and clear the hashmap
+        String previousSelection;
+
+        // Note: If this was called as a result of a device detachment then the netManager refresh
+        // would have handled the device disconnection
+
+        // Retrieve the device box spinner, save the current selection, and clear the hashmap
         Spinner spinner = findViewById(R.id.device_box);
+        previousSelection = (String) spinner.getSelectedItem();
         spinnerHashMap.clear();
 
         // Ensure that the usbManager is valid
@@ -591,6 +606,20 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
 
         // Apply the adapter to the spinner
         spinner.setAdapter(adapter);
+
+        // If there was no previous selection or the previous selection was "NONE", finish processing here
+        if (previousSelection == null || previousSelection.equals("NONE")) { return; }
+
+        // Attempt to get the new index of the previously selected item, throwing up a message box and returning if not found
+        // Note: spinner.setSelection will trigger onItemSelected, so we don't need to connect here
+        int index = adapter.getPosition(previousSelection);
+        if (index == -1) {
+            showMessageDialog("The previously selected device is no longer available", null);
+            // Replicate a pause event if the device was being played to
+            if (seq.isPlaying()) { onPauseButton(); }
+            return;
+        }
+        spinner.setSelection(index);
     } // End refreshDeviceLists method
 
     // Requests permission to access all attached USB devices
@@ -611,12 +640,18 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         ArrayList<UsbDevice> usbDevices = new ArrayList<>(usbManager.getDeviceList().values());
         for (int i = 0; i < usbDevices.size(); ++i) {
             // Add an entry for the device in the permission status list, add it to the device list
-            permissionStatuses.put(i, false);
-            devices.put(i, usbDevices.get(i));
+            if (!usbManager.hasPermission(usbDevices.get(i))) {
+                permissionStatuses.put(i, false);
+                devices.put(i, usbDevices.get(i));
+            }
 
             // Request permission to access the device
-            requestPermission(devices.get(i), i);
+            //requestPermission(devices.get(i), i);
         } // End for(i < usbDevices.size)
+
+        if (devices.size() != 0) {requestPermission(devices.get(0), 0);}
+        else { initMoppy(); }
+
     } // End requestPermissionForAllDevices method
 
     // Request permission to access a specific attached USB device, specifying the index of the permissionStatuses entry for it
