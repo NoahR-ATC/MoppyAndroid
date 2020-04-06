@@ -4,12 +4,14 @@ package com.moppyandroid.main;
 Author: Noah Reeder, noahreederatc@gmail.com
 
 Known bugs:
-    - TODO: Investigate issues with restarting app (force stopping first works)
-    - TODO: Gracefully close BridgeSerial connection on application close
+
 
 Known problems:
     - Hard to use track slider in slide menu (adjust slide menu sensitivity?)
     - Must connect to device, disconnect, and connect again for connection to work... sometimes
+    - Doesn't work with non-serial device connected... easiest fix is to implement multi-device selection
+    - To fix the app not shutting down properly, I eliminated being able to play songs while the app is
+        minimized or the device is locked. This can be reintroduced by switching to UI/Service model
 
 
 Features to implement:
@@ -21,6 +23,9 @@ Features to implement:
 Scope creep is getting really bad... let's make a list of nice-to-have-but-slightly-out-of-scope features:
     - Sigh... Another port of MIDISplitter
     - Visualization
+    - Media control notification. Requires project restructure into UI/Service model
+        • Solves most issues with application lifetime, but exaggerates issues with device disconnection
+        • Use a foreground service to run sequencer and interact with Intents/StatusConsumer updates
 
 
 Regexes:
@@ -182,6 +187,47 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         findViewById(R.id.pause_button).setOnClickListener((View v) -> onPauseButton());
     } // End onCreate method
 
+    // Method triggered when the activity is obscured by another activity (e.g. another app or file load dialog)
+    @Override
+    protected void onStop() {
+        // Disconnect the bridge, but don't reset the current bridge identifier
+        closeBridge(false);
+        super.onStop();
+    } // End onStop method
+
+    // Method triggered when the activity is brought back into focus after an onStop call
+    @Override
+    protected void onRestart() {
+        if (currentBridgeIdentifier != null) {
+            try {
+                netManager.connectBridge(currentBridgeIdentifier);
+                // Enable the stop and play buttons as necessary
+                enablePauseButton(true);
+                if (sequenceLoaded) {
+                    enablePlayButton(true);
+                    enableSongSlider(true);
+                } // End if(sequenceLoaded)
+            } // End try {connectBridge}
+            catch (IOException e) {
+                Spinner deviceBox = findViewById(R.id.device_box);
+                showMessageDialog("Unable to connect to " + deviceBox.getSelectedItem(), null);
+
+                // Set the selection to "NONE"
+                deviceBox.setSelection(0);
+            } // end try {connectBridge} catch(IOException)
+        } // End if(currentBridgeIdentifier != null)
+        super.onRestart();
+    } // End onResume method
+
+    // Method triggered when the app is destroyed (e.g. force killed, finalize called, killed to reclaim memory)
+    @Override
+    protected void onDestroy() {
+        if (currentBridgeIdentifier != null && netManager.isConnected(currentBridgeIdentifier)) {
+            closeBridge(false);
+        } // End if(currentBridgeIdentifier.isConnected)
+        super.onDestroy();
+    } // End onDestroy method
+
     // Method triggered when the back event is raised (e.g. back button pressed). Taken from AndroidSlidingUpPanel
     // demo application located at https://github.com/umano/AndroidSlidingUpPanel/tree/master/demo
     @Override
@@ -265,10 +311,10 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
 
                 // Mark that a sequence has been loaded, and enable the play button and song slider if necessary
                 sequenceLoaded = true;
-                if (currentBridgeIdentifier != null && !songSlider.isEnabled()) {
+                if (currentBridgeIdentifier != null && netManager.isConnected(currentBridgeIdentifier) && !songSlider.isEnabled()) {
                     enablePlayButton(true);
                     enableSongSlider(true);
-                } // End if(bridgeConnected && !songSlider.enabled)
+                } // End if(currentBridgeIdentifier.isConnected && !songSlider.enabled)
             } // End if(result == OK)
         } // End if(request == LOAD_FILE)
     } // End onActivityResult method
@@ -360,16 +406,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
             // Attempt to start a connection to the selected device/bridge
             try {
                 // If necessary, close the current connection
-                if (currentBridgeIdentifier != null && netManager.isConnected(currentBridgeIdentifier)) {
-                    // Note:
-                    try { netManager.closeBridge(currentBridgeIdentifier); }
-                    catch (IOException e) {
-                        // In the words of MoppyLib's author when they deal with this exception, "There's not
-                        // much we can do if it fails to close (it's probably already closed). Just log it and move on"
-                        Log.w("com.moppyandroid.main.MainActivity", "Unable to close bridge", e);
-                    }
-                    currentBridgeIdentifier = null;
-                } // End if(currentBridgeIdentifier != null)
+                closeBridge(true);
 
                 // Get the bridge to connect to and do so, recording the new bridge as the current bridge if successful
                 String bridgeIdentifier = spinnerHashMap.get(parent.getItemAtPosition(position));
@@ -381,7 +418,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
                 if (sequenceLoaded) {
                     enablePlayButton(true);
                     enableSongSlider(true);
-                } // End if(bridgeConnected && !songSlider.enabled)
+                } // End if(sequenceLoaded)
             } // End try {connectBridge}
             catch (IOException e) {
                 showMessageDialog("Unable to connect to " + parent.getItemAtPosition(position), null);
@@ -396,19 +433,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
             enableSongSlider(false);
             enablePauseButton(false);
 
-            // Return if there isn't a bridge to close
-            if (currentBridgeIdentifier == null) { return; }
-
-            // Attempt to close the current bridge
-            try {
-                netManager.closeBridge(currentBridgeIdentifier);
-                currentBridgeIdentifier = null;
-            } // End try {closeBridge}
-            catch (IOException e) {
-                // In the words of MoppyLib's author when they deal with this exception, "There's not
-                // much we can do if it fails to close (it's probably already closed). Just log it and move on"
-                Log.w("com.moppyandroid.main.MainActivity", "Unable to close bridge", e);
-            } // End try {closeBridge} catch(IOException e)
+            closeBridge(true);
         } // End if(position != 0) {} else
     } // End onItemSelected method
 
@@ -449,12 +474,12 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
                 netManager.refreshSerialDevices();
                 refreshDevices();
             } // End if(netManager == null) {} else
-        } // End if(permissionStatuses.doesntContain(false))
+        } // End if(permissionStatuses.allTrue)
         else {
             if (pos < permissionStatuses.size() - 1) {
                 requestPermission(devices.get(pos + 1), pos + 1);
-            }
-        }
+            } // End if(pos < permissionStatuses.lastIndex)
+        } // End if(permissionStatuses.allTrue)
     } // End onUsbPermissionIntent method
 
     // Method triggered when a USB device is attached
@@ -618,7 +643,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
             // Replicate a pause event if the device was being played to
             if (seq.isPlaying()) { onPauseButton(); }
             return;
-        }
+        } // End if(index == -1)
         spinner.setSelection(index);
     } // End refreshDeviceLists method
 
@@ -643,16 +668,35 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
             if (!usbManager.hasPermission(usbDevices.get(i))) {
                 permissionStatuses.put(i, false);
                 devices.put(i, usbDevices.get(i));
-            }
+            } // End if(usbDevices.get(i).needsPermission)
 
             // Request permission to access the device
             //requestPermission(devices.get(i), i);
         } // End for(i < usbDevices.size)
 
-        if (devices.size() != 0) {requestPermission(devices.get(0), 0);}
+        if (devices.size() != 0) { requestPermission(devices.get(0), 0); }
         else { initMoppy(); }
 
     } // End requestPermissionForAllDevices method
+
+    // Closes the currently connected bridge, resetting currentBridgeIdentifier to null if passed true
+    private void closeBridge(boolean resetIdentifier) {
+        // Return if there isn't a bridge to close
+        if (currentBridgeIdentifier == null || !netManager.isConnected(currentBridgeIdentifier)) {
+            return;
+        } // End if(currentBridgeIdentifier.notConnected)
+
+        // Attempt to close the current bridge
+        try {
+            netManager.closeBridge(currentBridgeIdentifier);
+            if (resetIdentifier) { currentBridgeIdentifier = null; }
+        } // End try {closeBridge}
+        catch (IOException e) {
+            // In the words of MoppyLib's author when they deal with this exception, "There's not
+            // much we can do if it fails to close (it's probably already closed). Just log it and move on"
+            Log.w("com.moppyandroid.main.MainActivity", "Unable to close bridge", e);
+        } // End try {closeBridge} catch(IOException e)
+    } // End closeBridge method
 
     // Request permission to access a specific attached USB device, specifying the index of the permissionStatuses entry for it
     private void requestPermission(UsbDevice device, int index) {
