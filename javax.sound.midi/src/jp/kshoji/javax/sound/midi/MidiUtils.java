@@ -1,6 +1,8 @@
 // Pulled from http://hg.openjdk.java.net/jdk8/jdk8/jdk/file/687fd7c7986d/src/share/classes/com/sun/media/sound/MidiUtils.java
 // on 2020-03-22
 
+// Change by Noah Reeder: Visibility of both getTempoMPQAT methods changed from package-private to public
+
 /*
  * Copyright (c) 2003, 2013, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
@@ -26,7 +28,7 @@
  * questions.
  */
 
-package com.sun.media.sound;
+package jp.kshoji.javax.sound.midi;
 
 import jp.kshoji.javax.sound.midi.*;
 import java.util.ArrayList;
@@ -343,11 +345,11 @@ public final class MidiUtils {
             return currTempo;
         }
 
-        float getTempoMPQAt(long tick) {
+        public float getTempoMPQAt(long tick) {
             return getTempoMPQAt(tick, -1.0f);
         }
 
-        synchronized float getTempoMPQAt(long tick, float startTempoMPQ) {
+        public synchronized float getTempoMPQAt(long tick, float startTempoMPQ) {
             for (int i = 0; i < ticks.length; i++) {
                 if (ticks[i] > tick) {
                     if (i > 0) i--;

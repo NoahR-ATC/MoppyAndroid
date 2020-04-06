@@ -44,6 +44,8 @@ import java.security.PrivilegedAction;
 
 import javax.sound.sampled.AudioPermission;
 
+import com.sun.media.sound.Printer;
+
 /** Managing security in the Java Sound implementation.
  * This class contains all code that uses and is used by
  * SecurityManager.doPrivileged().

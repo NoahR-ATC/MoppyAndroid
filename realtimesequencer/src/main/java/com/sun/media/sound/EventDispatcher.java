@@ -34,6 +34,7 @@ import java.util.List;
 import jp.kshoji.javax.sound.midi.ControllerEventListener;
 import jp.kshoji.javax.sound.midi.MetaEventListener;
 import jp.kshoji.javax.sound.midi.MetaMessage;
+import com.sun.media.sound.Printer;
 import jp.kshoji.javax.sound.midi.ShortMessage;
 import javax.sound.sampled.LineEvent;
 import javax.sound.sampled.LineListener;
@@ -110,7 +111,7 @@ final class EventDispatcher implements Runnable {
         // process an LineEvent
         if (eventInfo.getEvent() instanceof LineEvent) {
             LineEvent event = (LineEvent) eventInfo.getEvent();
-            if (Printer.debug) Printer.debug("Sending "+event+" to "+count+" listeners");
+            if (Printer.debug) Printer.debug("Sending " + event + " to " + count + " listeners");
             for (int i = 0; i < count; i++) {
                 try {
                     ((LineListener) eventInfo.getListener(i)).update(event);
