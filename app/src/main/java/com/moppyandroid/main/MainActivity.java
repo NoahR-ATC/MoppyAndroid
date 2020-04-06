@@ -375,6 +375,9 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
                 temp = Long.toString(songLength % 60);
                 timeTextBuilder.append(("00" + temp).substring(temp.length()));
                 ((TextView) findViewById(R.id.song_time_text)).setText(timeTextBuilder.toString());
+
+                // If necessary, unpause the timer task
+                if (seq.isPlaying()) { songTimerTask.unpause(); }
                 break;
             } // End SEQUENCE_LOAD case
             case SEQUENCE_START: {

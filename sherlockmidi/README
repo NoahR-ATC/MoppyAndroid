@@ -1,0 +1,6 @@
+Original author: KyoSherlock
+README and MoppyAndroid author: Noah Reeder
+
+I have pulled this code from the master branch of https://github.com/kyosherlock/mididriver on 2020-03-19. My
+only modification has been to remove the contained jp.kshoji.javax.sound.midi package and instead add my
+modified version of it as a gradle dependency.
