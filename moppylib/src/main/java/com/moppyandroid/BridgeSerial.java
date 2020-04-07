@@ -125,7 +125,7 @@ public class BridgeSerial extends NetworkBridge {
     }
 
     /**
-     * Closes this BridgeSerial connection
+     * Closes this BridgeSerial connection. Unlike the original MoppyLib implementation, renders this BridgeSerial inoperable
      * @throws IOException if unable to write the SYS_STOP message
      * @throws UnableToObtainDeviceException if the serial port could not be recreated after closing communication
      * @author Sam Archer
@@ -141,17 +141,6 @@ public class BridgeSerial extends NetworkBridge {
             // Stop and cleanup listener thread
             listenerThread.interrupt();
             listenerThread = null;
-
-            // Calling syncClose closes the UsbDeviceConnection, so now we need to recreate the device
-            String portName = serialPort.getPortName();
-            serialPort = UsbSerialDevice.createUsbSerialDevice(device, usbManager.openDevice(device));
-            if (serialPort == null) {
-                // There's nothing we can do about it not opening so just log it and throw a runtime exception
-                Logger.getLogger(BridgeSerial.class.getName()).log(Level.SEVERE, "Unable to reopen port " + portName, device);
-                //noinspection ThrowFromFinallyBlock
-                throw new UnableToObtainDeviceException("Unable to reopen " + portName);
-            }
-            serialPort.setPortName(portName);
         }
     }
 
