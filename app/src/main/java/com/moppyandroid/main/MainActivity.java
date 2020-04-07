@@ -4,7 +4,6 @@ package com.moppyandroid.main;
 Author: Noah Reeder, noahreederatc@gmail.com
 
 Known bugs:
-TODO: Erroneous comma at the end of device name
 TODO: Sequencer stops on file load
 
 
@@ -613,8 +612,11 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
                 } // End if(usbDevice.productName != null)
 
                 // Add the manufacturer name and vendor/product IDs
-                deviceDescription.append(usbDevice.getManufacturerName()).append(", ");
-                deviceDescription.append(usbDevice.getVendorId()).append("/").append(usbDevice.getProductId()).append(", ");
+                if (usbDevice.getManufacturerName() != null) {
+                    deviceDescription.append(usbDevice.getManufacturerName()).append(", ");
+                } // End if(usbDevice.manufacturerName != null)
+                deviceDescription.append(Integer.toHexString(usbDevice.getVendorId())).append("/");
+                deviceDescription.append(Integer.toHexString(usbDevice.getProductId()));
             } // End if(usbDevice != null)
 
             // Add the device description to the hashmap for the spinner, and update our copy of the device list
