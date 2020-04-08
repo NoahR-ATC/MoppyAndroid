@@ -16,7 +16,8 @@
             android:name="com.moppyandroid.main.MoppyMediaService"
             android:stopWithTask="false"
             android:enabled="true" />
-        <activity android:name="com.moppyandroid.main.MainActivity">
+        <activity android:name="com.moppyandroid.main.MainActivity"
+            android:launchMode="singleTask">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <action android:name="android.hardware.usb.action.USB_DEVICE_ATTACHED" />

@@ -55,7 +55,7 @@ public class MoppyMediaService extends Service {
                     onPause(intent);
                     break;
                 }
-                case ACTION_STOP:{
+                case ACTION_STOP: {
                     onStop(intent);
                     break;
                 }
@@ -77,8 +77,8 @@ public class MoppyMediaService extends Service {
         LocalBroadcastManager.getInstance(this).registerReceiver(broadcastReceiver, intentFilter);
 
         // Create the notification channel
-        @SuppressLint("WrongConstant") // Don't know why this is appearing, I'm using what is suggests
-        NotificationChannel notificationChannel = new NotificationChannel(
+        // Note: Don't know why this warning is appearing, I'm using what is suggests
+        @SuppressLint("WrongConstant") NotificationChannel notificationChannel = new NotificationChannel(
                 CHANNEL_ID,
                 "Media Service Channel",
                 NotificationManager.IMPORTANCE_LOW
@@ -93,10 +93,11 @@ public class MoppyMediaService extends Service {
     /**
      * Triggered when this service is started with a call to {@link Context#startService}.
      *
-     * @param intent the intent used in the {@code Context.startService call}
-     * @param flags either 0, {@link Service#START_FLAG_REDELIVERY}, or {@link Service#START_FLAG_RETRY}
+     * @param intent  the intent used in the {@code Context.startService call}
+     * @param flags   either 0, {@link Service#START_FLAG_REDELIVERY}, or {@link Service#START_FLAG_RETRY}
      * @param startId unique identifier for this start instance, used with {@link Service#stopSelfResult(int)}
-     * @return
+     * @return flag for how the system should handle restarting the service, one of the
+     * {@link Service#START_CONTINUATION_MASK} flags
      */
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
@@ -157,19 +158,19 @@ public class MoppyMediaService extends Service {
     }
 
     // Triggered by an ACTION_REMOVE_DEVICE broadcast
-    private void onRemoveDevice(Intent intent){
+    private void onRemoveDevice(Intent intent) {
         LocalBroadcastManager.getInstance(this).sendBroadcast(
                 new Intent(MainActivity.ACTION_UNABLE_TO_CONNECT_DEVICE)
         ); // End sendBroadcast call
     }
 
     // Triggered by an ACTION_PLAY broadcast
-    private void onPlay(Intent intent){
+    private void onPlay(Intent intent) {
 
     }
 
     // Triggered by an ACTION_PAUSE broadcast
-    private void onPause(Intent intent){
+    private void onPause(Intent intent) {
 
     }
 
