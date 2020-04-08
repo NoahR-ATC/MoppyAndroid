@@ -45,6 +45,7 @@ Regexes:
 
 
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.localbroadcastmanager.content.LocalBroadcastManager;
 
 import android.annotation.SuppressLint;
 import android.app.Activity;
@@ -118,8 +119,11 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
     private Handler uiHandler;
     private boolean sequenceLoaded;
     private boolean playAfterTrackingFinished;
+    private MoppyMediaService mediaService;
 
     public static final String ACTION_USB_PERMISSION = "com.moppyandroid.USB_PERMISSION";
+    public static final String ACTION_UNABLE_START_MOPPY = "com.moppyandroid.UNABLE_TO_START_MOPPY";
+    public static final String ACTION_UNABLE_TO_CONNECT_DEVICE = "com.moppyandroid.UNABLE_TO_CONNECT_DEVICE";
 
     // Define the receiver to process relevant intent messages
     private BroadcastReceiver broadcastReceiver = new BroadcastReceiver() {
@@ -130,6 +134,20 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
 
             // Determine action and process accordingly
             switch (intent.getAction()) {
+                case ACTION_UNABLE_START_MOPPY: {
+
+                }
+                case ACTION_UNABLE_TO_CONNECT_DEVICE: {
+                    Spinner deviceBox = findViewById(R.id.device_box);
+                    Log.e(
+                            this.getClass().getName(),
+                            "Unable to connect to device",
+                            (Throwable) (intent.getSerializableExtra("exception")));
+                    showMessageDialog("Unable to connect to " + deviceBox.getSelectedItem(), null);
+
+                    // Set the selection to "NONE"
+                    deviceBox.setSelection(0);
+                }
                 case ACTION_USB_PERMISSION: {
                     onUsbPermissionIntent(intent);
                     break;
@@ -159,12 +177,21 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         enableSongSlider(false);
         enablePauseButton(false);
 
-        // Create the filter describing which intents to process and register it
-        IntentFilter intentFilter = new IntentFilter();
-        intentFilter.addAction(ACTION_USB_PERMISSION);
-        intentFilter.addAction(UsbManager.ACTION_USB_DEVICE_ATTACHED);
-        intentFilter.addAction(UsbManager.ACTION_USB_DEVICE_DETACHED);
-        registerReceiver(broadcastReceiver, intentFilter);
+        // Create the filter describing which operating system intents to process and register it
+        IntentFilter globalIntentFilter = new IntentFilter();
+        globalIntentFilter.addAction(ACTION_USB_PERMISSION);
+        globalIntentFilter.addAction(UsbManager.ACTION_USB_DEVICE_ATTACHED);
+        globalIntentFilter.addAction(UsbManager.ACTION_USB_DEVICE_DETACHED);
+        registerReceiver(broadcastReceiver, globalIntentFilter);
+
+        // Create the filter describing which local intents to process and register it
+        IntentFilter localIntentFilter = new IntentFilter();
+        localIntentFilter.addAction(ACTION_UNABLE_START_MOPPY);
+        localIntentFilter.addAction(ACTION_UNABLE_TO_CONNECT_DEVICE);
+        LocalBroadcastManager.getInstance(this).registerReceiver(broadcastReceiver, localIntentFilter);
+
+        // Start the media service
+        startForegroundService(new Intent(this, MoppyMediaService.class));
 
         // Configure the sliding panel and toolbar
         panelLayout = findViewById(R.id.sliding_panel_layout);
@@ -209,6 +236,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
             } // End try {connectBridge}
             catch (IOException e) {
                 Spinner deviceBox = findViewById(R.id.device_box);
+                Log.e(this.getClass().getName(), "Unable to connect to device", e);
                 showMessageDialog("Unable to connect to " + deviceBox.getSelectedItem(), null);
 
                 // Set the selection to "NONE"
@@ -224,6 +252,8 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         if (currentBridgeIdentifier != null && netManager.isConnected(currentBridgeIdentifier)) {
             closeBridge(false);
         } // End if(currentBridgeIdentifier.isConnected)
+        unregisterReceiver(broadcastReceiver);
+        LocalBroadcastManager.getInstance(this).unregisterReceiver(broadcastReceiver);
         super.onDestroy();
     } // End onDestroy method
 
@@ -314,6 +344,9 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
                     enablePlayButton(true);
                     enableSongSlider(true);
                 } // End if(currentBridgeIdentifier.isConnected && !songSlider.enabled)
+
+                // TODO: Replace this test
+                LocalBroadcastManager.getInstance(this).sendBroadcast(new Intent(MoppyMediaService.ACTION_LOAD_FILE));
             } // End if(result == OK)
         } // End if(request == LOAD_FILE)
     } // End onActivityResult method
