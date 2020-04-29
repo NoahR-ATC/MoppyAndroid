@@ -11,14 +11,12 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 
-import com.moppyandroid.BridgeSerial;
-import com.moppyandroid.com.moppy.core.comms.MoppyMessage;
-import com.moppyandroid.com.moppy.core.comms.NetworkMessageConsumer;
-import com.moppyandroid.com.moppy.core.comms.bridge.BridgeUDP;
-import com.moppyandroid.com.moppy.core.comms.bridge.MultiBridge;
-import com.moppyandroid.com.moppy.core.comms.bridge.NetworkBridge;
-import com.moppyandroid.com.moppy.core.status.StatusBus;
-import com.moppyandroid.com.moppy.core.status.StatusUpdate;
+import com.moppy.core.comms.bridge.BridgeSerial;
+import com.moppy.core.comms.bridge.BridgeUDP;
+import com.moppy.core.comms.bridge.MultiBridge;
+import com.moppy.core.comms.bridge.NetworkBridge;
+import com.moppy.core.status.StatusBus;
+import com.moppy.core.status.StatusUpdate;
 
 public class MoppyUsbManager {
     private final StatusBus statusBus;
@@ -50,7 +48,7 @@ public class MoppyUsbManager {
 
     /**
      * Connects to a specified network bridge using its identifier, which usually is either a UDP socket
-     * or serial port path. Potentially throws {@link com.moppyandroid.BridgeSerial.UnableToObtainDeviceException}.
+     * or serial port path. Potentially throws {@link BridgeSerial.UnableToObtainDeviceException}.
      *
      * @param bridgeIdentifier the identifier of the bridge to connect
      * @throws IOException if unable to create the bridge
@@ -118,7 +116,7 @@ public class MoppyUsbManager {
 
     /**
      * Retrieves the {@link MultiBridge} this {@code MoppyUsbManager} manages. Needed for registering
-     * this {@code MoppyUsbManager} to receive messages from a {@link com.moppyandroid.com.moppy.core.midi.MoppyMIDIReceiverSender}.
+     * this {@code MoppyUsbManager} to receive messages from a {@link com.moppy.core.midi.MoppyMIDIReceiverSender}.
      *
      * @return the managed {@code MultiBridge}
      */

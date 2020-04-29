@@ -74,15 +74,15 @@ import android.widget.Spinner;
 import android.widget.TextView;
 import android.os.Bundle;
 
-import com.moppyandroid.BridgeSerial;
-import com.moppyandroid.MoppyMIDISequencer;
-import com.moppyandroid.com.moppy.core.events.mapper.MIDIEventMapper;
-import com.moppyandroid.com.moppy.core.events.mapper.MapperCollection;
-import com.moppyandroid.com.moppy.core.events.postprocessor.MessagePostProcessor;
-import com.moppyandroid.com.moppy.core.midi.MoppyMIDIReceiverSender;
-import com.moppyandroid.com.moppy.core.status.StatusBus;
-import com.moppyandroid.com.moppy.core.status.StatusConsumer;
-import com.moppyandroid.com.moppy.core.status.StatusUpdate;
+import com.moppy.core.comms.bridge.BridgeSerial;
+import com.moppy.core.midi.MoppyMIDISequencer;
+import com.moppy.core.events.mapper.MIDIEventMapper;
+import com.moppy.core.events.mapper.MapperCollection;
+import com.moppy.core.events.postprocessor.MessagePostProcessor;
+import com.moppy.core.midi.MoppyMIDIReceiverSender;
+import com.moppy.core.status.StatusBus;
+import com.moppy.core.status.StatusConsumer;
+import com.moppy.core.status.StatusUpdate;
 
 import com.sothree.slidinguppanel.SlidingUpPanelLayout;
 import com.sothree.slidinguppanel.SlidingUpPanelLayout.PanelState;
@@ -119,7 +119,6 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
     private Handler uiHandler;
     private boolean sequenceLoaded;
     private boolean playAfterTrackingFinished;
-    private MoppyMediaService mediaService;
 
     public static final String ACTION_USB_PERMISSION = "com.moppyandroid.USB_PERMISSION";
     public static final String ACTION_UNABLE_START_MOPPY = "com.moppyandroid.UNABLE_TO_START_MOPPY";

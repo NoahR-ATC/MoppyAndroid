@@ -23,6 +23,8 @@
             android:stopWithTask="false">
             <intent-filter>
                 <action android:name="android.media.browse.MediaBrowserService" />
+                <action android:name="android.media.action.MEDIA_PLAY_FROM_SEARCH"/>
+                <category android:name="android.intent.category.DEFAULT"/>
             </intent-filter>
         </service>
         <receiver android:name="androidx.media.session.MediaButtonReceiver">

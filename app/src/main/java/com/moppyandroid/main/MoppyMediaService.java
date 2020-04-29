@@ -134,7 +134,6 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
         } // End if(notificationManager == null)
         notificationManager.createNotificationChannel(notificationChannel);
 
-
         // Create the initial notification and start this service in the foreground
         notificationBuilder = new NotificationCompat.Builder(this, CHANNEL_ID)
                 .setContentTitle("Moppy Media Player")
@@ -153,7 +152,6 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
                 ) // End setStyle call
                 .setColor(getColor(R.color.colorPrimaryDark))
                 .setVisibility(NotificationCompat.VISIBILITY_PUBLIC);
-
         startForeground(NOTIFICATION_ID, notificationBuilder.build());
 
         // Attempt to create the MIDI library. Probably will fail due to permissions not having been
@@ -173,7 +171,6 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
         super.onStartCommand(intent, flags, startId);
-
         return START_REDELIVER_INTENT;
     } // End onStartCommand method
 
