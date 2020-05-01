@@ -23,9 +23,15 @@ import androidx.localbroadcastmanager.content.LocalBroadcastManager;
 import androidx.media.MediaBrowserServiceCompat;
 import androidx.media.session.MediaButtonReceiver;
 
+import com.moppy.core.comms.bridge.BridgeSerial;
+
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
+
+import jp.kshoji.javax.sound.midi.InvalidMidiDataException;
+import jp.kshoji.javax.sound.midi.MidiUnavailableException;
 
 public class MoppyMediaService extends MediaBrowserServiceCompat {
     /**
@@ -33,21 +39,41 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
      */
     public static final String CHANNEL_ID = "MoppyMediaServiceChannel";
     /**
-     * The custom action identifier for adding a Moppy device.
+     * The intent name for adding a Moppy device.
      */
     public static final String ACTION_ADD_DEVICE = "com.moppyandroid.main.MoppyMediaService.ADD_DEVICE";
     /**
-     * The custom action identifier for removing a Moppy device.
+     * The intent name for removing a Moppy device.
      */
     public static final String ACTION_REMOVE_DEVICE = "com.moppyandroid.main.MoppyMediaService.REMOVE_DEVICE";
     /**
-     * The custom action identifier for removing a Moppy device.
+     * The intent name for removing a Moppy device.
      */
     public static final String ACTION_INIT_LIBRARY = "com.moppyandroid.main.MoppyMediaService.INIT_LIBRARY";
     /**
-     * String extra field for the port name associated with a {@code ACTION_ADD_DEVICE} or {@code ACTION_REMOVE_DEVICE} event.
+     * The intent name for refreshing the available USB devices.
      */
-    public static final String EXTRA_PORT_NAME = "MOPPY_DEVICE_PORT_NAME";
+    public static final String ACTION_REFRESH_DEVICES = "com.moppyandroid.main.MoppyMediaService.REFRESH_DEVICES";
+    /**
+     * The intent name for informing clients about a failed {@link #ACTION_ADD_DEVICE} intent.
+     */
+    public static final String RESPONSE_CONNECTION_FAILED = "com.moppyandroid.main.MoppyMediaService.CONNECTION_FAILED";
+    /**
+     * The intent name for informing clients about a failed loading action.
+     */
+    public static final String RESPONSE_LOAD_FAILED = "com.moppyandroid.main.MoppyMediaService.LOAD_FAILED";
+    /**
+     * {@link String} extra field for the port name associated with a {@code ACTION_ADD_DEVICE} or {@code ACTION_REMOVE_DEVICE} event.
+     */
+    public static final String EXTRA_PORT_NAME = "MOPPY_EXTRA_DEVICE_PORT_NAME";
+    /**
+     * {@link MediaMetadataCompat} extra field for the metadata associated with a song.
+     */
+    public static final String EXTRA_MEDIA_METADATA = "MOPPY_EXTRA_MEDIA_METADATA";
+    /**
+     * {@link Exception} extra field for a parceled exception.
+     */
+    public static final String EXTRA_EXCEPTION = "MOPPY_EXTRA_EXCEPTION";
 
     private static final int NOTIFICATION_ID = 1;               // ID of the service notification
     private static final int NOTIFICATION_PLAY_PAUSE_INDEX = 2; // Index of play/pause button in notification actions
@@ -58,11 +84,13 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
     private MediaSessionCompat mediaSession;
     private PlaybackStateCompat.Builder playbackStateBuilder;
     private NotificationCompat.Builder notificationBuilder;
-    private MIDILibrary midiLibrary;
+    private MidiLibrary midiLibrary;
+    private MoppyManager moppyManager;
+    private long currentSequencerLength;
 
     private BroadcastReceiver broadcastReceiver = new BroadcastReceiver() {
         @Override
-        public void onReceive(Context context, Intent intent) {
+        public void onReceive(Context context, Intent intent) { // TODO: Replace with custom Browser actions
             if (intent.getAction() == null) { return; }
             switch (intent.getAction()) {
                 case ACTION_ADD_DEVICE: {
@@ -77,6 +105,10 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
                     initializeMIDILibrary();
                     break;
                 } // End ACTION_INIT_LIBRARY case
+                case ACTION_REFRESH_DEVICES: {
+                    moppyManager.getUsbManager().refreshDeviceList();
+                    break;
+                }
             } // End switch(getAction)
         } // End onReceive method
     }; // End BroadcastReceiver implementation
@@ -136,8 +168,8 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
 
         // Create the initial notification and start this service in the foreground
         notificationBuilder = new NotificationCompat.Builder(this, CHANNEL_ID)
-                .setContentTitle("Moppy Media Player")
-                .setContentText("No song loaded")
+                .setContentTitle("No song loaded")
+                .setContentText("0 devices connected")
                 .setSmallIcon(R.drawable.ic_notification)
                 .setContentIntent(mediaController.getSessionActivity())
                 .addAction(R.drawable.ic_prev, "Previous", MediaButtonReceiver.buildMediaButtonPendingIntent(this, PlaybackStateCompat.ACTION_SKIP_TO_PREVIOUS))
@@ -152,11 +184,19 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
                 ) // End setStyle call
                 .setColor(getColor(R.color.colorPrimaryDark))
                 .setVisibility(NotificationCompat.VISIBILITY_PUBLIC);
+
+        // Create the MoppyManager, crashing if it cannot be created. If an exception is raised, it
+        // is an unrecoverable runtime error. The exception is logged during MoppyManager with Log.wtf,
+        // so all we need to do is ensure the process is killed by raising a runtime exception
+        try { moppyManager = new MoppyManager(this); }
+        catch (MidiUnavailableException e) { throw new RuntimeException(e); }
+        moppyManager.registerCallback(new MoppyCallback());
+
         startForeground(NOTIFICATION_ID, notificationBuilder.build());
 
         // Attempt to create the MIDI library. Probably will fail due to permissions not having been
         // granted yet, but hopefully the user will grant them so the next attempt is successful
-        midiLibrary = MIDILibrary.getMIDILibrary(this);
+        midiLibrary = MidiLibrary.getMIDILibrary(this);
     } // End onCreate method
 
     /**
@@ -191,6 +231,7 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
      */
     @Override
     public void onDestroy() {
+        if (moppyManager != null) { moppyManager.getUsbManager().closeAllBridges(); }
         stopForeground(true);
         if (mediaSession != null) { mediaSession.release(); }
         if (localBroadcastManager != null) {
@@ -209,7 +250,7 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
      */
     @Override
     public BrowserRoot onGetRoot(String clientPackageName, int clientUid, Bundle rootHints) {
-        return new BrowserRoot(MIDILibrary.ROOT_ID, null);
+        return new BrowserRoot(MidiLibrary.ROOT_ID, null);
     } // End onGetRoot method
 
     /**
@@ -226,7 +267,7 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
         // If the MIDI library isn't loaded yet, Start another thread to load it and recall this method
         if (midiLibrary == null) {
             result.detach();
-            MIDILibrary.getMIDILibraryAsync(
+            MidiLibrary.getMIDILibraryAsync(
                     MoppyMediaService.this,
                     midiLibraryResult -> {
                         // Send that an error occurred if we don't have permission to access storage
@@ -235,41 +276,41 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
                             this.midiLibrary = midiLibraryResult;
                             onLoadChildren(parentMediaId, result);
                         }
-                    } // End MIDILibrary.Callback lambda
+                    } // End MidiLibrary.Callback lambda
             ); // End getMIDILibraryAsync call
             return;
         } // End if(midiLibrary == null)
 
         // Attempt to retrieve the provided ID's children from the MIDI library and convert them to MediaItems
-        MIDILibrary.MapNode node = midiLibrary.get(parentMediaId);
+        MidiLibrary.MapNode node = midiLibrary.get(parentMediaId);
         if (node == null) { // ID doesn't exist
             result.sendResult(null);
             return;
         } // End if(node == null)
-        if (node instanceof MIDILibrary.Folder) {
-            Set<MIDILibrary.MapNode> children = node.getChildren();
-            for (MIDILibrary.MapNode child : children) {
+        if (node instanceof MidiLibrary.Folder) {
+            Set<MidiLibrary.MapNode> children = node.getChildren();
+            for (MidiLibrary.MapNode child : children) {
                 mediaItems.add(new MediaBrowserCompat.MediaItem(
                         child.getMetadata().getDescription(),
-                        (child instanceof MIDILibrary.MIDIFile) ?
+                        (child instanceof MidiLibrary.MidiFile) ?
                                 MediaBrowserCompat.MediaItem.FLAG_PLAYABLE :
                                 MediaBrowserCompat.MediaItem.FLAG_BROWSABLE
                 )); // End add call
             } // End for(child : children)
         } // End if(node ∈ Folder)
 
-        // If node is a MIDIFile then mediaItems will be an empty list
+        // If node is a MidiFile then mediaItems will be an empty list
 
         result.sendResult(mediaItems);
     } // End onLoadChildren method
 
     /**
-     * Creates the {@link MIDILibrary} object this {@code MoppyMediaService} uses for controlling files.
+     * Creates the {@link MidiLibrary} object this {@code MoppyMediaService} uses for controlling files.
      * Strongly suggested to call this method as soon as the {@link android.app.Activity} has been granted
      * the {@link Manifest.permission#READ_EXTERNAL_STORAGE} permission by the user.
      */
     public void initializeMIDILibrary() {
-        if (midiLibrary == null) { midiLibrary = MIDILibrary.getMIDILibrary(this); }
+        if (midiLibrary == null) { midiLibrary = MidiLibrary.getMIDILibrary(this); }
     } // End initializeMIDILibrary method
 
     // Method to toggle the notification between playing (pause icon) and not-playing (play icon) modes.
@@ -285,8 +326,6 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
         long currentActionFlags = PlaybackStateCompat.ACTION_PLAY_PAUSE |
                                   PlaybackStateCompat.ACTION_STOP |
                                   PlaybackStateCompat.ACTION_SEEK_TO |
-                                  PlaybackStateCompat.ACTION_FAST_FORWARD |
-                                  PlaybackStateCompat.ACTION_REWIND |
                                   ((metadata == null) ?
                                           PlaybackStateCompat.ACTION_PLAY :
                                           PlaybackStateCompat.ACTION_PAUSE
@@ -309,7 +348,7 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
                             )
                     ) // End NotificationCompat.Action constructor call
             ); // End mActions.add call
-            if (changeText) { notificationBuilder.setContentText("No file loaded"); }
+            if (changeText) { notificationBuilder.setContentTitle("No file loaded"); }
         } // End if(metadata == null)
         else { // Playing mode
             notificationBuilder.setOngoing(true);
@@ -325,7 +364,7 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
                     ) // End NotificationCompat.Action constructor call
             ); // End mActions.add call
             if (changeText) {
-                notificationBuilder.setContentText(metadata.getString(MediaMetadataCompat.METADATA_KEY_TITLE));
+                notificationBuilder.setContentTitle(metadata.getString(MediaMetadataCompat.METADATA_KEY_TITLE));
             } // End if(changeText)
         } // End if(metadata == null) {} else
 
@@ -335,23 +374,52 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
     // Triggered by an ACTION_ADD_DEVICE intent
     private void onAddDevice(Intent intent) {
         if (intent.getExtras() == null || intent.getExtras().getString(EXTRA_PORT_NAME) == null) {
-            Log.w(this.getClass().getName(), "ACTION_ADD_DEVICE: No port name supplied");
+            Log.w(MoppyMediaService.class.getName() + "->onAddDevice", "No port name supplied");
             return;
         }
         String portName = intent.getExtras().getString(EXTRA_PORT_NAME);
-        // TODO: Manage device connection
+
+        try { moppyManager.getUsbManager().connectBridge(portName); }
+        catch (IllegalArgumentException | BridgeSerial.UnableToObtainDeviceException | IOException e) {
+            Log.e(MoppyMediaService.class.getName() + "->onAddDevice", "Unable to connect bridge", e);
+            Intent failureIntent = new Intent(RESPONSE_CONNECTION_FAILED);
+            failureIntent.putExtra(EXTRA_PORT_NAME, portName);
+            failureIntent.putExtra(EXTRA_EXCEPTION, e);
+            localBroadcastManager.sendBroadcast(failureIntent);
+            return;
+        }
+
+        int numConnected = moppyManager.getUsbManager().getNumberConnected();
+        notificationBuilder.setContentText(numConnected + " device" + ((numConnected == 1) ? "" : "s") + " connected");
+        notificationManager.notify(NOTIFICATION_ID, notificationBuilder.build());
     } // End onAddDevice method
 
     // Triggered by an ACTION_REMOVE_DEVICE intent
     private void onRemoveDevice(Intent intent) {
         if (intent.getExtras() == null || intent.getExtras().getString(EXTRA_PORT_NAME) == null) {
-            Log.w(this.getClass().getName(), "ACTION_REMOVE_DEVICE: No port name supplied");
+            Log.w(MoppyMediaService.class.getName() + "->onRemoveDevice", "No port name supplied");
         }
         String portName = intent.getExtras().getString(EXTRA_PORT_NAME);
-        // TODO: Manage device disconnection
+
+        if (!moppyManager.getUsbManager().isConnected(portName)) {
+            Log.w(MoppyMediaService.class.getName() + "->onRemoveDevice", "Attempted to close unconnected bridge");
+            return;
+        }
+
+        try {moppyManager.getUsbManager().closeBridge(portName);}
+        catch (IOException e) {
+            // In the words of MoppyLib's author when they deal with this exception, "There's not
+            // much we can do if it fails to close (it's probably already closed). Just log it and move on"
+            Log.e(MoppyMediaService.class.getName() + "->onRemoveDevice", "Unable to close bridge", e);
+            return;
+        } // End try {closeBridge} catch(IOException e)
+
+        int numConnected = moppyManager.getUsbManager().getNumberConnected();
+        notificationBuilder.setContentText(numConnected + " device" + ((numConnected == 1) ? "" : "s") + " connected");
+        notificationManager.notify(NOTIFICATION_ID, notificationBuilder.build());
     } // End onRemoveDevice method
 
-    // Class defining the media button callbacks. All callbacks are disabled if their action is not supported
+    // Callbacks for media button events. All callbacks are disabled if their associated action is not supported
     private class MediaCallback extends MediaSessionCompat.Callback {
         @Override
         public void onPlay() {
@@ -367,8 +435,7 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
             );
             togglePlayPauseMediaButton(false, mediaController.getMetadata());
 
-            // TODO: Play MIDI sequencer
-
+            moppyManager.play();
             super.onPlay();
         } // End onPlay method
 
@@ -379,17 +446,17 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
 
             // Create the MIDI library if needed and retrieve the requested file
             if (midiLibrary == null) {
-                // Don't want to hold up UI thread creating a MIDILibrary that may not be created successfully,
+                // Don't want to hold up UI thread creating a MidiLibrary that may not be created successfully,
                 // so we will just trigger creation and skip the play event
-                MIDILibrary.getMIDILibraryAsync(
+                MidiLibrary.getMIDILibraryAsync(
                         MoppyMediaService.this,
                         midiLibraryResult -> MoppyMediaService.this.midiLibrary = midiLibraryResult
                 );
                 return;
             }
 
-            MIDILibrary.MapNode node = midiLibrary.get(mediaId);
-            if (!(node instanceof MIDILibrary.MIDIFile)) { return; }
+            MidiLibrary.MapNode node = midiLibrary.get(mediaId);
+            if (!(node instanceof MidiLibrary.MidiFile)) { return; }
 
             // Load in the file's metadata, and update the notification and playback state
             mediaSession.setMetadata(node.getMetadata());
@@ -400,8 +467,18 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
             );
             togglePlayPauseMediaButton(true, node.getMetadata());
 
-            // TODO: Load file into and play MIDI sequencer
-
+            try {
+                moppyManager.load((MidiLibrary.MidiFile) node, MoppyMediaService.this);
+                currentSequencerLength = moppyManager.getMillisecondsLength();
+                moppyManager.play();
+            }
+            catch (IOException | InvalidMidiDataException e) {
+                Log.e(MediaCallback.class.getName() + "->onPlayFromMediaID", "Unable to load file", e);
+                Intent failureIntent = new Intent(RESPONSE_LOAD_FAILED);
+                failureIntent.putExtra(EXTRA_MEDIA_METADATA, node.getMetadata());
+                failureIntent.putExtra(EXTRA_EXCEPTION, e);
+                localBroadcastManager.sendBroadcast(failureIntent);
+            }
             super.onPlayFromMediaId(mediaId, extras);
         } // End onPlayFromMediaId method
 
@@ -410,14 +487,14 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
             PlaybackStateCompat playbackState = mediaController.getPlaybackState();
             if ((playbackState.getActions() & PlaybackStateCompat.ACTION_PLAY) == 0) { return; }
 
-            MIDILibrary.MIDIFile file = null;
+            MidiLibrary.MidiFile file;
             String mediaFocus = extras.getString(MediaStore.EXTRA_MEDIA_FOCUS);
 
             // Create the MIDI library if needed and retrieve the requested file
             if (midiLibrary == null) {
-                // Don't want to hold up UI thread creating a MIDILibrary that may not be created successfully,
+                // Don't want to hold up UI thread creating a MidiLibrary that may not be created successfully,
                 // so we will just trigger creation and skip the play event
-                MIDILibrary.getMIDILibraryAsync(
+                MidiLibrary.getMIDILibraryAsync(
                         MoppyMediaService.this,
                         midiLibraryResult -> MoppyMediaService.this.midiLibrary = midiLibraryResult
                 );
@@ -435,9 +512,11 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
                     // Unsupported
                     return;
                 case MediaStore.Audio.Artists.ENTRY_CONTENT_TYPE: // 'Artist' request
-                    break;
+                    // TODO: Construct queue of songs by the artist
+                    return;
                 case MediaStore.Audio.Albums.ENTRY_CONTENT_TYPE: // 'Album' request
-                    break;
+                    // TODO: Construct queue of songs in the album
+                    return;
                 case MediaStore.Audio.Media.ENTRY_CONTENT_TYPE: // 'Song' request
                     file = midiLibrary.searchFileFuzzy(extras.getString(MediaStore.EXTRA_MEDIA_TITLE));
                     break;
@@ -449,7 +528,10 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
                     file = midiLibrary.searchFileFuzzy(query);
                     break;
             }
-            if (file == null) { return; }
+            if (file == null) {
+                Log.i(MediaCallback.class.getName() + "->onPlayFromSearch", "Query not found");
+                return;
+            }
 
             // Load in the file's metadata, and update the notification and playback state
             mediaSession.setMetadata(file.getMetadata());
@@ -460,8 +542,18 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
             );
             togglePlayPauseMediaButton(true, file.getMetadata());
 
-            // TODO: Load file into and play MIDI sequencer
-
+            try {
+                moppyManager.load(file, MoppyMediaService.this);
+                currentSequencerLength = moppyManager.getMillisecondsLength();
+                moppyManager.play();
+            }
+            catch (IOException | InvalidMidiDataException e) {
+                Log.e(MediaCallback.class.getName() + "->onPlayFromSearch", "Unable to load file", e);
+                Intent failureIntent = new Intent(RESPONSE_LOAD_FAILED);
+                failureIntent.putExtra(EXTRA_MEDIA_METADATA, file.getMetadata());
+                failureIntent.putExtra(EXTRA_EXCEPTION, e);
+                localBroadcastManager.sendBroadcast(failureIntent);
+            }
             super.onPlayFromSearch(query, extras);
         }
 
@@ -478,8 +570,7 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
             );
             togglePlayPauseMediaButton(false, null);
 
-            // TODO: Pause MIDI sequencer
-
+            moppyManager.pause();
             super.onPause();
         } // End onPause method
 
@@ -489,15 +580,16 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
             if ((playbackState.getActions() & PlaybackStateCompat.ACTION_STOP) == 0) { return; }
 
             // Update notification and playback state
-            playbackStateBuilder.setState(
-                    PlaybackStateCompat.STATE_STOPPED,
-                    0,
-                    1
-            );
-            togglePlayPauseMediaButton(false, null);
+            if (mediaController.getMetadata() != null) {
+                playbackStateBuilder.setState(
+                        PlaybackStateCompat.STATE_STOPPED,
+                        0,
+                        1
+                );
+                togglePlayPauseMediaButton(false, null);
+            }
 
-            // TODO: Stop MIDI sequencer
-
+            moppyManager.stop();
             super.onStop();
         } // End onStop method
 
@@ -516,48 +608,11 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
             );
             mediaSession.setPlaybackState(playbackStateBuilder.build());
 
-            // TODO: Set MIDI sequencer position
+            // Seek the sequencer to position if it is lower than the length, otherwise seek to the end
+            moppyManager.seekTo(position, playbackState.getState() == PlaybackStateCompat.STATE_PLAYING);
 
             super.onSeekTo(position);
         } // End onSeekTo method
-
-        @Override
-        public void onFastForward() {
-            PlaybackStateCompat playbackState = mediaController.getPlaybackState();
-            if ((playbackState.getActions() & PlaybackStateCompat.ACTION_FAST_FORWARD) == 0) {
-                return;
-            } // End if(getActions ∋ ACTION_FAST_FORWARD)
-
-            // Update playback speed, adding 1 if in fast-forward mode already
-            playbackStateBuilder.setState(
-                    PlaybackStateCompat.STATE_PLAYING,
-                    mediaController.getPlaybackState().getPosition(),
-                    ((playbackState.getPlaybackSpeed() < 2) ? 2 : playbackState.getPlaybackSpeed() + 1)
-            );
-            mediaSession.setPlaybackState(playbackStateBuilder.build());
-
-            // TODO: Fast-forward MIDI sequencer
-
-            super.onFastForward();
-        } // End onFastForward method
-
-        @Override
-        public void onRewind() {
-            PlaybackStateCompat playbackState = mediaController.getPlaybackState();
-            if ((playbackState.getActions() & PlaybackStateCompat.ACTION_REWIND) == 0) { return; }
-
-            // Update playback speed, adding -1 if in rewind mode already
-            playbackStateBuilder.setState(
-                    PlaybackStateCompat.STATE_PLAYING,
-                    mediaController.getPlaybackState().getPosition(),
-                    ((playbackState.getPlaybackSpeed() > -1) ? -1 : playbackState.getPlaybackSpeed() - 1)
-            );
-            mediaSession.setPlaybackState(playbackStateBuilder.build());
-
-            // TODO: Rewind MIDI sequencer
-
-            super.onRewind();
-        } // End onRewind method
 
         /**
          * Called when a {@link MediaControllerCompat} wants a
@@ -577,4 +632,27 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
             super.onCustomAction(action, extras);
         } // End onCustomAction method
     } // End MediaCallback class
+
+    // Callback for MoppyManager events
+    private class MoppyCallback extends MoppyManager.Callback {
+        @Override
+        void onSongEnd(boolean reset) {
+            PlaybackStateCompat currentState = mediaController.getPlaybackState();
+            if (
+                    mediaController.getMetadata() != null &&
+                    (currentState.getState() == PlaybackStateCompat.STATE_PLAYING ||
+                     currentState.getState() == PlaybackStateCompat.STATE_PAUSED)
+            ) {
+                // TODO: Advance to next song if available
+                playbackStateBuilder.setState(
+                        PlaybackStateCompat.STATE_STOPPED,
+                        (reset ? 0 : mediaController.getMetadata().getLong(MediaMetadataCompat.METADATA_KEY_DURATION)),
+                        1
+                );
+                mediaSession.setPlaybackState(playbackStateBuilder.build());
+                togglePlayPauseMediaButton(false, null);
+            } // End if(fileLoaded && currentState == PLAYING | PAUSED)
+            super.onSongEnd(reset);
+        } // End onSongEnd method
+    } // End MoppyCallback class
 } // End MoppyMediaService class

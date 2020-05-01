@@ -23,6 +23,7 @@ public class MoppyUsbManager {
     private final MultiBridge multiBridge;
     private final HashMap<String, NetworkBridge> networkBridges;
     private final List<String> bridgeIdentifiers;
+    private final List<String> connectedIdentifiers;
 
     /**
      * Creates a MoppyUsbManager, using the specified bus to alert consumers to device change events.
@@ -34,6 +35,7 @@ public class MoppyUsbManager {
         multiBridge = new MultiBridge();
         networkBridges = new HashMap<>();
         bridgeIdentifiers = new ArrayList<>();
+        connectedIdentifiers = new ArrayList<>();
 
         // Attempt to create a UDP bridge and refresh the device lists
         try {
@@ -41,7 +43,7 @@ public class MoppyUsbManager {
             networkBridges.put(udpBridge.getNetworkIdentifier(), udpBridge);
         } // End try {networkBridges.put(new BridgeUDP())}
         catch (UnknownHostException ex) {
-            Log.e(this.getClass().getName(), "Unable to create UDP Bridge", ex);
+            Log.e(MoppyUsbManager.class.getName(), "Unable to create UDP Bridge", ex);
         } // End try {networkBridges.put(new BridgeUDP)} catch(UnknownHostException)
         refreshDeviceList();
     } // End MoppyUsbManager constructor
@@ -65,6 +67,7 @@ public class MoppyUsbManager {
                 multiBridge.addBridge(newBridge);
                 networkBridges.put(bridgeIdentifier, newBridge);
             } // End if(currentBridge != null) {} else
+            connectedIdentifiers.add(bridgeIdentifier);
         } // End try {bridge.connect}
         finally {
             statusBus.receiveUpdate(StatusUpdate.NET_STATUS_CHANGED);
@@ -79,7 +82,6 @@ public class MoppyUsbManager {
      * @throws IOException if unable to send the close message to the device
      */
     public void closeBridge(String bridgeIdentifier) throws IOException {
-
         NetworkBridge bridge = networkBridges.get(bridgeIdentifier);
         if (bridge == null) { return; }
         multiBridge.removeBridge(bridge);
@@ -87,11 +89,26 @@ public class MoppyUsbManager {
         networkBridges.remove(bridgeIdentifier);
         try {
             bridge.close();
+            connectedIdentifiers.remove(bridgeIdentifier);
         } // End try {bridge.close}
         finally {
             statusBus.receiveUpdate(StatusUpdate.NET_STATUS_CHANGED);
         } // End try {networkBridges.put(new BridgeSerial)} finally
     } // End closeBridge method
+
+    /**
+     * Closes all open connections, logging and discarding any generated {@link IOException}s.
+     */
+    public void closeAllBridges() {
+        for (String bridgeIdentifier : connectedIdentifiers) {
+            try { closeBridge(bridgeIdentifier); }
+            catch (IOException e) {
+                // In the words of MoppyLib's author when they deal with this exception, "There's not
+                // much we can do if it fails to close (it's probably already closed). Just log it and move on"
+                Log.e(MoppyUsbManager.class.getName() + "->closeAllBridges", "Unable to close a bridge", e);
+            }
+        }
+    }
 
     /**
      * Checks if a specific bridge is connected using its identifier, which usually is either a UDP socket
@@ -110,6 +127,7 @@ public class MoppyUsbManager {
     public void refreshDeviceList() {
         // Add all UDP bridges as well as all available serial bridges to the identifier list
         // Note: If any serial bridges are in the networkBridges hashmap the keys will be the same so it doesn't matter
+        bridgeIdentifiers.clear();
         bridgeIdentifiers.addAll(networkBridges.keySet());
         bridgeIdentifiers.addAll(BridgeSerial.getAvailableSerials());
     } // End refreshDeviceList method
@@ -130,4 +148,18 @@ public class MoppyUsbManager {
      * @return the cached bridge identifiers
      */
     public List<String> getDevices() { return bridgeIdentifiers; }
+
+    /**
+     * Retrieves the number of connected bridges.
+     *
+     * @return the number of bridges
+     */
+    public int getNumberConnected() { return connectedIdentifiers.size(); }
+
+    /**
+     * Retrieves the list of the identifiers for all connected bridges
+     *
+     * @return the connect bridge identifiers
+     */
+    public List<String> getConnectedIdentifiers() { return connectedIdentifiers; }
 } // End MoppyUsbManager class

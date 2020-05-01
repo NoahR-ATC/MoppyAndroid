@@ -30,11 +30,11 @@ import java.util.function.Predicate;
 /**
  * Represents the MIDI file library of an Android device.
  */
-public class MIDILibrary implements Map<String, MIDILibrary.MapNode> {
+public class MidiLibrary implements Map<String, MidiLibrary.MapNode> {
     /**
-     * The package and name of the {@code MIDILibrary} class. Refactors <b>must</b> ensure this is accurate.
+     * The package and name of the {@code MidiLibrary} class. Refactors <b>must</b> ensure this is accurate.
      */
-    protected static final String CLASS_NAME = "com.moppyandroid.main.MIDILibrary";
+    protected static final String CLASS_NAME = "com.moppyandroid.main.MidiLibrary";
     /**
      * The ID of the root folder.
      */
@@ -115,7 +115,7 @@ public class MIDILibrary implements Map<String, MIDILibrary.MapNode> {
      * @return {@code null} if read permission has not been granted, otherwise a valid MIDI library
      */
     @Nullable
-    public static MIDILibrary getMIDILibrary(Context context) {
+    public static MidiLibrary getMIDILibrary(Context context) {
         if (!hasStoragePermission(context)) { return null; }
 
         // Create the root folder and the category folders
@@ -157,7 +157,7 @@ public class MIDILibrary implements Map<String, MIDILibrary.MapNode> {
                     String album = cursor.getString(albumColumn);
                     Uri contentUri = ContentUris.withAppendedId(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, id);
 
-                    // Use the retrieved information to create a MIDIFile in each folder category
+                    // Use the retrieved information to create a MidiFile in each folder category
                     // Note: If an InvalidPathException is raised (likely because a file with that name already exists)
                     //      then the file is re-added to that category with it's path appended to its name
                     // Path category
@@ -188,56 +188,19 @@ public class MIDILibrary implements Map<String, MIDILibrary.MapNode> {
             } // End if(cursor != null)
         } // End try(cursor = query(EXTERNAL_CONTENT_URI)
 
-        // Create and return the MIDILibrary object
-        return new MIDILibrary(realRootFolder);
+        // Create and return the MidiLibrary object
+        return new MidiLibrary(realRootFolder);
     }
 
-    public static void getMIDILibraryAsync(Context context, MIDILibrary.Callback callback) {
+    public static void getMIDILibraryAsync(Context context, MidiLibrary.Callback callback) {
         new Thread() {
             @Override
             public void run() { callback.onLoadCompletion(getMIDILibrary(context)); }
         }.start();
-    }
-
-    /*private static void addToFolder(Folder folder, String folderStructurePath, MIDIFile midiFile) {
-        List<String> segments = Arrays.asList(folderStructurePath.split("/"));
-        if (segments.isEmpty()) { return; }
-        if (segments.contains("")) {
-            throw new InvalidPathException(folderStructurePath, "One or more segments missing in file/folder name");
-        }
-
-        // Iterate backwards through the path to add the file to until a common node is found within the folder
-        for (int i = segments.size(); i > 0; --i) {
-            MapNode workingFolder;      // The lowest common folder
-            List<String> preSegments;   // The path segments leading up to the working folder
-            StringBuilder pathToHereBuilder = new StringBuilder();
-            preSegments = segments.subList(0, i);
-
-            // Attempt to retrieve a folder in the passed folder that represents
-            preSegments.forEach(s -> pathToHereBuilder.append(s).append("/"));
-            pathToHereBuilder.setLength(pathToHereBuilder.length() - 1);
-            workingFolder = folder.get(pathToHereBuilder.toString());
-            if (workingFolder != null) {
-                if (!(workingFolder instanceof Folder)) {
-                    throw new InvalidPathException(folderStructurePath, pathToHereBuilder.toString() + " isn't a folder");
-                }
-                List<String> segmentsToBuild = segments.subList(i, segments.size());
-                if (!segmentsToBuild.isEmpty()) {
-                    for (String segmentToBuild : segmentsToBuild) {
-                        workingFolder = ((Folder) workingFolder).createFolder(segmentToBuild);
-                    }
-                }
-                ((Folder) workingFolder).addChild(midiFile);
-                return;
-            } // End if(workingFolder != null)
-        } // End for(i = segments.size; i > 0)
-
-        // No sections of the path was found, create the tree
-        folder.addChild(Folder.createFolderStructureWithFile(folderStructurePath, midiFile, folder.getGlobalName()));
-    }*/
+    } // End getMIDILibraryAsync method
 
     // Constructs a MIDI library with the passed root folder. See getMIDILibrary for explanation about root folder to pass
-    private MIDILibrary(Folder rootFolder) { this.rootFolder = rootFolder; }
+    private MidiLibrary(Folder rootFolder) { this.rootFolder = rootFolder; }
 
     /**
      * Gets the number of items in the root of this MIDI library.
@@ -285,7 +248,7 @@ public class MIDILibrary implements Map<String, MIDILibrary.MapNode> {
             throw new ClassCastException(
                     "value is of type " +
                     (value == null ? "null" : value.getClass().getName()) +
-                    " not " + MIDIFile.class.getName()
+                    " not " + MidiFile.class.getName()
             );
         } // End if(value ∉ MapNode)
         return rootFolder.getChildren().contains(value);
@@ -314,8 +277,8 @@ public class MIDILibrary implements Map<String, MIDILibrary.MapNode> {
      */
     @Nullable
     @Override
-    public MIDIFile put(String key, MapNode value) {
-        throw new UnsupportedOperationException("put method not supported by " + MIDILibrary.class.getName());
+    public MidiFile put(String key, MapNode value) {
+        throw new UnsupportedOperationException("put method not supported by " + MidiLibrary.class.getName());
     } // End put method
 
     /**
@@ -324,8 +287,8 @@ public class MIDILibrary implements Map<String, MIDILibrary.MapNode> {
      */
     @Nullable
     @Override
-    public MIDIFile remove(@Nullable Object key) {
-        throw new UnsupportedOperationException("remove method not supported by " + MIDILibrary.class.getName());
+    public MidiFile remove(@Nullable Object key) {
+        throw new UnsupportedOperationException("remove method not supported by " + MidiLibrary.class.getName());
     } // End remove method
 
 
@@ -335,7 +298,7 @@ public class MIDILibrary implements Map<String, MIDILibrary.MapNode> {
      */
     @Override
     public void putAll(@NonNull Map<? extends String, ? extends MapNode> m) {
-        throw new UnsupportedOperationException("putAll method not supported by " + MIDILibrary.class.getName());
+        throw new UnsupportedOperationException("putAll method not supported by " + MidiLibrary.class.getName());
     } // End putAll method
 
     /**
@@ -344,7 +307,7 @@ public class MIDILibrary implements Map<String, MIDILibrary.MapNode> {
      */
     @Override
     public void clear() {
-        throw new UnsupportedOperationException("clear method not supported by " + MIDILibrary.class.getName());
+        throw new UnsupportedOperationException("clear method not supported by " + MidiLibrary.class.getName());
     } // End clear method
 
     /**
@@ -390,7 +353,7 @@ public class MIDILibrary implements Map<String, MIDILibrary.MapNode> {
     @NonNull
     @Override
     public Set<Entry<String, MapNode>> entrySet() {
-        throw new UnsupportedOperationException("entrySet method not supported by " + MIDILibrary.class.getName());
+        throw new UnsupportedOperationException("entrySet method not supported by " + MidiLibrary.class.getName());
     } // End entrySet method
 
     /**
@@ -400,20 +363,20 @@ public class MIDILibrary implements Map<String, MIDILibrary.MapNode> {
      * @return {@code null} if {@code query} didn't match any files, otherwise the first matched file
      */
     @Nullable
-    public MIDIFile searchFileFuzzy(String query) { return searchFileFuzzy(query, (f) -> true); }
+    public MidiFile searchFileFuzzy(String query) { return searchFileFuzzy(query, (f) -> true); }
 
     /**
-     * Searches for a {@link MIDIFile} using a {@link Predicate} to allow the caller to specify
-     * attributes needed by a found {@code MIDIFile} to be considered valid.
+     * Searches for a {@link MidiFile} using a {@link Predicate} to allow the caller to specify
+     * attributes needed by a found {@code MidiFile} to be considered valid.
      * <p>
      * e.g. predicate could be {@code (file) -> { return file.getAlbum() == "Greatest Hits"; } }
      *
      * @param query     the name of the file to search for
-     * @param predicate the functional interface used to validate a matching MIDIFile
+     * @param predicate the functional interface used to validate a matching {@code MidiFile}
      * @return {@code null} if no matching files were found, otherwise the first matched file
      */
     @Nullable
-    public MIDIFile searchFileFuzzy(String query, Predicate<MIDIFile> predicate) {
+    public MidiFile searchFileFuzzy(String query, Predicate<MidiFile> predicate) {
         // Replace _ and spaces with nothing and convert to lowercase for better search results
         query = query.replace("_", "");
         query = query.replace(" ", "");
@@ -422,17 +385,17 @@ public class MIDILibrary implements Map<String, MIDILibrary.MapNode> {
         // Retrieve the children of the requested branch and return the queried file if found
         MapNode node = get(PATH_ID);
         if (!(node instanceof Folder)) {
-            throw new IllegalStateException("PATH folder not created in MIDILibrary instance");
+            throw new IllegalStateException("PATH folder not created in MidiLibrary instance");
         }
         Set<MapNode> collection = node.getChildrenRecursive();
         for (MapNode item : collection) {
-            if (!(item instanceof MIDIFile)) { continue; }
+            if (!(item instanceof MidiFile)) { continue; }
             String name = item.getName();
             name = name.replace("_", "");
             name = name.replace(" ", "");
             name = name.toLowerCase();
-            if ((query.contains(name) || name.contains(query)) && predicate.test((MIDIFile) item)) {
-                return (MIDIFile) item;
+            if ((query.contains(name) || name.contains(query)) && predicate.test((MidiFile) item)) {
+                return (MidiFile) item;
             }
         } // End for(item : collection)
 
@@ -441,18 +404,18 @@ public class MIDILibrary implements Map<String, MIDILibrary.MapNode> {
     } // End searchFuzzy(String, String) method
 
     /**
-     * Callback interface used for running code upon completion of asynchronous MIDILibrary creation
+     * Callback interface used for running code upon completion of asynchronous {@link MidiLibrary} creation
      *
-     * @see #getMIDILibraryAsync(Context, MIDILibrary.Callback)
+     * @see #getMIDILibraryAsync(Context, MidiLibrary.Callback)
      */
     public interface Callback {
-        void onLoadCompletion(MIDILibrary midiLibrary);
+        void onLoadCompletion(MidiLibrary midiLibrary);
     }
 
     /**
      * A structure representing a MIDI file that can be contained in a {@link Folder}.
      */
-    public static class MIDIFile implements MapNode { // https://developer.android.com/training/data-storage/shared/media
+    public static class MidiFile implements MapNode { // https://developer.android.com/training/data-storage/shared/media
         private final Uri uri;
         private final String name;
         private final int duration;
@@ -463,7 +426,7 @@ public class MIDILibrary implements Map<String, MIDILibrary.MapNode> {
         private final MediaMetadataCompat metadata;
 
         /**
-         * Constructs a {@code MIDIFile} object.
+         * Constructs a {@code MidiFile} object.
          *
          * @param uri        the {@link Uri} that can be used to open the file
          * @param name       the file's name
@@ -472,7 +435,7 @@ public class MIDILibrary implements Map<String, MIDILibrary.MapNode> {
          * @param album      the file's album
          * @param parentName the fully-qualified name of the parent {@link Folder}, use {@code null} if there is no parent
          */
-        public MIDIFile(Uri uri, String name, int duration, String artist, String album, String parentName) {
+        public MidiFile(Uri uri, String name, int duration, String artist, String album, String parentName) {
             this.uri = uri;
             this.name = name;
             this.duration = duration; // Duration is in milliseconds
@@ -490,34 +453,34 @@ public class MIDILibrary implements Map<String, MIDILibrary.MapNode> {
             metaBuilder.putString(MediaMetadataCompat.METADATA_KEY_DISPLAY_ICON_URI, MUSIC_FILE_ICON_URI);
             metaBuilder.putLong(MediaMetadataCompat.METADATA_KEY_DURATION, duration);
             metadata = metaBuilder.build();
-        } // End MIDIFile constructor
+        } // End MidiFile constructor
 
 
         // Getters
 
         /**
-         * Gets the {@link Uri} of this {@code MIDIFile}.
+         * Gets the {@link Uri} of this {@code MidiFile}.
          *
          * @return the {@code Uri}
          */
         public Uri getUri() { return uri; }
 
         /**
-         * Gets the duration (in milliseconds) of this {@code MIDIFile}.
+         * Gets the duration (in milliseconds) of this {@code MidiFile}.
          *
          * @return the duration
          */
         public int getDuration() { return duration; }
 
         /**
-         * Gets the artist of this {@code MIDIFile}.
+         * Gets the artist of this {@code MidiFile}.
          *
          * @return the artist
          */
         public String getArtist() { return artist; }
 
         /**
-         * Gets the album this {@code MIDIFile} belongs to.
+         * Gets the album this {@code MidiFile} belongs to.
          * <p>
          *
          * @return the album
@@ -584,7 +547,7 @@ public class MIDILibrary implements Map<String, MIDILibrary.MapNode> {
         public boolean isFile() { return true; }
 
         /**
-         * Gets the name of this {@code MIDIFile}.
+         * Gets the name of this {@code MidiFile}.
          *
          * @return the name
          */
@@ -592,7 +555,7 @@ public class MIDILibrary implements Map<String, MIDILibrary.MapNode> {
         public String getName() { return name; }
 
         /**
-         * Gets the fully-qualified name of this {@code MIDIFile}.
+         * Gets the fully-qualified name of this {@code MidiFile}.
          *
          * @return the global name
          */
@@ -600,7 +563,7 @@ public class MIDILibrary implements Map<String, MIDILibrary.MapNode> {
         public String getNameGlobal() { return globalName; }
 
         /**
-         * Gets the fully-qualified name of this {@code MIDIFile}'s parent.
+         * Gets the fully-qualified name of this {@code MidiFile}'s parent.
          *
          * @return the parent's global name
          */
@@ -608,7 +571,7 @@ public class MIDILibrary implements Map<String, MIDILibrary.MapNode> {
         public String getParentName() { return parentName; }
 
         /**
-         * Gets the metadata of this {@code MIDIFile}.
+         * Gets the metadata of this {@code MidiFile}.
          *
          * @return the metadata
          */
@@ -616,18 +579,18 @@ public class MIDILibrary implements Map<String, MIDILibrary.MapNode> {
         public MediaMetadataCompat getMetadata() { return metadata; }
 
         /**
-         * Compares this {@code MIDIFile} with another {@link MapNode} and determines which should be sorted first. Case is ignored.
+         * Compares this {@code MidiFile} with another {@link MapNode} and determines which should be sorted first. Case is ignored.
          *
          * @param node the {@code MapNode} to compare against
-         * @return negative integer if this {@code MIDIFile} should be sorted first, 0 if the objects should be sorted equally, or
+         * @return negative integer if this {@code MidiFile} should be sorted first, 0 if the objects should be sorted equally, or
          * a positive integer if {@code node} should be sorted first
          */
         @Override
         public int compareTo(MapNode node) { return this.name.compareToIgnoreCase(node.getName()); }
-    } // End MIDIFile class
+    } // End MidiFile class
 
     /**
-     * A structure representing a folder in a {@link MIDILibrary}. Backed by a {@link TreeMap}.
+     * A structure representing a folder in a {@link MidiLibrary}. Backed by a {@link TreeMap}.
      */
     public static class Folder implements MapNode {
         private final String name;
@@ -638,14 +601,14 @@ public class MIDILibrary implements Map<String, MIDILibrary.MapNode> {
         private TreeMap<String, MapNode> children;
 
         /**
-         * Creates a folder to house the provided {@link MIDIFile}. The default folder icon is used for all new folders.
+         * Creates a folder to house the provided {@link MidiFile}. The default folder icon is used for all new folders.
          *
          * @param midiFile the file to create folders to contain
          * @param iconUri  the URI {@link String} of the icon to use for the folders; use {@code null} for default icon
          * @return {@code null} if no folders are in file path
          */
         @Nullable
-        public static Folder createFolderStructureWithFile(MIDIFile midiFile, String iconUri) {
+        public static Folder createFolderStructureWithFile(MidiFile midiFile, String iconUri) {
             // Break up the fully-qualified name of the file and ensure it is valid. Size must be 2 or greater, since
             // segments ∋ {..., parentNameSegment, folderName}, as less than 2 elements would mean a name is missing
             List<String> segments = Arrays.asList(midiFile.getNameGlobal().split("/"));
@@ -662,7 +625,7 @@ public class MIDILibrary implements Map<String, MIDILibrary.MapNode> {
                 if (i < segments.size() - 2) { parentNameBuilder.append("/"); }
             } // End for(i < segments.size - 1)
 
-            // Recursively create the folders until the MIDIFile can be added
+            // Recursively create the folders until the MidiFile can be added
             // Note: Default icon used
             Folder rootFolder = new Folder(segments.get(0), parentNameBuilder.toString(), null);
             if (segments.size() == 2) { rootFolder.addChild(midiFile); }
@@ -708,137 +671,6 @@ public class MIDILibrary implements Map<String, MIDILibrary.MapNode> {
             );
             metadata = metaBuilder.build();
         } // End Folder(String, String, String) constructor
-
-        // **** UNUSED AND UNFINISHED CODE **** Included for historical purposes, will be removed in next commit
-        @Nullable
-        @Deprecated
-        private static Folder merge(Folder folderA, Folder folderB) {
-            // if(true) used to bypass code-unreachable compile-time error to allow for testing,
-            //      while still preventing usage of the unfinished merge method
-            if (true) {
-                throw new UnsupportedOperationException("putAll method not supported by " + MIDILibrary.class.getName());
-            }
-            Folder result;
-            String folderAPath = folderA.getNameGlobal();
-            String folderBPath = folderB.getNameGlobal();
-            List<String> folderASegments = Arrays.asList(folderAPath.split("/"));
-            List<String> folderBSegments = Arrays.asList(folderBPath.split("/"));
-
-            // Ensure both paths are valid
-            if (folderASegments.isEmpty()) { return null; }
-            if (folderBSegments.isEmpty()) { return null; }
-            if (folderASegments.contains("")) {
-                throw new InvalidPathException(folderAPath, "One or more segments missing in folder name");
-            } // End if(folderASegments ∋ "")
-            if (folderBSegments.contains("")) {
-                throw new InvalidPathException(folderBPath, "One or more segments missing in folder name");
-            } // End if(folderBSegments ∋ "")
-
-            // Scan for if the first segment of FolderB's path is the same as any element of FolderA's path
-            Set<MapNode> FolderAChildren = folderA.getChildren();
-            Folder parentFolder = folderA;
-            for (MapNode child : FolderAChildren) {
-                if (child.getName().equals(folderB.getName())) {
-                    if (!(child instanceof Folder)) {
-                        throw new InvalidPathException(
-                                parentFolder.getNameGlobal(),
-                                child.getName() + " represents both a folder and a file"
-                        ); // End new InvalidPathException
-                    } // End if(!(child ∈ Folder))
-
-                    // Find which Folder has the longer ancestor chain, then add the two together
-                    if (((Folder) child).getNameGlobal().contains(folderB.getNameGlobal())) {
-                        // FolderA has longer ancestor chain
-                        result = folderA.clone();
-                        result.addChild(folderB);
-                        return result;
-                    } // End if(child.globalName ∋ folderB.globalName)
-                    else if (folderB.getNameGlobal().contains(((Folder) child).getNameGlobal())) {
-                        // FolderB has longer ancestor chain
-                        result = folderB.clone();
-                        result.addChild(child);
-                        return result;
-                    } // End if(child.globalName ∋ folderB.globalName) {} else if (folderB.globalName ∋ child.globalName)
-
-                    // getName is the same, but neither globalName contains the other's, therefore the folders have
-                    // the same name but are different; continue looping
-                } // End if(child.name == folderB.name)
-                else {
-                    if (child instanceof Folder) {
-                        parentFolder = (Folder) child;
-                        Set<MapNode> childChildren = child.getChildrenRecursive();
-
-                    } // End if(child ∈ Folder)
-                } // End if(child.name == folderB.name) {} else
-            }
-
-
-            for (int i = 0; i < folderASegments.size(); ++i) {
-                if (folderASegments.get(i).equals(folderBSegments.get(0))) {
-                    result = folderA.clone();
-                    // Handle if folderA and folderB are the same
-                    if (i == 0) {
-                        Set<MapNode> values = folderB.getChildren();
-                        for (MapNode child : values) { result.addChild(child); }
-                    } // End if(i == 0)
-                    else {
-                        // Handle if the first segment of folderB is the same as a segment other than the first in folderA
-
-                        // Recreate the path to the common folder and retrieve it from the cloned folderA
-                        // Note: folderA cloned since it has the larger ancestral chain here
-                        StringBuilder pathToCommonBuilder = new StringBuilder();
-                        for (int j = 0; j <= i; ++j) {
-                            pathToCommonBuilder.append(folderASegments.get(j));
-                            if (j != i) { pathToCommonBuilder.append("/"); }
-                        } // End for(j <= i)
-                        MapNode common = result.get(pathToCommonBuilder.toString());
-
-                        // Ensure the common node is actually a folder, then add all the children of folderB to it
-                        if (!(common instanceof Folder)) { // Folder has file in path
-                            throw new InvalidPathException(
-                                    pathToCommonBuilder.toString(),
-                                    folderASegments.get(i) + " represents both a folder and a file"
-                            ); // End new InvalidPathException
-                        } // End if(!(common ∈ Folder))
-                        Set<MapNode> children = folderB.getChildren();
-                        for (MapNode child : children) { ((Folder) common).addChild(child); }
-                    } // End if(i == 0) {} else
-                    return result;
-                } // End if(folderASegments[i] == folderBSegments[0])
-            } // End for(i < folderASegments.size)
-
-            // Scan folderB's segments looking for a match with the first segment of FolderA's path
-            // Note: Starts at 1 since folderBSegments[0] has already been compared to folderASegments[0]
-            for (int i = 1; i < folderBSegments.size(); ++i) {
-                // Handle if the first segment of folderA is the same as a segment other than the first in folderB
-                if (folderBSegments.get(i).equals(folderASegments.get(0))) {
-                    // Clone folderB since it has the longer ancestral history
-                    result = folderB.clone();
-
-                    // Recreate the path to the common folder and retrieve it from the cloned folderA
-                    StringBuilder pathToCommonBuilder = new StringBuilder();
-                    for (int j = 0; j <= i; ++j) {
-                        pathToCommonBuilder.append(folderASegments.get(j));
-                        if (j != i) { pathToCommonBuilder.append("/"); }
-                    } // End for(j <= i)
-                    MapNode common = result.get(pathToCommonBuilder.toString());
-
-                    // Ensure the common node is actually a folder, then add all the children of folderA to it
-                    if (!(common instanceof Folder)) { // Folder has file in path
-                        throw new InvalidPathException(
-                                pathToCommonBuilder.toString(),
-                                folderASegments.get(i) + " represents both a folder and a file"
-                        ); // End new InvalidPathException
-                    } // End if(!(common ∈ Folder))
-                    Set<MapNode> children = folderA.getChildren();
-                    for (MapNode child : children) { ((Folder) common).addChild(child); }
-                    return result;
-                } // End if(folderBSegments[i] == folderASegments[0])
-            } // End for(i < folderBSegments.size)
-
-            // The first segment of either Folder's path wasn't included anywhere in the other Folder's path
-            return null;
-        } // End merge method
 
         // Used for cloning
         private Folder(Folder sourceFolder) {
@@ -920,7 +752,7 @@ public class MIDILibrary implements Map<String, MIDILibrary.MapNode> {
         } // End createFolder method
 
         /**
-         * Creates a {@link MIDIFile} in this {@code Folder}.
+         * Creates a {@link MidiFile} in this {@code Folder}.
          *
          * @param uri      the {@link Uri} that can be used to open the file
          * @param fileName the file's name
@@ -929,8 +761,8 @@ public class MIDILibrary implements Map<String, MIDILibrary.MapNode> {
          * @param album    the file's album
          * @return the created file
          */
-        public MIDIFile createFile(Uri uri, String fileName, int duration, String artist, String album) {
-            MIDIFile midiFile = new MIDIFile(uri, fileName, duration, artist, album, this.getNameGlobal());
+        public MidiFile createFile(Uri uri, String fileName, int duration, String artist, String album) {
+            MidiFile midiFile = new MidiFile(uri, fileName, duration, artist, album, this.getNameGlobal());
             addChild(midiFile);
             return midiFile;
         } // End createFile method
@@ -1047,7 +879,7 @@ public class MIDILibrary implements Map<String, MIDILibrary.MapNode> {
 
         /**
          * Recursively gets all the dead-end children of this {@code Folder}. In other words,
-         * any {@link MapNode}s without children (e.g. an empty {@code Folder} or a {@link MIDIFile})
+         * any {@link MapNode}s without children (e.g. an empty {@code Folder} or a {@link MidiFile})
          * are found and returned.
          *
          * @return the {@link Set} of all children which have no children
@@ -1081,7 +913,7 @@ public class MIDILibrary implements Map<String, MIDILibrary.MapNode> {
 
         /**
          * Recursively gets the names of all dead-end children children of this {@code Folder}. In other words,
-         * the names of any {@link MapNode}s without children (e.g. an empty {@code Folder} or a {@link MIDIFile})
+         * the names of any {@link MapNode}s without children (e.g. an empty {@code Folder} or a {@link MidiFile})
          * are found and returned.
          *
          * @return the {@link Set} of all names of children which have no children
@@ -1244,7 +1076,7 @@ public class MIDILibrary implements Map<String, MIDILibrary.MapNode> {
          * Gets the fully-qualified name of this {@code MapNode}. This name includes all parent path
          * segments leading up to the root directory.<br>
          * <br>
-         * For example, a {@link MIDIFile} {code Tetris.mid} could be housed in a tree of {@link Folder}s:<br>
+         * For example, a {@link MidiFile} {code Tetris.mid} could be housed in a tree of {@link Folder}s:<br>
          * <ul style="list-style-type:none;">
          * <li>{@code ROOT_FOLDER -> Music -> Folk -> Korobeiniki -> Tetris.mid}</li>
          * </ul>
@@ -1273,4 +1105,4 @@ public class MIDILibrary implements Map<String, MIDILibrary.MapNode> {
          */
         String getParentName();
     } // End MapNode interface
-} // End MIDILibrary class
+} // End MidiLibrary class

@@ -119,6 +119,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
     private Handler uiHandler;
     private boolean sequenceLoaded;
     private boolean playAfterTrackingFinished;
+    private LocalBroadcastManager localBroadcastManager;
 
     public static final String ACTION_USB_PERMISSION = "com.moppyandroid.USB_PERMISSION";
     public static final String ACTION_UNABLE_START_MOPPY = "com.moppyandroid.UNABLE_TO_START_MOPPY";
@@ -136,13 +137,13 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
                 case ACTION_UNABLE_START_MOPPY: {
 
                 }
-                case ACTION_UNABLE_TO_CONNECT_DEVICE: {
+                case MoppyMediaService.RESPONSE_CONNECTION_FAILED: {
                     Spinner deviceBox = findViewById(R.id.device_box);
                     Log.e(
-                            this.getClass().getName(),
+                            MainActivity.class.getName() + "->broadcastReceiver",
                             "Unable to connect to device",
                             (Throwable) (intent.getSerializableExtra("exception")));
-                    showMessageDialog("Unable to connect to " + deviceBox.getSelectedItem(), null);
+                    showMessageDialog("Unable to connect to " + intent.getStringExtra(MoppyMediaService.EXTRA_PORT_NAME), null);
 
                     // Set the selection to "NONE"
                     deviceBox.setSelection(0);
@@ -168,7 +169,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
     protected void onCreate(Bundle savedInstanceState) {
         // Forward to onCreate method of superclass
         super.onCreate(savedInstanceState);
-        MIDILibrary.requestStoragePermission(this);
+        MidiLibrary.requestStoragePermission(this);
 
         // Set the initial view and disable the pause and play buttons
         setContentView(R.layout.activity_main);
@@ -187,8 +188,9 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         // Create the filter describing which local intents to process and register it
         IntentFilter localIntentFilter = new IntentFilter();
         localIntentFilter.addAction(ACTION_UNABLE_START_MOPPY);
-        localIntentFilter.addAction(ACTION_UNABLE_TO_CONNECT_DEVICE);
-        LocalBroadcastManager.getInstance(this).registerReceiver(broadcastReceiver, localIntentFilter);
+        localIntentFilter.addAction(MoppyMediaService.RESPONSE_CONNECTION_FAILED);
+        localBroadcastManager = LocalBroadcastManager.getInstance(this);
+        localBroadcastManager.registerReceiver(broadcastReceiver, localIntentFilter);
 
         // Start the media service
         startForegroundService(new Intent(this, MoppyMediaService.class));
@@ -213,47 +215,11 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         findViewById(R.id.pause_button).setOnClickListener((View v) -> onPauseButton());
     } // End onCreate method
 
-    // Method triggered when the activity is obscured by another activity (e.g. another app or file load dialog)
-    @Override
-    protected void onStop() {
-        // Disconnect the bridge, but don't reset the current bridge identifier
-        closeBridge(false);
-        super.onStop();
-    } // End onStop method
-
-    // Method triggered when the activity is brought back into focus after an onStop call
-    @Override
-    protected void onRestart() {
-        if (currentBridgeIdentifier != null) {
-            try {
-                netManager.connectBridge(currentBridgeIdentifier);
-                // Enable the stop and play buttons as necessary
-                enablePauseButton(true);
-                if (sequenceLoaded) {
-                    enablePlayButton(true);
-                    enableSongSlider(true);
-                } // End if(sequenceLoaded)
-            } // End try {connectBridge}
-            catch (IOException e) {
-                Spinner deviceBox = findViewById(R.id.device_box);
-                Log.e(this.getClass().getName(), "Unable to connect to device", e);
-                showMessageDialog("Unable to connect to " + deviceBox.getSelectedItem(), null);
-
-                // Set the selection to "NONE"
-                deviceBox.setSelection(0);
-            } // end try {connectBridge} catch(IOException)
-        } // End if(currentBridgeIdentifier != null)
-        super.onRestart();
-    } // End onResume method
-
     // Method triggered when the app is destroyed (e.g. force killed, finalize called, killed to reclaim memory)
     @Override
     protected void onDestroy() {
-        if (currentBridgeIdentifier != null && netManager.isConnected(currentBridgeIdentifier)) {
-            closeBridge(false);
-        } // End if(currentBridgeIdentifier.isConnected)
         unregisterReceiver(broadcastReceiver);
-        LocalBroadcastManager.getInstance(this).unregisterReceiver(broadcastReceiver);
+        localBroadcastManager.unregisterReceiver(broadcastReceiver);
         super.onDestroy();
     } // End onDestroy method
 
@@ -352,7 +318,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
     @Override
     public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
         if (requestCode == RequestCodes.READ_STORAGE) {
-            // TODO: Inform service that MIDILibrary is now creatable
+            localBroadcastManager.sendBroadcast(new Intent(MoppyMediaService.ACTION_INIT_LIBRARY));
         }
     } // End onRequestPermissionsResult method
 
@@ -440,30 +406,22 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
 
         // Check that the selected entry isn't "NONE" (index 0)
         if (position != 0) {
-            // Attempt to start a connection to the selected device/bridge
-            try {
-                // If necessary, close the current connection
-                closeBridge(true);
+            // If necessary, close the current connection
+            closeBridge(true);
 
-                // Get the bridge to connect to and do so, recording the new bridge as the current bridge if successful
-                String bridgeIdentifier = spinnerHashMap.get(parent.getItemAtPosition(position));
-                netManager.connectBridge(bridgeIdentifier);
-                currentBridgeIdentifier = bridgeIdentifier; // Updated here in case connectBridge throws exception
+            // Get the bridge to connect to and do so, recording the new bridge as the current bridge if successful
+            String bridgeIdentifier = spinnerHashMap.get(parent.getItemAtPosition(position));
+            Intent connectIntent = new Intent(MoppyMediaService.ACTION_ADD_DEVICE);
+            connectIntent.putExtra(MoppyMediaService.EXTRA_PORT_NAME, bridgeIdentifier);
+            localBroadcastManager.sendBroadcast(connectIntent);
+            currentBridgeIdentifier = bridgeIdentifier; // TODO: Replace with callback in case connection fails weirdly
 
-                // Enable the stop and play buttons as necessary
-                enablePauseButton(true);
-                if (sequenceLoaded) {
-                    enablePlayButton(true);
-                    enableSongSlider(true);
-                } // End if(sequenceLoaded)
-            } // End try {connectBridge}
-            catch (IOException | BridgeSerial.UnableToObtainDeviceException e) {
-                showMessageDialog("Unable to connect to " + parent.getItemAtPosition(position), null);
-                Log.e(this.getClass().getName(), "Unable to connect to device", e);
-
-                // Set the selection to "NONE"
-                parent.setSelection(0);
-            } // end try {connectBridge} catch(IOException)
+            // Enable the stop and play buttons as necessary
+            enablePauseButton(true);
+            if (sequenceLoaded) {
+                enablePlayButton(true);
+                enableSongSlider(true);
+            } // End if(sequenceLoaded)
         } // End if(position != 0)
         else { // "NONE" selected
             // Set the buttons to be disabled
@@ -509,6 +467,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
             if (netManager == null) { initMoppy(); }
             else {
                 // If objects have already been initialized, refresh them
+                localBroadcastManager.sendBroadcast(new Intent(MoppyMediaService.ACTION_REFRESH_DEVICES));
                 netManager.refreshDeviceList();
                 refreshDevices();
             } // End if(netManager == null) {} else
@@ -535,8 +494,9 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
     // Method triggered when a USB device is detached
     private void onUsbDeviceDetachedIntent() {
         // Refresh the netManger device lists, waiting for the message box to be acknowledged before refreshing ours
-        netManager.refreshDeviceList();
-        currentBridgeIdentifier = null;
+        localBroadcastManager.sendBroadcast(new Intent(MoppyMediaService.ACTION_REFRESH_DEVICES));
+        netManager.refreshDeviceList(); // TODO: Get device list from service, dual MoppyUsbManagers running right now
+        //currentBridgeIdentifier = null;
         refreshDevices();
     } // End onUsbDeviceDetachedIntent method
 
@@ -685,7 +645,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
             return;
         } // End if(index == -1)
         spinner.setSelection(index);
-    } // End refreshDeviceLists method
+    } // End refreshDevices method
 
     // Requests permission to access all attached USB devices
     private void requestPermissionForAllDevices() {
@@ -722,20 +682,15 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
     // Closes the currently connected bridge, resetting currentBridgeIdentifier to null if passed true
     private void closeBridge(boolean resetIdentifier) {
         // Return if there isn't a bridge to close
-        if (currentBridgeIdentifier == null || !netManager.isConnected(currentBridgeIdentifier)) {
+        if (currentBridgeIdentifier == null) {//|| !netManager.isConnected(currentBridgeIdentifier)) {
             return;
         } // End if(currentBridgeIdentifier.notConnected)
 
-        // Attempt to close the current bridge
-        try {
-            netManager.closeBridge(currentBridgeIdentifier);
-            if (resetIdentifier) { currentBridgeIdentifier = null; }
-        } // End try {closeBridge}
-        catch (IOException e) {
-            // In the words of MoppyLib's author when they deal with this exception, "There's not
-            // much we can do if it fails to close (it's probably already closed). Just log it and move on"
-            Log.w("com.moppyandroid.main.MainActivity", "Unable to close bridge", e);
-        } // End try {closeBridge} catch(IOException e)
+        // Send intent to close the current bridge
+        Intent disconnectIntent = new Intent(MoppyMediaService.ACTION_REMOVE_DEVICE);
+        disconnectIntent.putExtra(MoppyMediaService.EXTRA_PORT_NAME, currentBridgeIdentifier);
+        localBroadcastManager.sendBroadcast(disconnectIntent);
+        if (resetIdentifier) { currentBridgeIdentifier = null; }
     } // End closeBridge method
 
     // Request permission to access a specific attached USB device, specifying the index of the permissionStatuses entry for it
