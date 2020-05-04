@@ -640,6 +640,9 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
     // Triggered by ACTION_REFRESH_DEVICES
     private void onRefreshDevices(Result<Bundle> result) {
         moppyManager.getUsbManager().refreshDeviceList();
+        int numConnected = moppyManager.getUsbManager().getNumberConnected();
+        notificationBuilder.setContentText(numConnected + " device" + ((numConnected == 1) ? "" : "s") + " connected");
+        notificationManager.notify(NOTIFICATION_ID, notificationBuilder.build());
         onGetDevices(result); // Add the new device list and send the result
     }
 

@@ -5,8 +5,6 @@ Author: Noah Reeder, noahreederatc@gmail.com
 
 Known bugs:
 TODO: Sequencer stops on file load
-TODO: UDP bridge is broken
-TODO: Change MoppyUsbManager to remove the entries for devices that were physically removed after connection upon refresh
 
 
 Known problems:
@@ -491,7 +489,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
 
         // Check if all permission requests have been satisfied, and initialize objects if applicable
         if (!permissionStatuses.containsValue(false)) {
-            updateDevicesUI();
+            requestDevicesRefresh();
         } // End if(permissionStatuses.allTrue)
         else {
             if (pos < permissionStatuses.size() - 1) {
@@ -589,7 +587,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         if (deviceInfos == null) { return; }
 
         // Note: If this was called as a result of a device detachment then the service would have
-        // handled the device disconnection TODO: Confirm?
+        // handled the device disconnection
 
         // Retrieve the device box spinner, save the current selection, and clear the hashmap
         Spinner spinner = findViewById(R.id.device_box);
@@ -662,7 +660,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
 
         // Skip requesting permission and initialize Moppy objects if there are no devices
         if (usbManager.getDeviceList().size() == 0) {
-            return;
+            updateDevicesUI();
         } // End if(usbManager.getDeviceList.size == 0)
 
         // Get the list of all USB devices and iterate over it
