@@ -296,7 +296,7 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
 
         // Attempt to create the MIDI library. Probably will fail due to permissions not having been
         // granted yet, but hopefully the user will grant them so the next attempt is successful
-        midiLibrary = MidiLibrary.getMIDILibrary(this);
+        midiLibrary = MidiLibrary.getMidiLibrary(this);
     } // End onCreate method
 
     /**
@@ -367,7 +367,7 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
         // If the MIDI library isn't loaded yet, Start another thread to load it and recall this method
         if (midiLibrary == null) {
             result.detach();
-            MidiLibrary.getMIDILibraryAsync(
+            MidiLibrary.getMidiLibraryAsync(
                     MoppyMediaService.this,
                     midiLibraryResult -> {
                         // Send that an error occurred if we don't have permission to access storage
@@ -619,7 +619,7 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
     private void onInitLibrary(Result<Bundle> result) {
         if (midiLibrary == null) {
             result.detach();
-            MidiLibrary.getMIDILibraryAsync(this, (midiLibrary) -> {
+            MidiLibrary.getMidiLibraryAsync(this, (midiLibrary) -> {
                 this.midiLibrary = midiLibrary;
                 Bundle resultBundle = new Bundle();
                 resultBundle.putBoolean(EXTRA_LIBRARY_CREATED, midiLibrary != null);
@@ -682,7 +682,7 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
             // Don't want to hold up UI thread creating a MidiLibrary that may not be created successfully,
             // so we will just trigger creation and if failed send an error
             result.detach();
-            MidiLibrary.getMIDILibraryAsync(MoppyMediaService.this, (midiLibraryResult) -> {
+            MidiLibrary.getMidiLibraryAsync(MoppyMediaService.this, (midiLibraryResult) -> {
                 if (midiLibraryResult == null) {
                     Bundle errorBundle = new Bundle();
                     errorBundle.putString(EXTRA_ERROR_REASON, "Unable to create MIDI Library");
@@ -767,7 +767,7 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
             if (midiLibrary == null) {
                 // Don't want to hold up UI thread creating a MidiLibrary that may not be created successfully,
                 // so we will just trigger creation and skip the play event
-                MidiLibrary.getMIDILibraryAsync(
+                MidiLibrary.getMidiLibraryAsync(
                         MoppyMediaService.this,
                         midiLibraryResult -> MoppyMediaService.this.midiLibrary = midiLibraryResult
                 );
@@ -810,7 +810,7 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
             if (midiLibrary == null) {
                 // Don't want to hold up UI thread creating a MidiLibrary that may not be created successfully,
                 // so we will just trigger creation and skip the play event
-                MidiLibrary.getMIDILibraryAsync(
+                MidiLibrary.getMidiLibraryAsync(
                         MoppyMediaService.this,
                         midiLibraryResult -> MoppyMediaService.this.midiLibrary = midiLibraryResult
                 );

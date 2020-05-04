@@ -68,7 +68,6 @@ public class MidiLibrary implements Map<String, MidiLibrary.MapNode> {
      */
     public static final String MUSIC_FILE_ICON_URI = ContentResolver.SCHEME_ANDROID_RESOURCE + "://" + BuildConfig.APPLICATION_ID + "/drawable/ic_musicfile";
 
-
     private Folder rootFolder; // The root folder containing all categories
 
     // IDE Complains about minimum SDK version of 29 needed for MediaStore.Audio.Media.Duration, however
@@ -100,11 +99,11 @@ public class MidiLibrary implements Map<String, MidiLibrary.MapNode> {
      *
      * @param activity the activity to request permission on
      */
-    public static void requestStoragePermission(Activity activity) {
+    public static void requestStoragePermission(Activity activity, int requestCode) {
         ActivityCompat.requestPermissions(
                 activity,
                 new String[]{ Manifest.permission.READ_EXTERNAL_STORAGE },
-                MainActivity.RequestCodes.READ_STORAGE
+                requestCode
         ); // End requestPermissions call
     } // End requestStoragePermission method
 
@@ -115,7 +114,7 @@ public class MidiLibrary implements Map<String, MidiLibrary.MapNode> {
      * @return {@code null} if read permission has not been granted, otherwise a valid MIDI library
      */
     @Nullable
-    public static MidiLibrary getMIDILibrary(Context context) {
+    public static MidiLibrary getMidiLibrary(Context context) {
         if (!hasStoragePermission(context)) { return null; }
 
         // Create the root folder and the category folders
@@ -192,14 +191,14 @@ public class MidiLibrary implements Map<String, MidiLibrary.MapNode> {
         return new MidiLibrary(realRootFolder);
     }
 
-    public static void getMIDILibraryAsync(Context context, MidiLibrary.Callback callback) {
+    public static void getMidiLibraryAsync(Context context, MidiLibrary.Callback callback) {
         new Thread() {
             @Override
-            public void run() { callback.onLoadCompletion(getMIDILibrary(context)); }
+            public void run() { callback.onLoadCompletion(getMidiLibrary(context)); }
         }.start();
     } // End getMIDILibraryAsync method
 
-    // Constructs a MIDI library with the passed root folder. See getMIDILibrary for explanation about root folder to pass
+    // Constructs a MIDI library with the passed root folder. See getMidiLibrary for explanation about root folder to pass
     private MidiLibrary(Folder rootFolder) { this.rootFolder = rootFolder; }
 
     /**
@@ -399,14 +398,14 @@ public class MidiLibrary implements Map<String, MidiLibrary.MapNode> {
             }
         } // End for(item : collection)
 
-        // Return null if no MIDIFiles are found matching the query
+        // Return null if no MidiFiles are found matching the query
         return null;
     } // End searchFuzzy(String, String) method
 
     /**
      * Callback interface used for running code upon completion of asynchronous {@link MidiLibrary} creation
      *
-     * @see #getMIDILibraryAsync(Context, MidiLibrary.Callback)
+     * @see #getMidiLibraryAsync(Context, MidiLibrary.Callback)
      */
     public interface Callback {
         void onLoadCompletion(MidiLibrary midiLibrary);

@@ -459,7 +459,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
 
         // Initialize BridgeSerial
         BridgeSerial.init(this);
-        MidiLibrary.requestStoragePermission(this);
+        MidiLibrary.requestStoragePermission(this, RequestCodes.READ_STORAGE);
 
         // Request permission to access all attached USB devices (also initializes Moppy on completion)
         requestPermissionForAllDevices();
