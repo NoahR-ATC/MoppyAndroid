@@ -62,6 +62,7 @@ import android.hardware.usb.UsbManager;
 import android.net.Uri;
 import android.os.Handler;
 import android.os.RemoteException;
+import android.os.SystemClock;
 import android.provider.OpenableColumns;
 import android.support.v4.media.MediaBrowserCompat;
 import android.support.v4.media.MediaMetadataCompat;
@@ -80,20 +81,10 @@ import android.widget.TextView;
 import android.os.Bundle;
 
 import com.moppy.core.comms.bridge.BridgeSerial;
-import com.moppy.core.comms.bridge.MultiBridge;
-import com.moppy.core.midi.MoppyMIDISequencer;
-import com.moppy.core.events.mapper.MapperCollection;
-import com.moppy.core.events.postprocessor.MessagePostProcessor;
-import com.moppy.core.midi.MoppyMIDIReceiverSender;
-import com.moppy.core.status.StatusBus;
-import com.moppy.core.status.StatusConsumer;
-import com.moppy.core.status.StatusUpdate;
 
 import com.sothree.slidinguppanel.SlidingUpPanelLayout;
 import com.sothree.slidinguppanel.SlidingUpPanelLayout.PanelState;
 
-import jp.kshoji.javax.sound.midi.InvalidMidiDataException;
-import jp.kshoji.javax.sound.midi.MidiUnavailableException;
 import jp.kshoji.javax.sound.midi.io.StandardMidiFileReader;
 import jp.kshoji.javax.sound.midi.spi.MidiFileReader;
 
@@ -105,23 +96,24 @@ import java.util.HashMap;
 import java.util.Timer;
 import java.util.TimerTask;
 
-public class MainActivity extends AppCompatActivity implements AdapterView.OnItemSelectedListener, StatusConsumer, SeekBar.OnSeekBarChangeListener {
-    private MoppyMIDISequencer seq;
+public class MainActivity extends AppCompatActivity implements AdapterView.OnItemSelectedListener, SeekBar.OnSeekBarChangeListener {
     private String currentBridgeIdentifier;
     private HashMap<String, String> spinnerHashMap;
     private HashMap<Integer, UsbDevice> devices;
     private HashMap<Integer, Boolean> permissionStatuses;
     private SlidingUpPanelLayout panelLayout;
     private SeekBar songSlider;
-    private Timer songProgressTimer;
     private SongTimerTask songTimerTask;
     private Handler uiHandler;
-    private boolean sequenceLoaded;
-    private boolean playAfterTrackingFinished;
+    private boolean movingSlider;
+    private boolean initialized;
     private MediaBrowserCompat mediaBrowser;
     private MediaControllerCallback mediaControllerCallback;
+    private MediaControllerCompat.TransportControls transportControls;
+    private PlaybackStateCompat playbackState;
+    private MediaMetadataCompat metadata;
 
-    public static final String ACTION_USB_PERMISSION = "com.moppyandroid.USB_PERMISSION"; // TODO: Move to service
+    public static final String ACTION_USB_PERMISSION = "com.moppyandroid.USB_PERMISSION";
 
     // Define the receiver to process relevant intent messages
     private BroadcastReceiver broadcastReceiver = new BroadcastReceiver() {
@@ -136,7 +128,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
                     onUsbPermissionIntent(intent);
                     break;
                 } // End case ACTION_USB_PERMISSION
-                case UsbManager.ACTION_USB_DEVICE_ATTACHED: {
+                case UsbManager.ACTION_USB_DEVICE_ATTACHED: { // TODO: Move to service
                     onUsbDeviceAttachedIntent(intent);
                     break;
                 } // End case ACTION_USB_DEVICE_ATTACHED
@@ -151,30 +143,19 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
     // Method triggered upon activity creation
     @Override
     protected void onCreate(Bundle savedInstanceState) {
-        // Forward to onCreate method of superclass
         super.onCreate(savedInstanceState);
-        // TODO: Remove and rewire controls from seq to transport controls
-        try {
-            seq = new MoppyMIDISequencer(new StatusBus(), new MoppyMIDIReceiverSender(new MapperCollection<>(), MessagePostProcessor.PASS_THROUGH, new MultiBridge()));
-        }
-        catch (MidiUnavailableException | IOException e) {
-            e.printStackTrace();
-            finish();
-        }
+
+        devices = new HashMap<>();
+        permissionStatuses = new HashMap<>();
+        spinnerHashMap = new HashMap<>();
+        uiHandler = new Handler();
+        movingSlider = false;
+        initialized = false;
 
         // Set the initial view and disable the pause and play buttons
         setContentView(R.layout.activity_main);
         songSlider = findViewById(R.id.song_slider);
-        enablePlayButton(false);
-        enableSongSlider(false);
-        enablePauseButton(false);
-
-        // Create the filter describing which operating system intents to process and register it
-        IntentFilter globalIntentFilter = new IntentFilter();
-        globalIntentFilter.addAction(ACTION_USB_PERMISSION);
-        globalIntentFilter.addAction(UsbManager.ACTION_USB_DEVICE_ATTACHED);
-        globalIntentFilter.addAction(UsbManager.ACTION_USB_DEVICE_DETACHED);
-        registerReceiver(broadcastReceiver, globalIntentFilter);
+        setControlState(true);
 
         // Start the media service
         // Note: This is in addition to binding/unbinding in onStart and onStop to allow the service
@@ -218,7 +199,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         }
         mediaBrowser.disconnect();
 
-        unregisterReceiver(broadcastReceiver);
+        if (initialized) { unregisterReceiver(broadcastReceiver); }
         super.onDestroy();
     } // End onDestroy method
 
@@ -228,7 +209,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
      * demo application located at https://github.com/umano/AndroidSlidingUpPanel/tree/master/demo.
      */
     @Override
-    public void onBackPressed() {
+    public void onBackPressed() { // TODO: Quits without disconnecting devices, look into populating current device on startup
         // If the sliding menu is defined and open collapse it, otherwise do the default action
         if (panelLayout == null) { super.onBackPressed(); }
         if (panelLayout.getPanelState() == PanelState.EXPANDED || panelLayout.getPanelState() == PanelState.ANCHORED) {
@@ -276,7 +257,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
                     InputStream stream = getContentResolver().openInputStream(midiFileUri);
                     MidiFileReader reader = new StandardMidiFileReader();
                     if (stream == null) { throw new IOException("Unable to open file"); }
-                    seq.loadSequence(reader.getSequence(stream));
+                    //seq.loadSequence(reader.getSequence(stream));
                 } // End try {loadSequence}
                 catch (FileNotFoundException e) {
                     // Show a message box and exit method
@@ -294,32 +275,15 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
                     ); // End showMessageDialog call
                     return;
                 } // End try {loadSequence} catch(IOException)
-                catch (InvalidMidiDataException e) {
-                    // Show a message box and exit method
-                    showMessageDialog(
-                            (midiFileName.equals("") ? "Selected file" : midiFileName) + " is not a valid MIDI file",
-                            null
-                    ); // End showMessageDialog call
-                    return;
-                } // End try {loadSequence} catch(IOException)
+                // End try {loadSequence} catch(IOException)
 
                 // If an exception wasn't raised (in which case control would have returned), set the song title
                 setSongName(midiFileName);
 
                 // Mark that a sequence has been loaded, and enable the play button and song slider if necessary
-                sequenceLoaded = true;
-                if (currentBridgeIdentifier != null && !songSlider.isEnabled()) {
-                    mediaBrowser.sendCustomAction(MoppyMediaService.ACTION_GET_DEVICES, null, new MediaBrowserCompat.CustomActionCallback() {
-                        @Override
-                        public void onResult(String action, Bundle extras, Bundle resultData) {
-                            if (resultData.getInt(MoppyMediaService.EXTRA_NUM_CONNECTED) > 0) {
-                                enablePlayButton(true);
-                                enableSongSlider(true);
-                            }
-                            super.onResult(action, extras, resultData);
-                        }
-                    });
-                } // End if(currentBridgeIdentifier.isConnected && !songSlider.enabled)
+                if (!songSlider.isEnabled() && metadata != null) {
+                    setControlState(false);
+                } // End if(!songSlider.enabled && fileLoaded)
             } // End if(result == OK)
         } // End if(request == LOAD_FILE)
 
@@ -336,9 +300,9 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
     @Override
     public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
         if (seekBar == songSlider) {
-            if (fromUser) {
-                seq.setSecondsPosition(progress);
-                updateSongPositionText();
+            if (fromUser && !movingSlider) {
+                // Seek to the new position, which will update the playback state and therefore the text
+                transportControls.seekTo(progress);
             } // End if(fromUser)
         } // End if(seekBar == songSlider)
     } // End onProgressChanged method
@@ -347,8 +311,8 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
     @Override
     public void onStartTrackingTouch(SeekBar seekBar) {
         if (seekBar == songSlider) {
-            // Pause the sequencer so there isn't any garbled (possibly damaging?) notes as the slider moves
-            if (seq.isPlaying()) { seq.pause(); }
+            movingSlider = true;
+            songTimerTask.pause();
         } // End if(seekBar == songSlider)
     } // End onStartTrackingTouch method
 
@@ -356,58 +320,11 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
     @Override
     public void onStopTrackingTouch(SeekBar seekBar) {
         if (seekBar == songSlider) {
-            if (playAfterTrackingFinished) { seq.play(); }
+            movingSlider = false;
+            onProgressChanged(seekBar, seekBar.getProgress(), true);
+            songTimerTask.unpause(); // After onProgressChanged so time calculation doesn't overwrite seek
         } // End if(seekBar == songSlider)
     } // End onStopTrackingTouch method
-
-    // Method triggered when the sequencer sends a status update
-    @Override
-    public void receiveUpdate(StatusUpdate update) {
-        switch (update.getType()) {
-            case SEQUENCE_LOAD: {
-                // Start the timer, shutting it down first if it is still running, and ensure the task is paused
-                if (songTimerTask != null) { songTimerTask.cancel(); }
-                if (songProgressTimer != null) { songProgressTimer.cancel(); }
-                songTimerTask = new SongTimerTask();
-                songProgressTimer = new Timer();
-                songTimerTask.pause();
-                // Note: The timer tick is 500 so that if the timer's ticks are slightly offset from
-                // the sequencer's ticks the progress bar will still be pretty accurate
-                songProgressTimer.schedule(songTimerTask, 0, 500);
-                long songLength = seq.getSecondsLength();
-                songSlider.setMax(songLength < Integer.MAX_VALUE ? (int) songLength : Integer.MAX_VALUE);
-
-                // Set the song time text
-                StringBuilder timeTextBuilder = new StringBuilder();
-                String temp;
-                timeTextBuilder.append("0:00:00/");
-                timeTextBuilder.append(songLength / 3600);
-                timeTextBuilder.append(":");
-                temp = Long.toString((songLength % 3600) / 60);
-                timeTextBuilder.append(("00" + temp).substring(temp.length())).append(":");
-                temp = Long.toString(songLength % 60);
-                timeTextBuilder.append(("00" + temp).substring(temp.length()));
-                ((TextView) findViewById(R.id.song_time_text)).setText(timeTextBuilder.toString());
-                break;
-            } // End SEQUENCE_LOAD case
-            case SEQUENCE_START: {
-                songTimerTask.unpause();
-                break;
-            } // End SEQUENCE_START case
-            case SEQUENCE_PAUSE: {
-                if (songTimerTask != null) { songTimerTask.pause(); }
-                break;
-            } // End SEQUENCE_PAUSE case
-            case SEQUENCE_END: {
-                songTimerTask.pause();
-                ((ImageButton) findViewById(R.id.pause_button)).setImageResource(R.drawable.ic_stop);
-                update.getData().ifPresent(reset -> {
-                    if ((boolean) reset) { updateSongProgress(); }
-                }); // End ifPresent lambda
-                break;
-            } // End SEQUENCE_PAUSE/SEQUENCE_END case
-        } // End switch(update)
-    } // End receiveUpdate method
 
     // Method triggered when an item in a spinner is selected
     public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
@@ -428,11 +345,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
                 public void onResult(String action, Bundle extras, Bundle resultData) {
                     currentBridgeIdentifier = bridgeIdentifier;
                     // Enable the stop and play buttons as necessary
-                    enablePauseButton(true);
-                    if (sequenceLoaded) {
-                        enablePlayButton(true);
-                        enableSongSlider(true);
-                    } // End if(sequenceLoaded)
+                    setControlState(false);
                     super.onResult(action, extras, resultData);
                 } // End ACTION_ADD_DEVICE.onResult method
 
@@ -451,9 +364,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         } // End if(position != 0)
         else { // "NONE" selected
             // Set the buttons to be disabled
-            enablePlayButton(false);
-            enableSongSlider(false);
-            enablePauseButton(false);
+            setControlState(true);
 
             closeBridge(true);
         } // End if(position != 0) {} else
@@ -526,31 +437,25 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
     } // End onLoadButton method
 
     // Method triggered when play button pressed
-    private void onPlayButton() {
-        seq.play();
-        ((ImageButton) findViewById(R.id.pause_button)).setImageResource(R.drawable.ic_pause);
-        playAfterTrackingFinished = true;
-    } // End onPlayButton method
+    private void onPlayButton() { transportControls.play(); }
 
     // Method triggered when pause/stop button pressed
     private void onPauseButton() {
-        playAfterTrackingFinished = false;
-        if (seq.isPlaying()) {
-            seq.pause();
-            ((ImageButton) findViewById(R.id.pause_button)).setImageResource(R.drawable.ic_stop);
-        } // End if(seq.isPlaying)
-        else { seq.stop(); }
+        if (playbackState.getState() == PlaybackStateCompat.STATE_PLAYING) {
+            transportControls.pause();
+        }
+        else { transportControls.stop(); }
     } // End onPauseButton method
 
     // Initialize non-MoppyLib objects of the class and start the Moppy initialization chain
     @SuppressLint("UseSparseArrays")
     private void init() {
-        // Initialize objects
-        devices = new HashMap<>();
-        permissionStatuses = new HashMap<>();
-        spinnerHashMap = new HashMap<>();
-        uiHandler = new Handler();
-        sequenceLoaded = false;
+        // Create the filter describing which Android system intents to process and register it
+        IntentFilter globalIntentFilter = new IntentFilter();
+        globalIntentFilter.addAction(ACTION_USB_PERMISSION);
+        globalIntentFilter.addAction(UsbManager.ACTION_USB_DEVICE_ATTACHED);
+        globalIntentFilter.addAction(UsbManager.ACTION_USB_DEVICE_DETACHED);
+        registerReceiver(broadcastReceiver, globalIntentFilter);
 
         // Initialize BridgeSerial
         BridgeSerial.init(this);
@@ -558,6 +463,15 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
 
         // Request permission to access all attached USB devices (also initializes Moppy on completion)
         requestPermissionForAllDevices();
+
+        Timer songProgressTimer = new Timer();
+        songTimerTask = new SongTimerTask();
+        songTimerTask.pause();
+        // Note: The timer tick is 500 so that if the timer's ticks are slightly offset from
+        // the sequencer's ticks the progress bar will still be pretty accurate
+        songProgressTimer.schedule(songTimerTask, 0, 500);
+
+        initialized = true;
     } // End init method
 
     private void requestDevicesRefresh() {
@@ -644,7 +558,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
             showMessageDialog("The previously selected device is no longer available", null);
             currentBridgeIdentifier = null;
             // Replicate a pause event if the device was being played to
-            if (seq.isPlaying()) { onPauseButton(); }
+            if (playbackState.getState() == PlaybackStateCompat.STATE_PLAYING) { onPauseButton(); }
             spinner.setSelection(0); // Manual selection triggers onItemSelected and the service gets informed about disconnection
             return;
         } // End if(index == -1)
@@ -686,9 +600,9 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
     // Closes the currently connected bridge, resetting currentBridgeIdentifier to null if passed true
     private void closeBridge(boolean resetIdentifier) {
         // Return if there isn't a bridge to close
-        if (currentBridgeIdentifier == null) {//|| !netManager.isConnected(currentBridgeIdentifier)) {
+        if (currentBridgeIdentifier == null) {
             return;
-        } // End if(currentBridgeIdentifier.notConnected)
+        }
 
         // Send intent to close the current bridge
         Bundle disconnectBundle = new Bundle();
@@ -746,6 +660,25 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         } // End if(enabled) {} else
     } // End enableSongSlider method
 
+    private void setControlState(boolean forceDisable) {
+        if (forceDisable) {
+            enablePauseButton(false);
+            enablePlayButton(false);
+            enableSongSlider(false);
+        } // End if(forceDisable)
+        else {
+            enablePauseButton(true);
+            if (metadata != null) {
+                enablePlayButton(true);
+                enableSongSlider(true);
+            } // End if(sequenceLoaded)
+            else {
+                enablePlayButton(false);
+                enableSongSlider(false);
+            } // End if(sequenceLoaded) {} else
+        } // End if(forceDisable) {} else
+    } // End enableControls method
+
     // Assigns the passed string as the name of the loaded song
     private void setSongName(String songName) {
         ((TextView) findViewById(R.id.toolbar_song_title)).setText(songName);
@@ -754,18 +687,15 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
 
     // Updates the song position slider and textual counter
     private void updateSongProgress() {
-        long currentTime = seq.getSecondsPosition();
-        if (currentTime < 0 || currentTime > Integer.MAX_VALUE) {
-            songSlider.setProgress(songSlider.getMax());
-        } // End if(currentTime < 1 || currentTime > INT_MAX)
-        else { songSlider.setProgress((int) currentTime); }
-
-        updateSongPositionText();
+        long time = playbackState.getPosition();
+        time += playbackState.getPlaybackSpeed() * (SystemClock.elapsedRealtime() - playbackState.getLastPositionUpdateTime());
+        songSlider.setProgress((int) Math.min(time, Integer.MAX_VALUE));
+        updateSongPositionText(time);
     } // End updateSongProgress method
 
     // Updates the text label representing the song position (e.g. 0:02:24/0:03:00)
-    private void updateSongPositionText() {
-        long currentTime = seq.getSecondsPosition();
+    private void updateSongPositionText(long time) {
+        long currentTime = time / 1000;
 
         // Update the textual view of the current song time, retaining the song length portion
         // Note: A substring is taken for minutes and seconds to ensure that there is 2 digits
@@ -819,7 +749,8 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         @Override
         public void onConnected() { // Successful connection
             // Run the initializer
-            init();
+            if (!initialized) { init(); }
+
             MediaControllerCompat mediaController;
             try {
                 mediaController = new MediaControllerCompat(
@@ -835,45 +766,23 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
             }
             MediaControllerCompat.setMediaController(MainActivity.this, mediaController);
             mediaController.registerCallback(mediaControllerCallback);
-            // TODO: Setup controls
-            mediaBrowser.sendCustomAction(MoppyMediaService.ACTION_INIT_LIBRARY, null, new MediaBrowserCompat.CustomActionCallback() {
-                /**
-                 * Called when the custom action finished successfully.
-                 *
-                 * @param action     The custom action sent to the connected service.
-                 * @param extras     The bundle of service-specific arguments sent to the connected service.
-                 * @param resultData The additional data delivered from the connected service.
-                 */
-                @Override
-                public void onResult(String action, Bundle extras, Bundle resultData) {
-                    Log.i(MainActivity.class.getName() + "->sendCustomAction.onResult", "" + resultData.getBoolean(MoppyMediaService.EXTRA_LIBRARY_CREATED, false));
-                    super.onResult(action, extras, resultData);
-                }
+            playbackState = mediaController.getPlaybackState();
+            metadata = mediaController.getMetadata();
+            transportControls = mediaController.getTransportControls();
+            setControlState(false);
 
-                /**
-                 * Called when an error happens while performing the custom action or the connected service
-                 * doesn't support the requested custom action.
-                 *
-                 * @param action The custom action sent to the connected service.
-                 * @param extras The bundle of service-specific arguments sent to the connected service.
-                 * @param data   The additional data delivered from the connected service.
-                 */
-                @Override
-                public void onError(String action, Bundle extras, Bundle data) {
-                    super.onError(action, extras, data);
-                }
-            });
             super.onConnected();
         }
 
         @Override
         public void onConnectionSuspended() { // Server crashed, awaiting restart
-            // TODO: Freeze controls
+            setControlState(true);
             super.onConnectionSuspended();
         }
 
         @Override
         public void onConnectionFailed() { // Connection refused
+            // Log what (shouldn't have) happened and close the app
             Log.wtf(MainActivity.class.getName() + "->onConnected", "Unable to connect to MoppyMediaService");
             showMessageDialog("Unable to connect to Media Service", (dialog, which) -> MainActivity.this.finish());
             super.onConnectionFailed();
@@ -883,11 +792,67 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
     private class MediaControllerCallback extends MediaControllerCompat.Callback {
         @Override
         public void onPlaybackStateChanged(PlaybackStateCompat state) {
+            playbackState = state;
+            switch (playbackState.getState()) {
+                case PlaybackStateCompat.STATE_PLAYING: {
+                    songTimerTask.unpause();
+                    ((ImageButton) findViewById(R.id.pause_button)).setImageResource(R.drawable.ic_pause);
+                    break;
+                }
+                case PlaybackStateCompat.STATE_PAUSED: {
+                    songTimerTask.pause();
+                    ((ImageButton) findViewById(R.id.pause_button)).setImageResource(R.drawable.ic_stop);
+                    break;
+                }
+                case PlaybackStateCompat.STATE_STOPPED: {
+                    songTimerTask.pause();
+                    ((ImageButton) findViewById(R.id.pause_button)).setImageResource(R.drawable.ic_stop);
+                    // Move slider to where sequencer stopped (0 if reset, otherwise song end)
+                    updateSongProgress();
+                    break;
+                }
+                case PlaybackStateCompat.STATE_BUFFERING:
+                case PlaybackStateCompat.STATE_CONNECTING:
+                case PlaybackStateCompat.STATE_ERROR:
+                case PlaybackStateCompat.STATE_FAST_FORWARDING:
+                case PlaybackStateCompat.STATE_NONE:
+                case PlaybackStateCompat.STATE_REWINDING:
+                case PlaybackStateCompat.STATE_SKIPPING_TO_NEXT:
+                case PlaybackStateCompat.STATE_SKIPPING_TO_PREVIOUS:
+                case PlaybackStateCompat.STATE_SKIPPING_TO_QUEUE_ITEM:
+                    songTimerTask.pause();
+                    break;
+            }
             super.onPlaybackStateChanged(state);
         }
 
         @Override
         public void onMetadataChanged(MediaMetadataCompat metadata) {
+            MainActivity.this.metadata = metadata;
+            setControlState(false);
+            long duration = metadata.getLong(MediaMetadataCompat.METADATA_KEY_DURATION);
+
+            // Pause the slider updates while we update the maximum, re-enabling after if necessary
+            songTimerTask.pause();
+            songSlider.setMax((int) Math.min(duration, Integer.MAX_VALUE));
+
+            // Set the song time text
+            int durationSeconds = (int) Math.min(duration / 1000, Integer.MAX_VALUE);
+            StringBuilder timeTextBuilder = new StringBuilder();
+            String temp;
+            timeTextBuilder.append("0:00:00/");
+            timeTextBuilder.append(durationSeconds / 3600);
+            timeTextBuilder.append(":");
+            temp = Long.toString((durationSeconds % 3600) / 60);
+            timeTextBuilder.append(("00" + temp).substring(temp.length())).append(":");
+            temp = Long.toString(durationSeconds % 60);
+            timeTextBuilder.append(("00" + temp).substring(temp.length()));
+            ((TextView) findViewById(R.id.song_time_text)).setText(timeTextBuilder.toString());
+
+            if (playbackState != null && playbackState.getState() == PlaybackStateCompat.STATE_PLAYING) {
+                songTimerTask.unpause();
+            }
+
             super.onMetadataChanged(metadata);
         }
     }

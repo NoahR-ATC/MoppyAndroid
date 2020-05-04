@@ -62,8 +62,8 @@ public class MoppyUsbManager {
                 newBridge.registerMessageReceiver(multiBridge);
                 multiBridge.addBridge(newBridge);
                 networkBridges.put(bridgeIdentifier, newBridge);
+                connectedIdentifiers.add(bridgeIdentifier);
             } // End if(currentBridge != null) {} else
-            connectedIdentifiers.add(bridgeIdentifier);
         } // End try {bridge.connect}
         finally {
             statusBus.receiveUpdate(StatusUpdate.NET_STATUS_CHANGED);
