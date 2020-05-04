@@ -3,6 +3,9 @@
 
 package com.moppyandroid.main;
 
+import android.content.Context;
+import android.hardware.usb.UsbDevice;
+import android.hardware.usb.UsbManager;
 import android.util.Log;
 
 import java.io.IOException;
@@ -24,18 +27,20 @@ public class MoppyUsbManager {
     private final HashMap<String, NetworkBridge> networkBridges;
     private final List<String> bridgeIdentifiers;
     private final List<String> connectedIdentifiers;
+    private final UsbManager androidUsbManager;
 
     /**
      * Creates a MoppyUsbManager, using the specified bus to alert consumers to device change events.
      *
      * @param statusBus the bus used to communicate with status consumers
      */
-    public MoppyUsbManager(StatusBus statusBus) {
+    public MoppyUsbManager(StatusBus statusBus, Context context) {
         this.statusBus = statusBus;
         multiBridge = new MultiBridge();
         networkBridges = new HashMap<>();
         bridgeIdentifiers = new ArrayList<>();
         connectedIdentifiers = new ArrayList<>();
+        androidUsbManager = (UsbManager) context.getSystemService(Context.USB_SERVICE);
 
         // Attempt to create a UDP bridge and refresh the device lists
         try {
@@ -50,7 +55,7 @@ public class MoppyUsbManager {
 
     /**
      * Connects to a specified network bridge using its identifier, which usually is either a UDP socket
-     * or serial port path. Potentially throws {@link BridgeSerial.UnableToObtainDeviceException}.
+     * or serial port path. Potentially throws {@link com.moppy.core.comms.bridge.BridgeSerial.UnableToObtainDeviceException}.
      *
      * @param bridgeIdentifier the identifier of the bridge to connect
      * @throws IOException if unable to create the bridge
@@ -87,9 +92,9 @@ public class MoppyUsbManager {
         multiBridge.removeBridge(bridge);
         bridge.deregisterMessageReceiver(multiBridge); // Just in case a message gets sent mid-closing
         networkBridges.remove(bridgeIdentifier);
+        connectedIdentifiers.remove(bridgeIdentifier);
         try {
             bridge.close();
-            connectedIdentifiers.remove(bridgeIdentifier);
         } // End try {bridge.close}
         finally {
             statusBus.receiveUpdate(StatusUpdate.NET_STATUS_CHANGED);
@@ -122,7 +127,7 @@ public class MoppyUsbManager {
     } // End isConnected method
 
     /**
-     * Refreshes the list of bridge identifiers
+     * Refreshes the list of bridge identifiers with connected devices guaranteed to remain.
      */
     public void refreshDeviceList() {
         // Add all UDP bridges as well as all available serial bridges to the identifier list
@@ -162,4 +167,57 @@ public class MoppyUsbManager {
      * @return the connect bridge identifiers
      */
     public List<String> getConnectedIdentifiers() { return connectedIdentifiers; }
+
+    /**
+     * Uses the identifier of a device to get the following information in an {@link ArrayList}:
+     * {port name, product name, manufacturer name, hex vendor ID, hex product ID}.
+     * {@code ArrayList} returned rather than {@link List} because it implements {@link java.io.Serializable}.
+     *
+     * @param identifier the identifier of the device to find information on
+     * @return an {@code ArrayList<String>} with the device information
+     */
+    public ArrayList<String> getDeviceInfo(String identifier) {
+        ArrayList<String> info = new ArrayList<>(5);
+        info.add(identifier);
+
+        // Try to retrieve the UsbDevice object for the current device. NOTE: null if not found
+        UsbDevice usbDevice = androidUsbManager.getDeviceList().get(identifier);
+
+        // If we received a UsbDevice object add information of interest to the array
+        if (usbDevice != null) {
+            if (usbDevice.getProductName() != null) { info.add(usbDevice.getProductName()); }
+            else { info.add(null); }
+
+            if (usbDevice.getManufacturerName() != null) {
+                info.add(usbDevice.getManufacturerName());
+            }
+            else { info.add(null); }
+
+            info.add("0x" + String.format("%1$04X", usbDevice.getVendorId()));
+            info.add("0x" + String.format("%1$04X", usbDevice.getProductId()));
+        } // End if(usbDevice != null)
+        else {
+            // Fill information array with null if device not found
+            info.add(null);
+            info.add(null);
+            info.add(null);
+            info.add(null);
+        } // End if(usbDevice != null) {} else
+
+        return info;
+    } // End getDeviceInfo method
+
+    /**
+     * Retrieves the following information for all devices in an {@link ArrayList}:
+     * {port name, product name, manufacturer name, hex vendor ID, hex product ID}.
+     * {@code ArrayList} returned rather than {@link List} because it implements {@link java.io.Serializable}.
+     *
+     * @return an {@code ArrayList<ArrayList<String>>} of the information for all available devices
+     */
+    public ArrayList<ArrayList<String>> getDeviceInfoForAll() {
+        ArrayList<ArrayList<String>> result = new ArrayList<>();
+        for (String identifier : bridgeIdentifiers) { result.add(getDeviceInfo(identifier)); }
+        return result;
+    } // End getDeviceInfoForAll method
 } // End MoppyUsbManager class
+

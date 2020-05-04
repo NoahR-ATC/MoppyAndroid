@@ -5,6 +5,8 @@ Author: Noah Reeder, noahreederatc@gmail.com
 
 Known bugs:
 TODO: Sequencer stops on file load
+TODO: UDP bridge is broken
+TODO: Change MoppyUsbManager to remove the entries for devices that were physically removed after connection upon refresh
 
 
 Known problems:
@@ -45,13 +47,13 @@ Regexes:
 
 
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.localbroadcastmanager.content.LocalBroadcastManager;
 
 import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.app.PendingIntent;
 import android.content.BroadcastReceiver;
+import android.content.ComponentName;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
@@ -61,7 +63,12 @@ import android.hardware.usb.UsbDevice;
 import android.hardware.usb.UsbManager;
 import android.net.Uri;
 import android.os.Handler;
+import android.os.RemoteException;
 import android.provider.OpenableColumns;
+import android.support.v4.media.MediaBrowserCompat;
+import android.support.v4.media.MediaMetadataCompat;
+import android.support.v4.media.session.MediaControllerCompat;
+import android.support.v4.media.session.PlaybackStateCompat;
 import android.util.Log;
 import android.view.View;
 import android.view.ViewGroup;
@@ -75,8 +82,8 @@ import android.widget.TextView;
 import android.os.Bundle;
 
 import com.moppy.core.comms.bridge.BridgeSerial;
+import com.moppy.core.comms.bridge.MultiBridge;
 import com.moppy.core.midi.MoppyMIDISequencer;
-import com.moppy.core.events.mapper.MIDIEventMapper;
 import com.moppy.core.events.mapper.MapperCollection;
 import com.moppy.core.events.postprocessor.MessagePostProcessor;
 import com.moppy.core.midi.MoppyMIDIReceiverSender;
@@ -88,7 +95,6 @@ import com.sothree.slidinguppanel.SlidingUpPanelLayout;
 import com.sothree.slidinguppanel.SlidingUpPanelLayout.PanelState;
 
 import jp.kshoji.javax.sound.midi.InvalidMidiDataException;
-import jp.kshoji.javax.sound.midi.MidiMessage;
 import jp.kshoji.javax.sound.midi.MidiUnavailableException;
 import jp.kshoji.javax.sound.midi.io.StandardMidiFileReader;
 import jp.kshoji.javax.sound.midi.spi.MidiFileReader;
@@ -103,11 +109,6 @@ import java.util.TimerTask;
 
 public class MainActivity extends AppCompatActivity implements AdapterView.OnItemSelectedListener, StatusConsumer, SeekBar.OnSeekBarChangeListener {
     private MoppyMIDISequencer seq;
-    private MoppyMIDIReceiverSender receiverSender;
-    private StatusBus statusBus;
-    private MapperCollection<MidiMessage> mappers;
-    private MoppyUsbManager netManager;
-    private UsbManager usbManager;
     private String currentBridgeIdentifier;
     private HashMap<String, String> spinnerHashMap;
     private HashMap<Integer, UsbDevice> devices;
@@ -119,11 +120,10 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
     private Handler uiHandler;
     private boolean sequenceLoaded;
     private boolean playAfterTrackingFinished;
-    private LocalBroadcastManager localBroadcastManager;
+    private MediaBrowserCompat mediaBrowser;
+    private MediaControllerCallback mediaControllerCallback;
 
-    public static final String ACTION_USB_PERMISSION = "com.moppyandroid.USB_PERMISSION";
-    public static final String ACTION_UNABLE_START_MOPPY = "com.moppyandroid.UNABLE_TO_START_MOPPY";
-    public static final String ACTION_UNABLE_TO_CONNECT_DEVICE = "com.moppyandroid.UNABLE_TO_CONNECT_DEVICE";
+    public static final String ACTION_USB_PERMISSION = "com.moppyandroid.USB_PERMISSION"; // TODO: Move to service
 
     // Define the receiver to process relevant intent messages
     private BroadcastReceiver broadcastReceiver = new BroadcastReceiver() {
@@ -134,20 +134,6 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
 
             // Determine action and process accordingly
             switch (intent.getAction()) {
-                case ACTION_UNABLE_START_MOPPY: {
-
-                }
-                case MoppyMediaService.RESPONSE_CONNECTION_FAILED: {
-                    Spinner deviceBox = findViewById(R.id.device_box);
-                    Log.e(
-                            MainActivity.class.getName() + "->broadcastReceiver",
-                            "Unable to connect to device",
-                            (Throwable) (intent.getSerializableExtra("exception")));
-                    showMessageDialog("Unable to connect to " + intent.getStringExtra(MoppyMediaService.EXTRA_PORT_NAME), null);
-
-                    // Set the selection to "NONE"
-                    deviceBox.setSelection(0);
-                }
                 case ACTION_USB_PERMISSION: {
                     onUsbPermissionIntent(intent);
                     break;
@@ -169,7 +155,14 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
     protected void onCreate(Bundle savedInstanceState) {
         // Forward to onCreate method of superclass
         super.onCreate(savedInstanceState);
-        MidiLibrary.requestStoragePermission(this);
+        // TODO: Remove and rewire controls from seq to transport controls
+        try {
+            seq = new MoppyMIDISequencer(new StatusBus(), new MoppyMIDIReceiverSender(new MapperCollection<>(), MessagePostProcessor.PASS_THROUGH, new MultiBridge()));
+        }
+        catch (MidiUnavailableException | IOException e) {
+            e.printStackTrace();
+            finish();
+        }
 
         // Set the initial view and disable the pause and play buttons
         setContentView(R.layout.activity_main);
@@ -185,15 +178,18 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         globalIntentFilter.addAction(UsbManager.ACTION_USB_DEVICE_DETACHED);
         registerReceiver(broadcastReceiver, globalIntentFilter);
 
-        // Create the filter describing which local intents to process and register it
-        IntentFilter localIntentFilter = new IntentFilter();
-        localIntentFilter.addAction(ACTION_UNABLE_START_MOPPY);
-        localIntentFilter.addAction(MoppyMediaService.RESPONSE_CONNECTION_FAILED);
-        localBroadcastManager = LocalBroadcastManager.getInstance(this);
-        localBroadcastManager.registerReceiver(broadcastReceiver, localIntentFilter);
-
         // Start the media service
+        // Note: This is in addition to binding/unbinding in onStart and onStop to allow the service
+        //      to run when the activity is minimized
         startForegroundService(new Intent(this, MoppyMediaService.class));
+
+        mediaBrowser = new MediaBrowserCompat(
+                this,
+                new ComponentName(this, MoppyMediaService.class),
+                new BrowserConnectionCallback(),
+                null
+        );
+        mediaControllerCallback = new MediaControllerCallback();
 
         // Configure the sliding panel and toolbar
         panelLayout = findViewById(R.id.sliding_panel_layout);
@@ -201,9 +197,6 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         panelLayout.setDragView(R.id.toolbar_layout);
         toolbarLayout.measure(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
         panelLayout.setPanelHeight(toolbarLayout.getMeasuredHeight());
-
-        // Run the initializer
-        init();
 
         // Set this activity to be called when the USB device spinner or the song slider have a selection event
         ((Spinner) findViewById(R.id.device_box)).setOnItemSelectedListener(this);
@@ -213,18 +206,29 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         findViewById(R.id.load_button).setOnClickListener((View v) -> onLoadButton());
         findViewById(R.id.play_button).setOnClickListener((View v) -> onPlayButton());
         findViewById(R.id.pause_button).setOnClickListener((View v) -> onPauseButton());
+
+        mediaBrowser.connect();
     } // End onCreate method
 
-    // Method triggered when the app is destroyed (e.g. force killed, finalize called, killed to reclaim memory)
+    /**
+     * Method triggered when the app is destroyed (e.g. force killed, finalize called, killed to reclaim memory).
+     */
     @Override
     protected void onDestroy() {
+        if (MediaControllerCompat.getMediaController(this) != null) {
+            MediaControllerCompat.getMediaController(this).unregisterCallback(mediaControllerCallback);
+        }
+        mediaBrowser.disconnect();
+
         unregisterReceiver(broadcastReceiver);
-        localBroadcastManager.unregisterReceiver(broadcastReceiver);
         super.onDestroy();
     } // End onDestroy method
 
-    // Method triggered when the back event is raised (e.g. back button pressed). Taken from AndroidSlidingUpPanel
-    // demo application located at https://github.com/umano/AndroidSlidingUpPanel/tree/master/demo
+
+    /**
+     * Method triggered when the back event is raised (e.g. back button pressed). Taken from AndroidSlidingUpPanel
+     * demo application located at https://github.com/umano/AndroidSlidingUpPanel/tree/master/demo.
+     */
     @Override
     public void onBackPressed() {
         // If the sliding menu is defined and open collapse it, otherwise do the default action
@@ -306,9 +310,17 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
 
                 // Mark that a sequence has been loaded, and enable the play button and song slider if necessary
                 sequenceLoaded = true;
-                if (currentBridgeIdentifier != null && netManager.isConnected(currentBridgeIdentifier) && !songSlider.isEnabled()) {
-                    enablePlayButton(true);
-                    enableSongSlider(true);
+                if (currentBridgeIdentifier != null && !songSlider.isEnabled()) {
+                    mediaBrowser.sendCustomAction(MoppyMediaService.ACTION_GET_DEVICES, null, new MediaBrowserCompat.CustomActionCallback() {
+                        @Override
+                        public void onResult(String action, Bundle extras, Bundle resultData) {
+                            if (resultData.getInt(MoppyMediaService.EXTRA_NUM_CONNECTED) > 0) {
+                                enablePlayButton(true);
+                                enableSongSlider(true);
+                            }
+                            super.onResult(action, extras, resultData);
+                        }
+                    });
                 } // End if(currentBridgeIdentifier.isConnected && !songSlider.enabled)
             } // End if(result == OK)
         } // End if(request == LOAD_FILE)
@@ -318,7 +330,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
     @Override
     public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
         if (requestCode == RequestCodes.READ_STORAGE) {
-            localBroadcastManager.sendBroadcast(new Intent(MoppyMediaService.ACTION_INIT_LIBRARY));
+            mediaBrowser.sendCustomAction(MoppyMediaService.ACTION_INIT_LIBRARY, null, null);
         }
     } // End onRequestPermissionsResult method
 
@@ -411,17 +423,33 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
 
             // Get the bridge to connect to and do so, recording the new bridge as the current bridge if successful
             String bridgeIdentifier = spinnerHashMap.get(parent.getItemAtPosition(position));
-            Intent connectIntent = new Intent(MoppyMediaService.ACTION_ADD_DEVICE);
-            connectIntent.putExtra(MoppyMediaService.EXTRA_PORT_NAME, bridgeIdentifier);
-            localBroadcastManager.sendBroadcast(connectIntent);
-            currentBridgeIdentifier = bridgeIdentifier; // TODO: Replace with callback in case connection fails weirdly
+            Bundle connectBundle = new Bundle();
+            connectBundle.putString(MoppyMediaService.EXTRA_PORT_NAME, bridgeIdentifier);
+            mediaBrowser.sendCustomAction(MoppyMediaService.ACTION_ADD_DEVICE, connectBundle, new MediaBrowserCompat.CustomActionCallback() {
+                @Override
+                public void onResult(String action, Bundle extras, Bundle resultData) {
+                    currentBridgeIdentifier = bridgeIdentifier;
+                    // Enable the stop and play buttons as necessary
+                    enablePauseButton(true);
+                    if (sequenceLoaded) {
+                        enablePlayButton(true);
+                        enableSongSlider(true);
+                    } // End if(sequenceLoaded)
+                    super.onResult(action, extras, resultData);
+                } // End ACTION_ADD_DEVICE.onResult method
 
-            // Enable the stop and play buttons as necessary
-            enablePauseButton(true);
-            if (sequenceLoaded) {
-                enablePlayButton(true);
-                enableSongSlider(true);
-            } // End if(sequenceLoaded)
+                @Override
+                public void onError(String action, Bundle extras, Bundle data) {
+                    parent.setSelection(0); // Select "NONE"
+                    Log.e(
+                            MainActivity.class.getName() + "->onItemSelected",
+                            "Unable to connect to device",
+                            (Throwable) (data.getSerializable(MoppyMediaService.EXTRA_EXCEPTION)));
+                    showMessageDialog("Unable to connect to " + data.getString(MoppyMediaService.EXTRA_PORT_NAME), null);
+
+                    super.onError(action, extras, data);
+                } // End ACTION_ADD_DEVICE.onError method
+            }); // End anonymous CustomActionCallback
         } // End if(position != 0)
         else { // "NONE" selected
             // Set the buttons to be disabled
@@ -463,14 +491,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
 
         // Check if all permission requests have been satisfied, and initialize objects if applicable
         if (!permissionStatuses.containsValue(false)) {
-            // Check if Moppy objects are uninitialized
-            if (netManager == null) { initMoppy(); }
-            else {
-                // If objects have already been initialized, refresh them
-                localBroadcastManager.sendBroadcast(new Intent(MoppyMediaService.ACTION_REFRESH_DEVICES));
-                netManager.refreshDeviceList();
-                refreshDevices();
-            } // End if(netManager == null) {} else
+            updateDevicesUI();
         } // End if(permissionStatuses.allTrue)
         else {
             if (pos < permissionStatuses.size() - 1) {
@@ -494,10 +515,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
     // Method triggered when a USB device is detached
     private void onUsbDeviceDetachedIntent() {
         // Refresh the netManger device lists, waiting for the message box to be acknowledged before refreshing ours
-        localBroadcastManager.sendBroadcast(new Intent(MoppyMediaService.ACTION_REFRESH_DEVICES));
-        netManager.refreshDeviceList(); // TODO: Get device list from service, dual MoppyUsbManagers running right now
-        //currentBridgeIdentifier = null;
-        refreshDevices();
+        requestDevicesRefresh();
     } // End onUsbDeviceDetachedIntent method
 
     // Method triggered when load button pressed
@@ -533,97 +551,83 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         devices = new HashMap<>();
         permissionStatuses = new HashMap<>();
         spinnerHashMap = new HashMap<>();
-        usbManager = (UsbManager) getSystemService(USB_SERVICE);
         uiHandler = new Handler();
         sequenceLoaded = false;
 
         // Initialize BridgeSerial
         BridgeSerial.init(this);
+        MidiLibrary.requestStoragePermission(this);
 
         // Request permission to access all attached USB devices (also initializes Moppy on completion)
         requestPermissionForAllDevices();
     } // End init method
 
-    // Initialize all MoppyLib objects of the class
-    // Note: Separate from init because these cannot be initialized before permission to access USB devices is awarded
-    private void initMoppy() {
-        // Initialize Moppy objects
-        statusBus = new StatusBus();
-        mappers = new MapperCollection<>();
-        mappers.addMapper(MIDIEventMapper.defaultMapper((byte) 0x01));
-        netManager = new MoppyUsbManager(statusBus);
-        try {
-            receiverSender = new MoppyMIDIReceiverSender(mappers, MessagePostProcessor.PASS_THROUGH, netManager.getPrimaryBridge());
-        } // End try {new MoppyMIDIReceiverSender}
-        catch (IOException ignored) {} // Not actually generated, method signature outdated
-        try { seq = new MoppyMIDISequencer(statusBus, receiverSender); }
-        catch (MidiUnavailableException e) {
-            // Log the unrecoverable error, throw up a message box, and exit the application with a non-zero value
-            Log.e("com.moppyandroid.main.MainActivity", "Unable to construct MoppyMIDISequencer", e);
-            showMessageDialog(
-                    "Unrecoverable error: Unable to get MIDI resources for Moppy initialization. exiting",
-                    (dialog, which) -> System.exit(1)
-            ); // End showMessageDialog call
-        } // End try {new MoppyMIDISequencer} catch(MidiUnavailableException)
+    private void requestDevicesRefresh() {
+        mediaBrowser.sendCustomAction(MoppyMediaService.ACTION_REFRESH_DEVICES, null, new MediaBrowserCompat.CustomActionCallback() {
+            @Override
+            @SuppressWarnings("unchecked cast")
+            public void onResult(String action, Bundle extras, Bundle resultData) {
+                updateDevicesUI((ArrayList<ArrayList<String>>) resultData.getSerializable(MoppyMediaService.EXTRA_DEVICE_INFOS));
+                super.onResult(action, extras, resultData);
+            }
+        });
+    }
 
-        // Register this class as a consumer of the status updates generated by the MoppyMIDISequencer
-        statusBus.registerConsumer(this);
-
-        // Refresh the device lists
-        refreshDevices();
-    } // End initMoppy method
+    private void updateDevicesUI() {
+        mediaBrowser.sendCustomAction(MoppyMediaService.ACTION_GET_DEVICES, null, new MediaBrowserCompat.CustomActionCallback() {
+            @Override
+            @SuppressWarnings("unchecked cast")
+            public void onResult(String action, Bundle extras, Bundle resultData) {
+                updateDevicesUI((ArrayList<ArrayList<String>>) resultData.getSerializable(MoppyMediaService.EXTRA_DEVICE_INFOS));
+                super.onResult(action, extras, resultData);
+            }
+        });
+    }
 
     // Refresh the device box and related lists
-    private void refreshDevices() {
-        String previousSelection;
+    private void updateDevicesUI(ArrayList<ArrayList<String>> deviceInfos) {
+        if (deviceInfos == null) { return; }
 
-        // Note: If this was called as a result of a device detachment then the netManager refresh
-        // would have handled the device disconnection
+        // Note: If this was called as a result of a device detachment then the service would have
+        // handled the device disconnection TODO: Confirm?
 
         // Retrieve the device box spinner, save the current selection, and clear the hashmap
         Spinner spinner = findViewById(R.id.device_box);
-        previousSelection = (String) spinner.getSelectedItem();
+        String previousSelection = (String) spinner.getSelectedItem();
         spinnerHashMap.clear();
 
-        // Ensure that the usbManager is valid
-        if (usbManager == null || usbManager.getDeviceList() == null) { return; }
-
         // Get the list of Moppy devices from the network manager and iterate over it
-        ArrayList<String> modifiedDeviceList = new ArrayList<>(netManager.getDevices());
-        for (int i = 0; i < modifiedDeviceList.size(); i++) {
+        ArrayList<String> deviceDescriptors = new ArrayList<>();
+        for (ArrayList<String> currentDeviceInfo : deviceInfos) {
+            if (currentDeviceInfo == null || currentDeviceInfo.get(0) == null) { continue; }
+            String portName = currentDeviceInfo.get(0);
+            String productName = currentDeviceInfo.get(1);
+            String manufacturer = currentDeviceInfo.get(2);
+            String vendorId = currentDeviceInfo.get(3);
+            String productId = currentDeviceInfo.get(4);
+
             // Start building a string to act as the device description
             StringBuilder deviceDescription = new StringBuilder();
+            deviceDescription.append(portName);
 
-            // Start with the string representing the current device
-            deviceDescription.append(modifiedDeviceList.get(i));
-
-            // Try to retrieve the UsbDevice object for the current device. NOTE: null if not found
-            UsbDevice usbDevice = usbManager.getDeviceList().get(modifiedDeviceList.get(i));
-
-            // If we received a UsbDevice object (not guarenteed, netManager.getDeviceList contains
-            // network bridges), add information of interest to the string
-            if (usbDevice != null) {
+            // Since an int cannot be null, the only way the vendor ID string can be null is if the UsbDevice didn't exist
+            if (vendorId != null) {
                 // Attach a comma to the end, and if available add the product name
                 deviceDescription.append(", ");
-                if (usbDevice.getProductName() != null) {
-                    deviceDescription.append(usbDevice.getProductName()).append(", ");
-                } // End if(usbDevice.productName != null)
-
-                // Add the manufacturer name and vendor/product IDs
-                if (usbDevice.getManufacturerName() != null) {
-                    deviceDescription.append(usbDevice.getManufacturerName()).append(", ");
-                } // End if(usbDevice.manufacturerName != null)
-                deviceDescription.append(Integer.toHexString(usbDevice.getVendorId())).append("/");
-                deviceDescription.append(Integer.toHexString(usbDevice.getProductId()));
+                if (productName != null) { deviceDescription.append(productName).append(", "); }
+                else { deviceDescription.append("unknown product, "); }
+                if (manufacturer != null) { deviceDescription.append(manufacturer).append(", "); }
+                else { deviceDescription.append("unknown manufacturer, "); }
+                deviceDescription.append(vendorId).append("/").append(productId);
             } // End if(usbDevice != null)
 
             // Add the device description to the hashmap for the spinner, and update our copy of the device list
-            spinnerHashMap.put(deviceDescription.toString(), modifiedDeviceList.get(i));
-            modifiedDeviceList.set(i, deviceDescription.toString());
-        } // End for(i < modifiedDeviceList.size)
+            spinnerHashMap.put(deviceDescription.toString(), portName);
+            deviceDescriptors.add(deviceDescription.toString());
+        } // End for(i < deviceInfos.size)
 
         // Create an array adapter to populate the spinner with the values from our copy of the device list
-        ArrayAdapter<String> adapter = new ArrayAdapter<>(this, android.R.layout.simple_list_item_1, modifiedDeviceList);
+        ArrayAdapter<String> adapter = new ArrayAdapter<>(this, android.R.layout.simple_list_item_1, deviceDescriptors);
 
         // Insert a "NONE" entry at the beginning of the adapter and set the dropdown style
         adapter.insert("NONE", 0);
@@ -640,21 +644,24 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         int index = adapter.getPosition(previousSelection);
         if (index == -1) {
             showMessageDialog("The previously selected device is no longer available", null);
+            currentBridgeIdentifier = null;
             // Replicate a pause event if the device was being played to
             if (seq.isPlaying()) { onPauseButton(); }
+            spinner.setSelection(0); // Manual selection triggers onItemSelected and the service gets informed about disconnection
             return;
         } // End if(index == -1)
         spinner.setSelection(index);
     } // End refreshDevices method
 
     // Requests permission to access all attached USB devices
+    // TODO: Switch to only requesting permission when a device is to be connected
     private void requestPermissionForAllDevices() {
         // Exit method if either the USB manager or the device list is invalid
+        UsbManager usbManager = (UsbManager) getSystemService(Context.USB_SERVICE);
         if (usbManager == null || usbManager.getDeviceList() == null) { return; }
 
         // Skip requesting permission and initialize Moppy objects if there are no devices
         if (usbManager.getDeviceList().size() == 0) {
-            initMoppy();
             return;
         } // End if(usbManager.getDeviceList.size == 0)
 
@@ -675,8 +682,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         } // End for(i < usbDevices.size)
 
         if (devices.size() != 0) { requestPermission(devices.get(0), 0); }
-        else { initMoppy(); }
-
+        else { updateDevicesUI(); }
     } // End requestPermissionForAllDevices method
 
     // Closes the currently connected bridge, resetting currentBridgeIdentifier to null if passed true
@@ -687,9 +693,9 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         } // End if(currentBridgeIdentifier.notConnected)
 
         // Send intent to close the current bridge
-        Intent disconnectIntent = new Intent(MoppyMediaService.ACTION_REMOVE_DEVICE);
-        disconnectIntent.putExtra(MoppyMediaService.EXTRA_PORT_NAME, currentBridgeIdentifier);
-        localBroadcastManager.sendBroadcast(disconnectIntent);
+        Bundle disconnectBundle = new Bundle();
+        disconnectBundle.putString(MoppyMediaService.EXTRA_PORT_NAME, currentBridgeIdentifier);
+        mediaBrowser.sendCustomAction(MoppyMediaService.ACTION_REMOVE_DEVICE, disconnectBundle, null);
         if (resetIdentifier) { currentBridgeIdentifier = null; }
     } // End closeBridge method
 
@@ -701,7 +707,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         // Add the device index to the intent message and broadcast it
         intent.putExtra("deviceIndex", index);
         PendingIntent pendingIntent = PendingIntent.getBroadcast(this, 0, intent, PendingIntent.FLAG_UPDATE_CURRENT);
-        usbManager.requestPermission(device, pendingIntent);
+        ((UsbManager) getSystemService(Context.USB_SERVICE)).requestPermission(device, pendingIntent);
     } // End requestPermission method
 
     // Enables/disables the play button
@@ -810,6 +816,83 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
 
         public void unpause() { notPaused = true; }
     } // End SongTimerTask class
+
+    private class BrowserConnectionCallback extends MediaBrowserCompat.ConnectionCallback {
+        @Override
+        public void onConnected() { // Successful connection
+            // Run the initializer
+            init();
+            MediaControllerCompat mediaController;
+            try {
+                mediaController = new MediaControllerCompat(
+                        MainActivity.this,
+                        mediaBrowser.getSessionToken()
+                );
+            }
+            catch (RemoteException e) {
+                Log.wtf(MainActivity.class.getName() + "->onConnected", "Unable to connect to MediaControllerCompat", e);
+                showMessageDialog("Unable to connect to media controller", (dialog, which) -> MainActivity.this.finish());
+                super.onConnected();
+                return;
+            }
+            MediaControllerCompat.setMediaController(MainActivity.this, mediaController);
+            mediaController.registerCallback(mediaControllerCallback);
+            // TODO: Setup controls
+            mediaBrowser.sendCustomAction(MoppyMediaService.ACTION_INIT_LIBRARY, null, new MediaBrowserCompat.CustomActionCallback() {
+                /**
+                 * Called when the custom action finished successfully.
+                 *
+                 * @param action     The custom action sent to the connected service.
+                 * @param extras     The bundle of service-specific arguments sent to the connected service.
+                 * @param resultData The additional data delivered from the connected service.
+                 */
+                @Override
+                public void onResult(String action, Bundle extras, Bundle resultData) {
+                    Log.i(MainActivity.class.getName() + "->sendCustomAction.onResult", "" + resultData.getBoolean(MoppyMediaService.EXTRA_LIBRARY_CREATED, false));
+                    super.onResult(action, extras, resultData);
+                }
+
+                /**
+                 * Called when an error happens while performing the custom action or the connected service
+                 * doesn't support the requested custom action.
+                 *
+                 * @param action The custom action sent to the connected service.
+                 * @param extras The bundle of service-specific arguments sent to the connected service.
+                 * @param data   The additional data delivered from the connected service.
+                 */
+                @Override
+                public void onError(String action, Bundle extras, Bundle data) {
+                    super.onError(action, extras, data);
+                }
+            });
+            super.onConnected();
+        }
+
+        @Override
+        public void onConnectionSuspended() { // Server crashed, awaiting restart
+            // TODO: Freeze controls
+            super.onConnectionSuspended();
+        }
+
+        @Override
+        public void onConnectionFailed() { // Connection refused
+            Log.wtf(MainActivity.class.getName() + "->onConnected", "Unable to connect to MoppyMediaService");
+            showMessageDialog("Unable to connect to Media Service", (dialog, which) -> MainActivity.this.finish());
+            super.onConnectionFailed();
+        }
+    }
+
+    private class MediaControllerCallback extends MediaControllerCompat.Callback {
+        @Override
+        public void onPlaybackStateChanged(PlaybackStateCompat state) {
+            super.onPlaybackStateChanged(state);
+        }
+
+        @Override
+        public void onMetadataChanged(MediaMetadataCompat metadata) {
+            super.onMetadataChanged(metadata);
+        }
+    }
 
     // The code constants for requests sent with startActivityForResult
     static final public class RequestCodes {

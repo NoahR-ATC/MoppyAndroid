@@ -47,7 +47,7 @@ public class MoppyManager implements com.moppy.core.status.StatusConsumer {
         statusBus.registerConsumer(this);
         MapperCollection<MidiMessage> mappers = new MapperCollection<>();
         mappers.addMapper(MIDIEventMapper.defaultMapper((byte) 0x01)); // Map to first device
-        netManager = new MoppyUsbManager(statusBus);
+        netManager = new MoppyUsbManager(statusBus, context);
 
         try {
             receiverSender = new MoppyMIDIReceiverSender(mappers, MessagePostProcessor.PASS_THROUGH, netManager.getPrimaryBridge());
