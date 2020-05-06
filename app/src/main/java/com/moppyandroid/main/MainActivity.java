@@ -205,7 +205,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         songSlider.setOnSeekBarChangeListener(this);
 
         // Define the listener lambdas for the load, play, and stop buttons
-        findViewById(R.id.load_button).setOnClickListener((View v) -> onLoadButton());
+        // findViewById(R.id.load_button).setOnClickListener((View v) -> onLoadButton()); // TODO: Implement new loading method
         findViewById(R.id.play_button).setOnClickListener((View v) -> onPlayButton());
         findViewById(R.id.pause_button).setOnClickListener((View v) -> onPauseButton());
 
