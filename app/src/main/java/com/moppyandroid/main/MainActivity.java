@@ -4,7 +4,7 @@ package com.moppyandroid.main;
 Author: Noah Reeder, noahreederatc@gmail.com
 
 Known bugs:
-TODO: Setup instance state for if app is killed, keyboard/mouse plugged in, rotation, etc.
+TODO: Setup instance state to reshow connected device if app is destroyed, keyboard/mouse plugged in, rotation, etc.
 
 
 Known problems:
@@ -140,7 +140,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
                     onUsbPermissionIntent(intent);
                     break;
                 } // End case ACTION_USB_PERMISSION
-                case UsbManager.ACTION_USB_DEVICE_ATTACHED: { // TODO: Move to service
+                case UsbManager.ACTION_USB_DEVICE_ATTACHED: {
                     onUsbDeviceAttachedIntent(intent);
                     break;
                 } // End case ACTION_USB_DEVICE_ATTACHED
@@ -219,9 +219,6 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
     protected void onDestroy() {
         if (MediaControllerCompat.getMediaController(this) != null) {
             MediaControllerCompat.getMediaController(this).unregisterCallback(mediaControllerCallback);
-        }
-        if (currentBridgeIdentifier != null && mediaBrowser.isConnected()) {
-            closeBridge(true);
         }
         mediaBrowser.disconnect();
 

@@ -31,7 +31,6 @@ import java.util.Set;
 import jp.kshoji.javax.sound.midi.InvalidMidiDataException;
 import jp.kshoji.javax.sound.midi.MidiUnavailableException;
 
-// TODO: Handle USB connection/disconnection events internally
 /**
  * The media service that controls Moppy playback.
  * <p>
