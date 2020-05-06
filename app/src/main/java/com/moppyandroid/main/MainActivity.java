@@ -4,7 +4,7 @@ package com.moppyandroid.main;
 Author: Noah Reeder, noahreederatc@gmail.com
 
 Known bugs:
-TODO: Sequencer stops on file load
+TODO: Setup instance state for if app is killed, keyboard/mouse plugged in, rotation, etc.
 
 
 Known problems:
@@ -56,7 +56,9 @@ import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.res.ColorStateList;
 import android.database.Cursor;
+import android.graphics.Color;
 import android.hardware.usb.UsbDevice;
 import android.hardware.usb.UsbManager;
 import android.net.Uri;
@@ -74,6 +76,7 @@ import android.view.ViewGroup;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.ImageButton;
+import android.widget.ProgressBar;
 import android.widget.RelativeLayout;
 import android.widget.SeekBar;
 import android.widget.Spinner;
@@ -97,16 +100,25 @@ import java.util.Timer;
 import java.util.TimerTask;
 
 public class MainActivity extends AppCompatActivity implements AdapterView.OnItemSelectedListener, SeekBar.OnSeekBarChangeListener {
+    private static final String EXTRA_DEVICE_INDEX = "DEVICE_INDEX";
+    private static final int REQUEST_LOAD_FILE = 0;
+    private static final int REQUEST_READ_STORAGE = 1;
+
     private String currentBridgeIdentifier;
     private HashMap<String, String> spinnerHashMap;
-    private HashMap<Integer, UsbDevice> devices;
+    private HashMap<Integer, String> statusDeviceIds;
     private HashMap<Integer, Boolean> permissionStatuses;
     private SlidingUpPanelLayout panelLayout;
     private SeekBar songSlider;
+    private Spinner deviceBox;
+    private AlertDialog progressBar; // TODO: Make look better
     private SongTimerTask songTimerTask;
     private Handler uiHandler;
+    private UsbManager usbManager;
     private boolean movingSlider;
     private boolean initialized;
+    private boolean sendInitLibraryOnConnect;
+    private int progressBarRequests;
     private MediaBrowserCompat mediaBrowser;
     private MediaControllerCallback mediaControllerCallback;
     private MediaControllerCompat.TransportControls transportControls;
@@ -145,16 +157,19 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        devices = new HashMap<>();
+        statusDeviceIds = new HashMap<>();
         permissionStatuses = new HashMap<>();
         spinnerHashMap = new HashMap<>();
         uiHandler = new Handler();
         movingSlider = false;
         initialized = false;
+        sendInitLibraryOnConnect = false;
+        progressBarRequests = 0;
 
         // Set the initial view and disable the pause and play buttons
         setContentView(R.layout.activity_main);
         songSlider = findViewById(R.id.song_slider);
+        deviceBox = findViewById(R.id.device_box);
         setControlState(true);
 
         // Start the media service
@@ -177,9 +192,17 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         toolbarLayout.measure(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
         panelLayout.setPanelHeight(toolbarLayout.getMeasuredHeight());
 
+        AlertDialog.Builder alertBuilder = new AlertDialog.Builder(this);
+        alertBuilder.setCancelable(false);
+        ProgressBar pb = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
+        pb.setIndeterminate(true);
+        pb.setIndeterminateTintList(ColorStateList.valueOf(Color.GREEN));
+        alertBuilder.setView(pb);
+        progressBar = alertBuilder.create();
+
         // Set this activity to be called when the USB device spinner or the song slider have a selection event
-        ((Spinner) findViewById(R.id.device_box)).setOnItemSelectedListener(this);
-        ((SeekBar) findViewById(R.id.song_slider)).setOnSeekBarChangeListener(this);
+        deviceBox.setOnItemSelectedListener(this);
+        songSlider.setOnSeekBarChangeListener(this);
 
         // Define the listener lambdas for the load, play, and stop buttons
         findViewById(R.id.load_button).setOnClickListener((View v) -> onLoadButton());
@@ -197,6 +220,9 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         if (MediaControllerCompat.getMediaController(this) != null) {
             MediaControllerCompat.getMediaController(this).unregisterCallback(mediaControllerCallback);
         }
+        if (currentBridgeIdentifier != null && mediaBrowser.isConnected()) {
+            closeBridge(true);
+        }
         mediaBrowser.disconnect();
 
         if (initialized) { unregisterReceiver(broadcastReceiver); }
@@ -209,7 +235,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
      * demo application located at https://github.com/umano/AndroidSlidingUpPanel/tree/master/demo.
      */
     @Override
-    public void onBackPressed() { // TODO: Quits without disconnecting devices, look into populating current device on startup
+    public void onBackPressed() {
         // If the sliding menu is defined and open collapse it, otherwise do the default action
         if (panelLayout == null) { super.onBackPressed(); }
         if (panelLayout.getPanelState() == PanelState.EXPANDED || panelLayout.getPanelState() == PanelState.ANCHORED) {
@@ -227,7 +253,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         super.onActivityResult(requestCode, resultCode, resultData);
 
         // Check if the request was a load file request made by us
-        if (requestCode == RequestCodes.LOAD_FILE) {
+        if (requestCode == REQUEST_LOAD_FILE) {
             String midiFileName;
 
             // Check if the request went through without issues (e.g. wasn't cancelled)
@@ -286,14 +312,16 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
                 } // End if(!songSlider.enabled && fileLoaded)
             } // End if(result == OK)
         } // End if(request == LOAD_FILE)
-
     } // End onActivityResult method
 
     @Override
     public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
-        if (requestCode == RequestCodes.READ_STORAGE) {
-            mediaBrowser.sendCustomAction(MoppyMediaService.ACTION_INIT_LIBRARY, null, null);
-        }
+        if (requestCode == REQUEST_READ_STORAGE) {
+            if (initialized) {
+                mediaBrowser.sendCustomAction(MoppyMediaService.ACTION_INIT_LIBRARY, null, null);
+            }
+            else { sendInitLibraryOnConnect = true; }
+        } // End if(READ_STORAGE)
     } // End onRequestPermissionsResult method
 
     // Method triggered when the song slider has been used
@@ -336,31 +364,24 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
             // If necessary, close the current connection
             closeBridge(true);
 
-            // Get the bridge to connect to and do so, recording the new bridge as the current bridge if successful
-            String bridgeIdentifier = spinnerHashMap.get(parent.getItemAtPosition(position));
-            Bundle connectBundle = new Bundle();
-            connectBundle.putString(MoppyMediaService.EXTRA_PORT_NAME, bridgeIdentifier);
-            mediaBrowser.sendCustomAction(MoppyMediaService.ACTION_ADD_DEVICE, connectBundle, new MediaBrowserCompat.CustomActionCallback() {
-                @Override
-                public void onResult(String action, Bundle extras, Bundle resultData) {
-                    currentBridgeIdentifier = bridgeIdentifier;
-                    // Enable the stop and play buttons as necessary
-                    setControlState(false);
-                    super.onResult(action, extras, resultData);
-                } // End ACTION_ADD_DEVICE.onResult method
+            // Get the requested UsbDevice
+            String bridgeIdentifier = spinnerHashMap.get((String) parent.getItemAtPosition(position));
+            UsbDevice device = usbManager.getDeviceList().get(bridgeIdentifier);
+            if (device == null) {
+                requestDevicesRefresh();
+                parent.setSelection(0);
+                return;
+            }
 
-                @Override
-                public void onError(String action, Bundle extras, Bundle data) {
-                    parent.setSelection(0); // Select "NONE"
-                    Log.e(
-                            MainActivity.class.getName() + "->onItemSelected",
-                            "Unable to connect to device",
-                            (Throwable) (data.getSerializable(MoppyMediaService.EXTRA_EXCEPTION)));
-                    showMessageDialog("Unable to connect to " + data.getString(MoppyMediaService.EXTRA_PORT_NAME), null);
-
-                    super.onError(action, extras, data);
-                } // End ACTION_ADD_DEVICE.onError method
-            }); // End anonymous CustomActionCallback
+            // If necessary, ask for permission to access the device and connect if granted, otherwise connecting
+            if (!usbManager.hasPermission(device)) {
+                showProgressBar();
+                int deviceIndex = permissionStatuses.size();
+                permissionStatuses.put(deviceIndex, false);
+                statusDeviceIds.put(deviceIndex, bridgeIdentifier);
+                requestPermission(device, deviceIndex);
+            }
+            else { openBridge(bridgeIdentifier); }
         } // End if(position != 0)
         else { // "NONE" selected
             // Set the buttons to be disabled
@@ -379,46 +400,25 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
     private void onUsbPermissionIntent(Intent intent) {
         // Exit processing if the current device index wasn't included or deviceIndex ∉ Integer
         if (intent.getExtras() == null) { return; }
-        if (!(intent.getExtras().get("deviceIndex") instanceof Integer)) { return; }
+        if (!(intent.getExtras().get(EXTRA_DEVICE_INDEX) instanceof Integer)) { return; }
 
         // Retrieve the current device index from the intent and exit processing if it is null
-        Integer pos = (Integer) intent.getExtras().get("deviceIndex");
+        Integer pos = (Integer) intent.getExtras().get(EXTRA_DEVICE_INDEX);
         if (pos == null) { return; }
 
         // Ensure permission was granted
         if (intent.getBooleanExtra(UsbManager.EXTRA_PERMISSION_GRANTED, false)) {
             // Mark that the permission for this device has been granted
             permissionStatuses.replace(pos, true);
+            openBridge(statusDeviceIds.get(pos));
         } // End if(EXTRA_PERMISSION_GRANTED)
-        else {
-            // Permission not granted, give a message box and request again
-            showMessageDialog(
-                    "Permission to access all of the attached USB devices is required for operation, please grant it this time",
-                    (dialog, which) -> requestPermission(devices.get(pos), pos)
-            ); // End showMessageDialog call
-        } // End if(EXTRA_PERMISSION_GRANTED) {} else
-
-        // Check if all permission requests have been satisfied, and initialize objects if applicable
-        if (!permissionStatuses.containsValue(false)) {
-            requestDevicesRefresh();
-        } // End if(permissionStatuses.allTrue)
-        else {
-            if (pos < permissionStatuses.size() - 1) {
-                requestPermission(devices.get(pos + 1), pos + 1);
-            } // End if(pos < permissionStatuses.lastIndex)
-        } // End if(permissionStatuses.allTrue)
+        else { deviceBox.setSelection(0); }
+        closeProgressBar();
     } // End onUsbPermissionIntent method
 
     // Method triggered when a USB device is attached
     private void onUsbDeviceAttachedIntent(Intent intent) {
-        int index;
-        UsbDevice device;
-
-        index = devices.size();
-        device = intent.getParcelableExtra(UsbManager.EXTRA_DEVICE);
-        devices.put(index, device);
-        permissionStatuses.put(index, false);
-        requestPermission(device, index);
+        requestDevicesRefresh();
     } // End onUsbDeviceAttachedIntent method
 
     // Method triggered when a USB device is detached
@@ -433,7 +433,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
         intent.addCategory(Intent.CATEGORY_OPENABLE);
         intent.setType("audio/midi");
-        startActivityForResult(intent, RequestCodes.LOAD_FILE);
+        startActivityForResult(intent, REQUEST_LOAD_FILE);
     } // End onLoadButton method
 
     // Method triggered when play button pressed
@@ -459,10 +459,17 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
 
         // Initialize BridgeSerial
         BridgeSerial.init(this);
-        MidiLibrary.requestStoragePermission(this, RequestCodes.READ_STORAGE);
+        MidiLibrary.requestStoragePermission(this, REQUEST_READ_STORAGE);
+
+        usbManager = (UsbManager) getSystemService(Context.USB_SERVICE);
+        if (usbManager == null) {
+            Log.wtf(MainActivity.class.getName() + "->init", "Unable to get USB manager");
+            showMessageDialog("Unable to get USB manager", (dialog, which) -> MainActivity.this.finish());
+            // Fall through since finish is non-blocking and we don't want to uninitialized variables
+        }
 
         // Request permission to access all attached USB devices (also initializes Moppy on completion)
-        requestPermissionForAllDevices();
+        requestDevicesRefresh();
 
         Timer songProgressTimer = new Timer();
         songTimerTask = new SongTimerTask();
@@ -470,6 +477,11 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         // Note: The timer tick is 500 so that if the timer's ticks are slightly offset from
         // the sequencer's ticks the progress bar will still be pretty accurate
         songProgressTimer.schedule(songTimerTask, 0, 500);
+
+        // If we already have storage access permission, create the MIDI library
+        if (sendInitLibraryOnConnect) {
+            mediaBrowser.sendCustomAction(MoppyMediaService.ACTION_INIT_LIBRARY, null, null);
+        }
 
         initialized = true;
     } // End init method
@@ -482,8 +494,8 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
                 updateDevicesUI((ArrayList<ArrayList<String>>) resultData.getSerializable(MoppyMediaService.EXTRA_DEVICE_INFOS));
                 super.onResult(action, extras, resultData);
             }
-        });
-    }
+        }); // End ACTION_REFRESH_DEVICES callback
+    } // End requestDevicesRefresh method
 
     private void updateDevicesUI() {
         mediaBrowser.sendCustomAction(MoppyMediaService.ACTION_GET_DEVICES, null, new MediaBrowserCompat.CustomActionCallback() {
@@ -493,8 +505,8 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
                 updateDevicesUI((ArrayList<ArrayList<String>>) resultData.getSerializable(MoppyMediaService.EXTRA_DEVICE_INFOS));
                 super.onResult(action, extras, resultData);
             }
-        });
-    }
+        }); // End ACTION_GET_DEVICES callback
+    } // End updateDevicesUI(void) method
 
     // Refresh the device box and related lists
     private void updateDevicesUI(ArrayList<ArrayList<String>> deviceInfos) {
@@ -504,8 +516,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         // handled the device disconnection
 
         // Retrieve the device box spinner, save the current selection, and clear the hashmap
-        Spinner spinner = findViewById(R.id.device_box);
-        String previousSelection = (String) spinner.getSelectedItem();
+        String previousSelection = (String) deviceBox.getSelectedItem();
         spinnerHashMap.clear();
 
         // Get the list of Moppy devices from the network manager and iterate over it
@@ -546,7 +557,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
 
         // Apply the adapter to the spinner
-        spinner.setAdapter(adapter);
+        deviceBox.setAdapter(adapter);
 
         // If there was no previous selection or the previous selection was "NONE", finish processing here
         if (previousSelection == null || previousSelection.equals("NONE")) { return; }
@@ -559,43 +570,38 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
             currentBridgeIdentifier = null;
             // Replicate a pause event if the device was being played to
             if (playbackState.getState() == PlaybackStateCompat.STATE_PLAYING) { onPauseButton(); }
-            spinner.setSelection(0); // Manual selection triggers onItemSelected and the service gets informed about disconnection
+            deviceBox.setSelection(0); // Manual selection triggers onItemSelected and the service gets informed about disconnection
             return;
         } // End if(index == -1)
-        spinner.setSelection(index);
-    } // End refreshDevices method
+        deviceBox.setSelection(index);
+    } // End updateDevicesUI(ArrayList<ArrayList<String>>) method
 
-    // Requests permission to access all attached USB devices
-    // TODO: Switch to only requesting permission when a device is to be connected
-    private void requestPermissionForAllDevices() {
-        // Exit method if either the USB manager or the device list is invalid
-        UsbManager usbManager = (UsbManager) getSystemService(Context.USB_SERVICE);
-        if (usbManager == null || usbManager.getDeviceList() == null) { return; }
+    // Opens a specific bridge
+    private void openBridge(String bridgeIdentifier) {
+        Bundle connectBundle = new Bundle();
+        connectBundle.putString(MoppyMediaService.EXTRA_PORT_NAME, bridgeIdentifier);
+        mediaBrowser.sendCustomAction(MoppyMediaService.ACTION_ADD_DEVICE, connectBundle, new MediaBrowserCompat.CustomActionCallback() {
+            @Override
+            public void onResult(String action, Bundle extras, Bundle resultData) {
+                currentBridgeIdentifier = bridgeIdentifier;
+                // Enable the stop and play buttons as necessary
+                setControlState(false);
+                super.onResult(action, extras, resultData);
+            } // End ACTION_ADD_DEVICE.onResult method
 
-        // Skip requesting permission and initialize Moppy objects if there are no devices
-        if (usbManager.getDeviceList().size() == 0) {
-            updateDevicesUI();
-        } // End if(usbManager.getDeviceList.size == 0)
+            @Override
+            public void onError(String action, Bundle extras, Bundle data) {
+                deviceBox.setSelection(0); // Select "NONE"
+                Log.e(
+                        MainActivity.class.getName() + "->onItemSelected",
+                        "Unable to connect to device",
+                        (Throwable) (data.getSerializable(MoppyMediaService.EXTRA_EXCEPTION)));
+                showMessageDialog("Unable to connect to " + data.getString(MoppyMediaService.EXTRA_PORT_NAME), null);
 
-        // Get the list of all USB devices and iterate over it
-        // Note: synchronization not needed because this is guaranteed to be done on the UI thread
-        permissionStatuses.clear();
-        devices.clear();
-        ArrayList<UsbDevice> usbDevices = new ArrayList<>(usbManager.getDeviceList().values());
-        for (int i = 0; i < usbDevices.size(); ++i) {
-            // Add an entry for the device in the permission status list, add it to the device list
-            if (!usbManager.hasPermission(usbDevices.get(i))) {
-                permissionStatuses.put(i, false);
-                devices.put(i, usbDevices.get(i));
-            } // End if(usbDevices.get(i).needsPermission)
-
-            // Request permission to access the device
-            //requestPermission(devices.get(i), i);
-        } // End for(i < usbDevices.size)
-
-        if (devices.size() != 0) { requestPermission(devices.get(0), 0); }
-        else { updateDevicesUI(); }
-    } // End requestPermissionForAllDevices method
+                super.onError(action, extras, data);
+            } // End ACTION_ADD_DEVICE.onError method
+        }); // End ACTION_ADD_DEVICE callback
+    } // End openBridge method
 
     // Closes the currently connected bridge, resetting currentBridgeIdentifier to null if passed true
     private void closeBridge(boolean resetIdentifier) {
@@ -617,9 +623,9 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         Intent intent = new Intent(ACTION_USB_PERMISSION);
 
         // Add the device index to the intent message and broadcast it
-        intent.putExtra("deviceIndex", index);
+        intent.putExtra(EXTRA_DEVICE_INDEX, index);
         PendingIntent pendingIntent = PendingIntent.getBroadcast(this, 0, intent, PendingIntent.FLAG_UPDATE_CURRENT);
-        ((UsbManager) getSystemService(Context.USB_SERVICE)).requestPermission(device, pendingIntent);
+        usbManager.requestPermission(device, pendingIntent);
     } // End requestPermission method
 
     // Enables/disables the play button
@@ -727,6 +733,20 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         builder.create().show();
     } // End showMessageDialog method
 
+    private void showProgressBar() {
+        if (progressBarRequests++ == 0) {
+            //getWindow().setFlags(WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE, WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE);
+            progressBar.show();
+        }
+    } // End showProgressBar method
+
+    private void closeProgressBar() {
+        if (--progressBarRequests == 0) {
+            progressBar.dismiss();
+            //getWindow().clearFlags(WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE);
+        }
+    } // End closeProgressBar method
+
     // Class used to update the song position slider and text every timer tick
     protected class SongTimerTask extends TimerTask {
         private boolean notPaused;
@@ -745,6 +765,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         public void unpause() { notPaused = true; }
     } // End SongTimerTask class
 
+    // Receives callbacks about mediaBrowser.connect
     private class BrowserConnectionCallback extends MediaBrowserCompat.ConnectionCallback {
         @Override
         public void onConnected() { // Successful connection
@@ -757,13 +778,15 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
                         MainActivity.this,
                         mediaBrowser.getSessionToken()
                 );
-            }
+            } // End try {new MediaControllerCompat}
             catch (RemoteException e) {
                 Log.wtf(MainActivity.class.getName() + "->onConnected", "Unable to connect to MediaControllerCompat", e);
                 showMessageDialog("Unable to connect to media controller", (dialog, which) -> MainActivity.this.finish());
                 super.onConnected();
                 return;
-            }
+            } // End try {new MediaControllerCompat} catch(RemoteException)
+
+            // Register this to receive callbacks from the controller and retrieve the current state
             MediaControllerCompat.setMediaController(MainActivity.this, mediaController);
             mediaController.registerCallback(mediaControllerCallback);
             playbackState = mediaController.getPlaybackState();
@@ -772,13 +795,13 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
             setControlState(false);
 
             super.onConnected();
-        }
+        } // End onConnected method
 
         @Override
         public void onConnectionSuspended() { // Server crashed, awaiting restart
             setControlState(true);
             super.onConnectionSuspended();
-        }
+        } // End onConnectionSuspended method
 
         @Override
         public void onConnectionFailed() { // Connection refused
@@ -786,9 +809,10 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
             Log.wtf(MainActivity.class.getName() + "->onConnected", "Unable to connect to MoppyMediaService");
             showMessageDialog("Unable to connect to Media Service", (dialog, which) -> MainActivity.this.finish());
             super.onConnectionFailed();
-        }
-    }
+        } // End onConnectionFailed method
+    } // End BrowserConnectionCallback class
 
+    // Receives callbacks when the media session loads a file or plays/pauses/stops/etc.
     private class MediaControllerCallback extends MediaControllerCompat.Callback {
         @Override
         public void onPlaybackStateChanged(PlaybackStateCompat state) {
@@ -796,21 +820,24 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
             switch (playbackState.getState()) {
                 case PlaybackStateCompat.STATE_PLAYING: {
                     songTimerTask.unpause();
+                    setControlState(false);
                     ((ImageButton) findViewById(R.id.pause_button)).setImageResource(R.drawable.ic_pause);
                     break;
-                }
+                } // End STATE_PLAYING case
                 case PlaybackStateCompat.STATE_PAUSED: {
                     songTimerTask.pause();
+                    setControlState(false);
                     ((ImageButton) findViewById(R.id.pause_button)).setImageResource(R.drawable.ic_stop);
                     break;
-                }
+                } // End STATE_PAUSED case
                 case PlaybackStateCompat.STATE_STOPPED: {
                     songTimerTask.pause();
+                    setControlState(false);
                     ((ImageButton) findViewById(R.id.pause_button)).setImageResource(R.drawable.ic_stop);
                     // Move slider to where sequencer stopped (0 if reset, otherwise song end)
                     updateSongProgress();
                     break;
-                }
+                } // End STATE_STOPPED case
                 case PlaybackStateCompat.STATE_BUFFERING:
                 case PlaybackStateCompat.STATE_CONNECTING:
                 case PlaybackStateCompat.STATE_ERROR:
@@ -819,12 +846,14 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
                 case PlaybackStateCompat.STATE_REWINDING:
                 case PlaybackStateCompat.STATE_SKIPPING_TO_NEXT:
                 case PlaybackStateCompat.STATE_SKIPPING_TO_PREVIOUS:
-                case PlaybackStateCompat.STATE_SKIPPING_TO_QUEUE_ITEM:
+                case PlaybackStateCompat.STATE_SKIPPING_TO_QUEUE_ITEM: {
                     songTimerTask.pause();
+                    setControlState(true);
                     break;
-            }
+                } // End !(STATE_PLAYING | STATE_PAUSED | STATE_STOPPED) case
+            } // End switch(playbackState)
             super.onPlaybackStateChanged(state);
-        }
+        } // End onPlaybackStateChanged method
 
         @Override
         public void onMetadataChanged(MediaMetadataCompat metadata) {
@@ -854,12 +883,6 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
             }
 
             super.onMetadataChanged(metadata);
-        }
-    }
-
-    // The code constants for requests sent with startActivityForResult
-    static final public class RequestCodes {
-        static public final int LOAD_FILE = 1;
-        static public final int READ_STORAGE = 2;
-    } // End RequestCodes class
+        } // End onMetadataChanged method
+    } // End MediaControllerCallback class
 } // End MainActivity class
