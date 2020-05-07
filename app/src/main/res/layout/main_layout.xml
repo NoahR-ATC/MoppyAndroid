@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical">
@@ -8,7 +8,6 @@
         android:id="@+id/devices_box_label"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_alignParentTop="true"
         android:fontFamily="sans-serif-black"
         android:text="@string/devices_box_label"
         android:textSize="18sp" />
@@ -16,21 +15,17 @@
     <Spinner
         android:id="@+id/device_box"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_below="@id/devices_box_label" />
+        android:layout_height="wrap_content" />
 
-    <Button
-        android:id="@+id/load_button"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_below="@id/device_box"
-        android:text="@string/load_button" />
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/library_recycler"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
 
     <FrameLayout
         android:id="@+id/toolbar_layout_placeholder_main"
         android:layout_width="match_parent"
-        android:layout_height="@dimen/toolbar_button_height"
-        android:layout_alignParentBottom="true">
+        android:layout_height="@dimen/toolbar_button_height">
 
     </FrameLayout>
-</RelativeLayout>
+</LinearLayout>

@@ -44,7 +44,9 @@ Regexes:
  */
 
 
+import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.recyclerview.widget.RecyclerView;
 
 import android.annotation.SuppressLint;
 import android.app.Activity;
@@ -83,6 +85,9 @@ import android.widget.Spinner;
 import android.widget.TextView;
 import android.os.Bundle;
 
+import com.google.android.flexbox.FlexDirection;
+import com.google.android.flexbox.FlexboxLayoutManager;
+import com.google.android.flexbox.JustifyContent;
 import com.moppy.core.comms.bridge.BridgeSerial;
 
 import com.sothree.slidinguppanel.SlidingUpPanelLayout;
@@ -96,6 +101,7 @@ import java.io.InputStream;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Timer;
 import java.util.TimerTask;
 
@@ -111,6 +117,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
     private SlidingUpPanelLayout panelLayout;
     private SeekBar songSlider;
     private Spinner deviceBox;
+    private RecyclerView libraryRecycler;
     private AlertDialog progressBar; // TODO: Make look better
     private SongTimerTask songTimerTask;
     private Handler uiHandler;
@@ -209,6 +216,13 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         findViewById(R.id.play_button).setOnClickListener((View v) -> onPlayButton());
         findViewById(R.id.pause_button).setOnClickListener((View v) -> onPauseButton());
 
+        libraryRecycler = findViewById(R.id.library_recycler);
+        FlexboxLayoutManager libraryLayout = new FlexboxLayoutManager(this);
+        libraryLayout.setFlexDirection(FlexDirection.ROW_REVERSE);
+        libraryLayout.setJustifyContent(JustifyContent.SPACE_AROUND);
+        libraryRecycler.setHasFixedSize(true);
+        libraryRecycler.setLayoutManager(libraryLayout);
+
         mediaBrowser.connect();
     } // End onCreate method
 
@@ -220,8 +234,10 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         if (MediaControllerCompat.getMediaController(this) != null) {
             MediaControllerCompat.getMediaController(this).unregisterCallback(mediaControllerCallback);
         }
-        mediaBrowser.disconnect();
-
+        if (mediaBrowser.isConnected()) {
+            mediaBrowser.unsubscribe(mediaBrowser.getRoot());
+            mediaBrowser.disconnect();
+        }
         if (initialized) { unregisterReceiver(broadcastReceiver); }
         super.onDestroy();
     } // End onDestroy method
@@ -447,6 +463,11 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
     // Initialize non-MoppyLib objects of the class and start the Moppy initialization chain
     @SuppressLint("UseSparseArrays")
     private void init() {
+        // If we already have storage access permission, create the MIDI library
+        if (sendInitLibraryOnConnect) {
+            mediaBrowser.sendCustomAction(MoppyMediaService.ACTION_INIT_LIBRARY, null, null);
+        }
+
         // Create the filter describing which Android system intents to process and register it
         IntentFilter globalIntentFilter = new IntentFilter();
         globalIntentFilter.addAction(ACTION_USB_PERMISSION);
@@ -475,10 +496,14 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         // the sequencer's ticks the progress bar will still be pretty accurate
         songProgressTimer.schedule(songTimerTask, 0, 500);
 
-        // If we already have storage access permission, create the MIDI library
-        if (sendInitLibraryOnConnect) {
-            mediaBrowser.sendCustomAction(MoppyMediaService.ACTION_INIT_LIBRARY, null, null);
-        }
+        // Display the root elements
+        mediaBrowser.subscribe(mediaBrowser.getRoot(), new MediaBrowserCompat.SubscriptionCallback() {
+            @Override
+            public void onChildrenLoaded(@NonNull String parentId, @NonNull List<MediaBrowserCompat.MediaItem> children) {
+                super.onChildrenLoaded(parentId, children);
+                libraryRecycler.setAdapter(new LibraryAdapter(children));
+            }
+        }); // End SubscriptionCallback lambda)
 
         initialized = true;
     } // End init method

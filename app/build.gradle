@@ -26,6 +26,7 @@ android {
 dependencies {
     implementation fileTree(include: ['*.jar'], dir: 'libs')
 
+    implementation 'com.google.android:flexbox:2.0.1'
     implementation 'com.sothree.slidinguppanel:library:3.4.0'
     //implementation 'jp.kshoji:javax-sound-midi:0.0.3:@aar'
     //implementation 'com.github.kyosherlock:mididriver:master'
@@ -39,4 +40,5 @@ dependencies {
     implementation project(path: ':moppylib')
     implementation project(path: ':javax.sound.midi')
     implementation project(path: ':realtimesequencer')
+    implementation 'androidx.cardview:cardview:1.0.0'
 }
