@@ -21,7 +21,7 @@ public class BrowserAdapter extends RecyclerView.Adapter<BrowserAdapter.Holder> 
     private ClickListener clickListener;
 
     /**
-     * Constructs a {@code LibraryAdapter} with a {@link List} of
+     * Constructs a {@code BrowserAdapter} with a {@link List} of
      * {@link android.support.v4.media.MediaBrowserCompat.MediaItem}s to display.
      *
      * @param dataset the {@link List} to show
@@ -29,7 +29,7 @@ public class BrowserAdapter extends RecyclerView.Adapter<BrowserAdapter.Holder> 
     public BrowserAdapter(List<MediaBrowserCompat.MediaItem> dataset, ClickListener clickListener) {
         this.dataset = dataset;
         this.clickListener = clickListener;
-    } // End LibraryHolder(List<MediaItem>) constructor
+    } // End BrowserAdapter(List<MediaItem>) constructor
 
     /**
      * Method triggered when a {@link androidx.recyclerview.widget.RecyclerView.ViewHolder} is created.
@@ -82,7 +82,7 @@ public class BrowserAdapter extends RecyclerView.Adapter<BrowserAdapter.Holder> 
         public TextView lengthView;
 
         /**
-         * Constructs a {@code LibraryAdapter.Holder} using an inflated {@code browser_entry_layout}.
+         * Constructs a {@code BrowserAdapter.Holder} using an inflated {@code browser_entry_layout}.
          *
          * @param v the {@code browser_entry_layout}
          */
@@ -91,10 +91,11 @@ public class BrowserAdapter extends RecyclerView.Adapter<BrowserAdapter.Holder> 
             iconView = v.findViewById(R.id.entry_icon_view);
             nameView = v.findViewById(R.id.entry_name_text);
             lengthView = v.findViewById(R.id.entry_length_text);
+            v.setOnClickListener(this);
         } // End BrowserAdapter.Holder(LinearLayout) constructor
 
         /**
-         * Method triggered when a {@code LibraryAdapter.Holder} is clicked.
+         * Method triggered when a {@code BrowserAdapter.Holder} is clicked.
          */
         @Override
         public void onClick(View v) {
@@ -106,6 +107,11 @@ public class BrowserAdapter extends RecyclerView.Adapter<BrowserAdapter.Holder> 
      * Used to notify clients of click events
      */
     interface ClickListener {
+        /**
+         * Triggered when a {@code browser_entry_layout} is clicked.
+         *
+         * @param item the item that was clicked
+         */
         void onClick(MediaBrowserCompat.MediaItem item);
     } // End BrowserAdapter.ClickListener interface
 } // End BrowserAdapter class

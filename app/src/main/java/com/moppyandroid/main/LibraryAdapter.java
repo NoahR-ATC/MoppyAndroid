@@ -51,6 +51,7 @@ public class LibraryAdapter extends RecyclerView.Adapter<LibraryAdapter.Holder> 
     public void onBindViewHolder(Holder holder, int position) {
         holder.imageView.setImageURI(dataset.get(position).getDescription().getIconUri());
         holder.textView.setText(dataset.get(position).getDescription().getTitle());
+        holder.textView.setSelected(true); // Enable marquee
     } // End onBindViewHolder method
 
     /**
@@ -81,8 +82,8 @@ public class LibraryAdapter extends RecyclerView.Adapter<LibraryAdapter.Holder> 
          */
         public Holder(LinearLayout v) {
             super(v);
-            imageView = v.findViewById(R.id.cell_image_view);
-            textView = v.findViewById(R.id.cell_text_view);
+            imageView = v.findViewById(R.id.library_cell_icon_view);
+            textView = v.findViewById(R.id.library_cell_title);
             v.setOnClickListener(this);
         } // End LibraryAdapter.Holder(LinearLayout) constructor
 
@@ -99,6 +100,11 @@ public class LibraryAdapter extends RecyclerView.Adapter<LibraryAdapter.Holder> 
      * Used to notify clients of click events
      */
     interface ClickListener {
+        /**
+         * Triggered when a {@code library_cell_layout} is clicked.
+         *
+         * @param item the item that was clicked
+         */
         void onClick(MediaBrowserCompat.MediaItem item);
     } // End LibraryAdapter.ClickListener interface
 } // End LibraryAdapter class

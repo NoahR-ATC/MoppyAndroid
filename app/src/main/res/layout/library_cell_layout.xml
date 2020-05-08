@@ -21,24 +21,29 @@
             android:layout_height="match_parent">
 
             <ImageView
-                android:id="@+id/cell_image_view"
+                android:id="@+id/library_cell_icon_view"
                 android:layout_width="128dp"
                 android:layout_height="128dp"
                 android:background="#E0E0E0" />
 
             <androidx.cardview.widget.CardView
-                android:id="@+id/cardView"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_below="@id/cell_image_view"
+                android:layout_below="@id/library_cell_icon_view"
                 android:layout_alignParentEnd="false">
 
 
                 <TextView
-                    android:id="@+id/cell_text_view"
+                    android:id="@+id/library_cell_title"
                     android:layout_width="128dp"
                     android:layout_height="wrap_content"
-                    android:padding="5dp" />
+                    android:ellipsize="marquee"
+                    android:focusable="true"
+                    android:focusableInTouchMode="true"
+                    android:marqueeRepeatLimit="marquee_forever"
+                    android:padding="5dp"
+                    android:scrollHorizontally="true"
+                    android:singleLine="true" />
             </androidx.cardview.widget.CardView>
 
         </RelativeLayout>

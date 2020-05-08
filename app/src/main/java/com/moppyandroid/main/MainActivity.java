@@ -525,7 +525,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
 
                                 // Start the browser activity and unsubscribe from the loaded item
                                 MainActivity.this.startActivityForResult(startIntent, REQUEST_BROWSE_ACTIVITY);
-                                mediaBrowser.unsubscribe(item.getMediaId());
+                                mediaBrowser.unsubscribe(parentId);
                             } // End 'ROOT/item'.onChildrenLoaded method
                         }); // End SubscriptionCallback implementation
                     } // End if(item.isBrowsable)

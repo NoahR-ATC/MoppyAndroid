@@ -9,6 +9,7 @@ import androidx.recyclerview.widget.RecyclerView;
 import android.os.Bundle;
 import android.support.v4.media.MediaBrowserCompat;
 import android.view.MenuItem;
+import android.widget.TextView;
 
 import java.util.ArrayList;
 
@@ -36,16 +37,22 @@ public class BrowserActivity extends AppCompatActivity {
 
         // Create the toolbar
         Toolbar toolbar = findViewById(R.id.browser_toolbar);
-        toolbar.setSubtitle(getIntent().getStringExtra(EXTRA_PATH_STRING));
+        TextView titleView = toolbar.findViewById(R.id.browser_toolbar_title);
         setSupportActionBar(toolbar);
+        titleView.setText(toolbar.getTitle());
         getSupportActionBar().setDisplayHomeAsUpEnabled(true);
+        getSupportActionBar().setDisplayShowTitleEnabled(false); // Since we're using a custom title view, disable the theme's
 
-        // Create the recycler
-        // TODO: Use listener to return media ID for next folder/file loading
+        // Create the recyclers
+        // TODO: Use listener to extract media ID for next folder/file loading
         ArrayList<MediaBrowserCompat.MediaItem> list = getIntent().getParcelableArrayListExtra(EXTRA_MEDIA_LIST);
-        RecyclerView recycler = findViewById(R.id.file_recycler);
-        recycler.setAdapter(new BrowserAdapter(list, null));
-        recycler.setLayoutManager(new LinearLayoutManager(this));
+        RecyclerView fileRecycler = findViewById(R.id.file_recycler);
+        fileRecycler.setAdapter(new BrowserAdapter(list, null));
+        fileRecycler.setLayoutManager(new LinearLayoutManager(this));
+
+        RecyclerView pathRecycler = findViewById(R.id.path_recycler);
+        pathRecycler.setAdapter(new PathAdapter(getIntent().getStringExtra(EXTRA_PATH_STRING), null));
+        pathRecycler.setLayoutManager(new LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false));
     } // End onCreate method
 
     /**
