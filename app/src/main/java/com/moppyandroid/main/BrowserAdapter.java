@@ -14,9 +14,9 @@ import java.util.List;
 
 /**
  * {@link List}{{@code @literal <}}{@link android.support.v4.media.MediaBrowserCompat.MediaItem}{{@code @literal >}}
- * adapter for a {@link RecyclerView} that displays each item's title and icon as a grid card.
+ * adapter for a {@link RecyclerView} that displays each item's icon, title, and subtitle as a list entry.
  */
-public class LibraryAdapter extends RecyclerView.Adapter<LibraryAdapter.Holder> {
+public class BrowserAdapter extends RecyclerView.Adapter<BrowserAdapter.Holder> {
     private List<MediaBrowserCompat.MediaItem> dataset;
     private ClickListener clickListener;
 
@@ -26,7 +26,7 @@ public class LibraryAdapter extends RecyclerView.Adapter<LibraryAdapter.Holder> 
      *
      * @param dataset the {@link List} to show
      */
-    public LibraryAdapter(List<MediaBrowserCompat.MediaItem> dataset, ClickListener clickListener) {
+    public BrowserAdapter(List<MediaBrowserCompat.MediaItem> dataset, ClickListener clickListener) {
         this.dataset = dataset;
         this.clickListener = clickListener;
     } // End LibraryHolder(List<MediaItem>) constructor
@@ -35,9 +35,9 @@ public class LibraryAdapter extends RecyclerView.Adapter<LibraryAdapter.Holder> 
      * Method triggered when a {@link androidx.recyclerview.widget.RecyclerView.ViewHolder} is created.
      */
     @Override
-    public LibraryAdapter.Holder onCreateViewHolder(ViewGroup parent, int viewType) {
+    public BrowserAdapter.Holder onCreateViewHolder(ViewGroup parent, int viewType) {
         LinearLayout v = (LinearLayout) LayoutInflater.from(parent.getContext()).inflate(
-                R.layout.library_cell_layout,
+                R.layout.browser_entry_layout,
                 parent,
                 false
         );
@@ -49,8 +49,11 @@ public class LibraryAdapter extends RecyclerView.Adapter<LibraryAdapter.Holder> 
      */
     @Override
     public void onBindViewHolder(Holder holder, int position) {
-        holder.imageView.setImageURI(dataset.get(position).getDescription().getIconUri());
-        holder.textView.setText(dataset.get(position).getDescription().getTitle());
+        holder.iconView.setImageURI(dataset.get(position).getDescription().getIconUri());
+        holder.nameView.setText(dataset.get(position).getDescription().getTitle());
+        holder.nameView.setSelected(true); // Enable marquee
+        holder.lengthView.setText(dataset.get(position).getDescription().getSubtitle());
+        holder.lengthView.setSelected(true); // Enable marquee
     } // End onBindViewHolder method
 
     /**
@@ -62,43 +65,47 @@ public class LibraryAdapter extends RecyclerView.Adapter<LibraryAdapter.Holder> 
     public int getItemCount() { return dataset.size(); }
 
     /**
-     * Represents an entry in a {@link LibraryAdapter}.
+     * Represents an entry in a {@link BrowserAdapter}.
      */
     public class Holder extends RecyclerView.ViewHolder implements View.OnClickListener {
         /**
-         * The 128dpx128dp {@link ImageView} displayed
+         * The 48dp x 48dp {@link ImageView} displayed at the left of an entry
          */
-        public ImageView imageView;
+        public ImageView iconView;
         /**
-         * The {@link TextView} displayed beneath the {@link ImageView}.
+         * The {@link TextView} for the large upper text of an entry used for displaying the name
          */
-        public TextView textView;
+        public TextView nameView;
+        /**
+         * The {@link TextView} for the small lower text of an entry used for displaying the song duration
+         */
+        public TextView lengthView;
 
         /**
-         * Constructs a {@code LibraryAdapter.Holder} using an inflated {@code library_cell_layout}.
+         * Constructs a {@code LibraryAdapter.Holder} using an inflated {@code browser_entry_layout}.
          *
-         * @param v the {@code library_cell_layout}
+         * @param v the {@code browser_entry_layout}
          */
         public Holder(LinearLayout v) {
             super(v);
-            imageView = v.findViewById(R.id.cell_image_view);
-            textView = v.findViewById(R.id.cell_text_view);
-            v.setOnClickListener(this);
-        } // End LibraryAdapter.Holder(LinearLayout) constructor
+            iconView = v.findViewById(R.id.entry_icon_view);
+            nameView = v.findViewById(R.id.entry_name_text);
+            lengthView = v.findViewById(R.id.entry_length_text);
+        } // End BrowserAdapter.Holder(LinearLayout) constructor
 
         /**
          * Method triggered when a {@code LibraryAdapter.Holder} is clicked.
          */
         @Override
-        public void onClick(View v) { // TODO: Start activity for next level media ID result
+        public void onClick(View v) {
             if (clickListener != null) { clickListener.onClick(dataset.get(getAdapterPosition())); }
         } // End onClick method
-    } // End LibraryAdapter.Holder class
+    } // End BrowserAdapter.Holder class
 
     /**
      * Used to notify clients of click events
      */
     interface ClickListener {
         void onClick(MediaBrowserCompat.MediaItem item);
-    } // End LibraryAdapter.ClickListener interface
-} // End LibraryAdapter class
+    } // End BrowserAdapter.ClickListener interface
+} // End BrowserAdapter class

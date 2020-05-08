@@ -6,11 +6,13 @@
     android:layout_height="match_parent"
     android:orientation="vertical">
 
-    <FrameLayout
-        android:id="@+id/song_title_bar"
+    <androidx.appcompat.widget.Toolbar
+        android:id="@+id/toolbar"
         android:layout_width="match_parent"
-        android:layout_height="@dimen/song_titlebar_height"
-        android:background="#50AC50">
+        android:layout_height="wrap_content"
+        android:background="#50AC50"
+        android:minHeight="?attr/actionBarSize"
+        android:theme="?attr/actionBarTheme">
 
         <TextView
             android:id="@+id/song_title"
@@ -24,7 +26,7 @@
             android:singleLine="true"
             android:text="@string/song_title"
             android:textColor="@android:color/white" />
-    </FrameLayout>
+    </androidx.appcompat.widget.Toolbar>
 
     <ImageView
         android:id="@+id/image_view"

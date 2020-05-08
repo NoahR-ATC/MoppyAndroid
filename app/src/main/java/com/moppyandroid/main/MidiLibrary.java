@@ -447,10 +447,22 @@ public class MidiLibrary implements Map<String, MidiLibrary.MapNode> {
             MediaMetadataCompat.Builder metaBuilder = new MediaMetadataCompat.Builder();
             metaBuilder.putString(MediaMetadataCompat.METADATA_KEY_MEDIA_ID, globalName);
             metaBuilder.putString(MediaMetadataCompat.METADATA_KEY_TITLE, name);
+            metaBuilder.putString(MediaMetadataCompat.METADATA_KEY_DISPLAY_TITLE, name);
             metaBuilder.putString(MediaMetadataCompat.METADATA_KEY_ALBUM, album);
             metaBuilder.putString(MediaMetadataCompat.METADATA_KEY_ARTIST, artist);
             metaBuilder.putString(MediaMetadataCompat.METADATA_KEY_DISPLAY_ICON_URI, MUSIC_FILE_ICON_URI);
             metaBuilder.putLong(MediaMetadataCompat.METADATA_KEY_DURATION, duration);
+            StringBuilder timeTextBuilder = new StringBuilder();
+            long durationSeconds = duration / 1000;
+            String temp;
+            timeTextBuilder.append(durationSeconds / 3600);
+            timeTextBuilder.append(":");
+            temp = Long.toString((durationSeconds % 3600) / 60);
+            timeTextBuilder.append(("00" + temp).substring(temp.length())).append(":");
+            temp = Long.toString(durationSeconds % 60);
+            timeTextBuilder.append(("00" + temp).substring(temp.length()));
+            temp = timeTextBuilder.toString();
+            metaBuilder.putString(MediaMetadataCompat.METADATA_KEY_DISPLAY_SUBTITLE, temp);
             metadata = metaBuilder.build();
         } // End MidiFile constructor
 

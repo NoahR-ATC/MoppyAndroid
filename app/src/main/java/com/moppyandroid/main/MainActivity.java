@@ -67,6 +67,7 @@ import android.net.Uri;
 import android.os.Handler;
 import android.os.RemoteException;
 import android.os.SystemClock;
+import android.provider.Browser;
 import android.provider.OpenableColumns;
 import android.support.v4.media.MediaBrowserCompat;
 import android.support.v4.media.MediaMetadataCompat;
@@ -100,6 +101,7 @@ import java.io.FileNotFoundException;
 import java.io.InputStream;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Timer;
@@ -109,6 +111,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
     private static final String EXTRA_DEVICE_INDEX = "DEVICE_INDEX";
     private static final int REQUEST_LOAD_FILE = 0;
     private static final int REQUEST_READ_STORAGE = 1;
+    private static final int REQUEST_BROWSE_ACTIVITY = 2;
 
     private String currentBridgeIdentifier;
     private HashMap<String, String> spinnerHashMap;
@@ -175,6 +178,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
 
         // Set the initial view and disable the pause and play buttons
         setContentView(R.layout.activity_main);
+        setSupportActionBar(findViewById(R.id.main_toolbar));
         songSlider = findViewById(R.id.song_slider);
         deviceBox = findViewById(R.id.device_box);
         setControlState(true);
@@ -497,13 +501,37 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         songProgressTimer.schedule(songTimerTask, 0, 500);
 
         // Display the root elements
-        mediaBrowser.subscribe(mediaBrowser.getRoot(), new MediaBrowserCompat.SubscriptionCallback() {
+        String mediaRoot = mediaBrowser.getRoot();
+        mediaBrowser.subscribe(mediaRoot, new MediaBrowserCompat.SubscriptionCallback() {
             @Override
             public void onChildrenLoaded(@NonNull String parentId, @NonNull List<MediaBrowserCompat.MediaItem> children) {
                 super.onChildrenLoaded(parentId, children);
-                libraryRecycler.setAdapter(new LibraryAdapter(children));
-            }
-        }); // End SubscriptionCallback lambda)
+                libraryRecycler.setAdapter(new LibraryAdapter(children, (item) -> {
+                    if (item.getMediaId() == null) { return; }
+
+                    // Check if the item is a folder, loading contents and opening a browser if so
+                    if (item.isBrowsable()) {
+                        mediaBrowser.subscribe(item.getMediaId(), new MediaBrowserCompat.SubscriptionCallback() {
+                            @Override
+                            public void onChildrenLoaded(@NonNull String parentId, @NonNull List<MediaBrowserCompat.MediaItem> children) {
+                                super.onChildrenLoaded(parentId, children);
+
+                                // Construct an intent to launch a browser with the loaded children
+                                // and the path without mediaRoot as extras
+                                Intent startIntent = new Intent(MainActivity.this, BrowserActivity.class);
+                                String pathWithoutRoot = item.getMediaId().substring(mediaRoot.length() + 1);
+                                startIntent.putExtra(BrowserActivity.EXTRA_PATH_STRING, pathWithoutRoot);
+                                startIntent.putParcelableArrayListExtra(BrowserActivity.EXTRA_MEDIA_LIST, new ArrayList<>(children));
+
+                                // Start the browser activity and unsubscribe from the loaded item
+                                MainActivity.this.startActivityForResult(startIntent, REQUEST_BROWSE_ACTIVITY);
+                                mediaBrowser.unsubscribe(item.getMediaId());
+                            } // End 'ROOT/item'.onChildrenLoaded method
+                        }); // End SubscriptionCallback implementation
+                    } // End if(item.isBrowsable)
+                })); // End LibraryAdapter.ClickListener lambda
+            } // End 'ROOT'.onChildrenLoaded method
+        }); // End SubscriptionCallback implementation
 
         initialized = true;
     } // End init method
