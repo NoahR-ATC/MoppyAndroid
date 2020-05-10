@@ -710,7 +710,7 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
         // Sequence loading done before media session loading in case the file is invalid or can't be read
         try {
             moppyManager.load((MidiLibrary.MidiFile) node, MoppyMediaService.this);
-            moppyManager.play();
+            if (extras.getBoolean(EXTRA_PLAY, false)) { moppyManager.play(); }
         } // End try {load(node); play}
         catch (InvalidMidiDataException | IOException e) {
             Log.e(MoppyMediaService.class.getName() + "->onLoadAction", "Unable to load file" + mediaId, e);
