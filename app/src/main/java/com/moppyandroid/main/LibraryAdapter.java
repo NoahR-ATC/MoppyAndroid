@@ -10,6 +10,7 @@ import android.widget.TextView;
 
 import androidx.recyclerview.widget.RecyclerView;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -27,7 +28,8 @@ public class LibraryAdapter extends RecyclerView.Adapter<LibraryAdapter.Holder> 
      * @param dataset the {@link List} to show
      */
     public LibraryAdapter(List<MediaBrowserCompat.MediaItem> dataset, ClickListener clickListener) {
-        this.dataset = dataset;
+        if (dataset == null) { this.dataset = new ArrayList<>(); }
+        else { this.dataset = dataset; }
         this.clickListener = clickListener;
     } // End LibraryHolder(List<MediaItem>) constructor
 
@@ -91,7 +93,7 @@ public class LibraryAdapter extends RecyclerView.Adapter<LibraryAdapter.Holder> 
          * Method triggered when a {@code LibraryAdapter.Holder} is clicked.
          */
         @Override
-        public void onClick(View v) { // TODO: Start activity for next level media ID result
+        public void onClick(View v) {
             if (clickListener != null) { clickListener.onClick(dataset.get(getAdapterPosition())); }
         } // End onClick method
     } // End LibraryAdapter.Holder class

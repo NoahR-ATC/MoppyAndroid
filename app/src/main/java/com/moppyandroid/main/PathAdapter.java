@@ -21,20 +21,23 @@ public class PathAdapter extends RecyclerView.Adapter<PathAdapter.Holder> {
     private ClickListener clickListener;
 
     /**
-     * Constructs a {@code PathAdapter} using a '/' delimited {@link String} to create the path segments to display.
+     * Constructs a {@code PathAdapter} with a {@link List}{@code {@literal <}}{@link String}{@code {@literal >}}
+     * of the path segments to display.
      *
-     * @param path the {@link String} to decompose
+     * @param pathSegments the {@link List} of path segments to show
      */
-    public PathAdapter(String path, ClickListener clickListener) {
+    public PathAdapter(List<String> pathSegments, ClickListener clickListener) {
         this.clickListener = clickListener;
 
-        if (path == null) { // Create empty list
-            dataset = new ArrayList<>();
-            return;
+        // If a null list is supplied we create an empty adapter, but if a list is supplied that doesn't
+        // have any items than this is a programming error and an IllegalArgumentException is raised
+        if (pathSegments == null) {
+            this.dataset = new ArrayList<>();
         }
-        String[] segments = path.split("/");
-        if (segments.length < 1) { throw new IllegalArgumentException("Invalid path supplied"); }
-        this.dataset = Arrays.asList(segments);
+        else if (pathSegments.size() < 1) {
+            throw new IllegalArgumentException("Empty path supplied");
+        }
+        else { this.dataset = pathSegments; }
     } // End PathAdapter(List<MediaItem>) constructor
 
     /**
@@ -90,9 +93,12 @@ public class PathAdapter extends RecyclerView.Adapter<PathAdapter.Holder> {
          * Method triggered when a {@code PathAdapter.Holder} is clicked.
          */
         @Override
-        public void onClick(View v) { // TODO: Start activity for selected media ID
+        public void onClick(View v) {
             if (clickListener != null) {
-                clickListener.onClick(dataset.subList(0, getAdapterPosition()));
+                // Checks if dataset[position + 1] is valid and returns if not, since the last cell
+                // is the current segment and there's no sense in reloading the same items
+                if (getAdapterPosition() + 1 >= getItemCount()) { return; }
+                clickListener.onClick(dataset.subList(0, getAdapterPosition() + 1));
             }
         } // End onClick method
     } // End PathAdapter.Holder class

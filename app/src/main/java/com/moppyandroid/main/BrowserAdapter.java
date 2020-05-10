@@ -10,6 +10,7 @@ import android.widget.TextView;
 
 import androidx.recyclerview.widget.RecyclerView;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -27,7 +28,8 @@ public class BrowserAdapter extends RecyclerView.Adapter<BrowserAdapter.Holder> 
      * @param dataset the {@link List} to show
      */
     public BrowserAdapter(List<MediaBrowserCompat.MediaItem> dataset, ClickListener clickListener) {
-        this.dataset = dataset;
+        if (dataset == null) { this.dataset = new ArrayList<>(); }
+        else { this.dataset = dataset; }
         this.clickListener = clickListener;
     } // End BrowserAdapter(List<MediaItem>) constructor
 

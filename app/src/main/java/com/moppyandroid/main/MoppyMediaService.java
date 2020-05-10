@@ -369,7 +369,7 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
             MidiLibrary.getMidiLibraryAsync(
                     MoppyMediaService.this,
                     midiLibraryResult -> {
-                        // Send that an error occurred if we don't have permission to access storage
+                        // Send that an empty list if we don't have permission to access storage
                         if (midiLibraryResult == null) { result.sendResult(null); }
                         else {
                             this.midiLibrary = midiLibraryResult;

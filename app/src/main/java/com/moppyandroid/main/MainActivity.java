@@ -5,7 +5,7 @@ Author: Noah Reeder, noahreederatc@gmail.com
 
 Known bugs:
 TODO: Setup instance state to reshow connected device if app is destroyed, keyboard/mouse plugged in, rotation, etc.
-
+TODO: "W/ActivityThread: handleWindowVisibilty: no activity for token" in log when starting BrowserActivity, unable to find reason
 
 Known problems:
     - Hard to use track slider in slide menu (adjust slide menu sensitivity?)
@@ -226,6 +226,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         libraryLayout.setJustifyContent(JustifyContent.SPACE_AROUND);
         libraryRecycler.setHasFixedSize(true);
         libraryRecycler.setLayoutManager(libraryLayout);
+        libraryRecycler.setAdapter(new LibraryAdapter(null, null)); // Dummy adapter until items loaded
 
         mediaBrowser.connect();
     } // End onCreate method
@@ -266,7 +267,6 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
     // Method triggered when a spawned activity exits
     @Override
     public void onActivityResult(int requestCode, int resultCode, Intent resultData) {
-        // Allow the superclass do process the spawned activity's result
         super.onActivityResult(requestCode, resultCode, resultData);
 
         // Check if the request was a load file request made by us
@@ -329,6 +329,12 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
                 } // End if(!songSlider.enabled && fileLoaded)
             } // End if(result == OK)
         } // End if(request == LOAD_FILE)
+        else if (requestCode == REQUEST_BROWSE_ACTIVITY) { // TODO: Handle errors and implement loading
+            if (resultCode == RESULT_OK) {
+                MediaBrowserCompat.MediaItem i = resultData.getParcelableExtra(BrowserActivity.EXTRA_SELECTED_FILE);
+                if (i != null) { Log.i("MainActivity", i.toString()); }
+            }
+        }
     } // End onActivityResult method
 
     @Override
@@ -511,26 +517,17 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
 
                     // Check if the item is a folder, loading contents and opening a browser if so
                     if (item.isBrowsable()) {
-                        mediaBrowser.subscribe(item.getMediaId(), new MediaBrowserCompat.SubscriptionCallback() {
-                            @Override
-                            public void onChildrenLoaded(@NonNull String parentId, @NonNull List<MediaBrowserCompat.MediaItem> children) {
-                                super.onChildrenLoaded(parentId, children);
+                        // Construct an intent to launch a browser with the loaded children
+                        // and the path without mediaRoot as extras
+                        Intent startIntent = new Intent(MainActivity.this, BrowserActivity.class);
+                        startIntent.putExtra(BrowserActivity.EXTRA_INITIAL_ID, item.getMediaId());
 
-                                // Construct an intent to launch a browser with the loaded children
-                                // and the path without mediaRoot as extras
-                                Intent startIntent = new Intent(MainActivity.this, BrowserActivity.class);
-                                String pathWithoutRoot = item.getMediaId().substring(mediaRoot.length() + 1);
-                                startIntent.putExtra(BrowserActivity.EXTRA_PATH_STRING, pathWithoutRoot);
-                                startIntent.putParcelableArrayListExtra(BrowserActivity.EXTRA_MEDIA_LIST, new ArrayList<>(children));
-
-                                // Start the browser activity and unsubscribe from the loaded item
-                                MainActivity.this.startActivityForResult(startIntent, REQUEST_BROWSE_ACTIVITY);
-                                mediaBrowser.unsubscribe(parentId);
-                            } // End 'ROOT/item'.onChildrenLoaded method
-                        }); // End SubscriptionCallback implementation
+                        // Start the browser activity and unsubscribe from the loaded item
+                        MainActivity.this.startActivityForResult(startIntent, REQUEST_BROWSE_ACTIVITY);
                     } // End if(item.isBrowsable)
+                    // TODO: Implement if(itemBrowsable) {} else
                 })); // End LibraryAdapter.ClickListener lambda
-            } // End 'ROOT'.onChildrenLoaded method
+            } // End subscribe(ROOT)->onChildrenLoaded method
         }); // End SubscriptionCallback implementation
 
         initialized = true;
