@@ -464,6 +464,7 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
             }
             case ACTION_LOAD_ITEM: {
                 onLoadAction(extras, result);
+                break;
             }
             default: {
                 Bundle errorBundle = new Bundle();
