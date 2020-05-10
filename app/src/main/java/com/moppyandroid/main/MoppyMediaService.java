@@ -236,8 +236,10 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
         ); // End mediaSession flags
         playbackStateBuilder = new PlaybackStateCompat.Builder()
                 .setActions(
-                        PlaybackStateCompat.ACTION_PLAY |
                         PlaybackStateCompat.ACTION_PLAY_PAUSE |
+                        PlaybackStateCompat.ACTION_PLAY_FROM_MEDIA_ID |
+                        PlaybackStateCompat.ACTION_PLAY_FROM_SEARCH |
+                        PlaybackStateCompat.ACTION_PLAY |
                         PlaybackStateCompat.ACTION_STOP
                 ) // End setActions call
                 .addCustomAction("initLibrary", "initLibrary", R.drawable.ic_folder)
@@ -323,7 +325,7 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
     public void onTaskRemoved(Intent rootIntent) {
         stopSelf();
         super.onTaskRemoved(rootIntent);
-    }
+    } // End onTaskRemoved method
 
     /**
      * Triggered when the service has completed and is being destroyed by the garbage collector.
@@ -335,7 +337,7 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
         if (mediaSession != null) { mediaSession.release(); }
 
         super.onDestroy();
-    }
+    } // End onDestroy method
 
     /**
      * Retrieves the node that allows a connecting client to browse the content library's root folder.
@@ -477,64 +479,6 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
         //super.onCustomAction(action, extras, result); // Just calls result.sendError(null);
     }
 
-    // Method to toggle the notification between playing (pause icon) and not-playing (play icon) modes.
-    //
-    // Set metadata to null to put the notification in not-playing mode
-    // Set changeText to true to update the notification text to "No song loaded" or the song name
-    //
-    // Note: Recommended to call playbackStateBuilder.setState before this method to avoid, having to
-    //      call mediaSession.setPlaybackState twice
-    @SuppressLint("RestrictedApi") // IDE doesn't want us to access notificationBuilder.mActions
-    private void togglePlayPauseMediaButton(boolean changeText, MediaMetadataCompat metadata) {
-        // Calculate flags and update session
-        long currentActionFlags = PlaybackStateCompat.ACTION_PLAY_PAUSE |
-                                  PlaybackStateCompat.ACTION_STOP |
-                                  PlaybackStateCompat.ACTION_SEEK_TO |
-                                  ((metadata == null) ?
-                                          PlaybackStateCompat.ACTION_PLAY :
-                                          PlaybackStateCompat.ACTION_PAUSE
-                                  );
-        playbackStateBuilder.setActions(currentActionFlags);
-        mediaSession.setPlaybackState(playbackStateBuilder.build());
-
-        // Replace button icon
-        notificationBuilder.mActions.remove(NOTIFICATION_PLAY_PAUSE_INDEX);
-        if (metadata == null) { // Not-playing mode
-            notificationBuilder.setOngoing(false);
-            notificationBuilder.mActions.add(
-                    NOTIFICATION_PLAY_PAUSE_INDEX,
-                    new NotificationCompat.Action(
-                            R.drawable.ic_play,
-                            "Play",
-                            MediaButtonReceiver.buildMediaButtonPendingIntent(
-                                    MoppyMediaService.this,
-                                    PlaybackStateCompat.ACTION_PLAY_PAUSE
-                            )
-                    ) // End NotificationCompat.Action constructor call
-            ); // End mActions.add call
-            if (changeText) { notificationBuilder.setContentTitle("No file loaded"); }
-        } // End if(metadata == null)
-        else { // Playing mode
-            notificationBuilder.setOngoing(true);
-            notificationBuilder.mActions.add(
-                    NOTIFICATION_PLAY_PAUSE_INDEX,
-                    new NotificationCompat.Action(
-                            R.drawable.ic_pause,
-                            "Pause",
-                            MediaButtonReceiver.buildMediaButtonPendingIntent(
-                                    MoppyMediaService.this,
-                                    PlaybackStateCompat.ACTION_PLAY_PAUSE
-                            )
-                    ) // End NotificationCompat.Action constructor call
-            ); // End mActions.add call
-            if (changeText) {
-                notificationBuilder.setContentTitle(metadata.getString(MediaMetadataCompat.METADATA_KEY_TITLE));
-            } // End if(changeText)
-        } // End if(metadata == null) {} else
-
-        notificationManager.notify(NOTIFICATION_ID, notificationBuilder.build());
-    } // End togglePlayPauseMediaButton method
-
     // Triggered by ACTION_ADD_DEVICE
     private void onAddDevice(Bundle extras, Result<Bundle> result) {
         if (extras == null || extras.getString(EXTRA_PORT_NAME) == null) {
@@ -673,9 +617,9 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
             return;
         }
         String mediaId = extras.getString(EXTRA_MEDIA_ID);
+        boolean setToPlaying = extras.getBoolean(EXTRA_PLAY, false);
 
         PlaybackStateCompat playbackState = mediaController.getPlaybackState();
-        if ((playbackState.getActions() & PlaybackStateCompat.ACTION_PLAY) == 0) { return; }
 
         // Create the MIDI library if needed and retrieve the requested file
         if (midiLibrary == null) {
@@ -711,8 +655,7 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
         // Sequence loading done before media session loading in case the file is invalid or can't be read
         try {
             moppyManager.load((MidiLibrary.MidiFile) node, MoppyMediaService.this);
-            if (extras.getBoolean(EXTRA_PLAY, false)) { moppyManager.play(); }
-        } // End try {load(node); play}
+        } // End try {load(node)}
         catch (InvalidMidiDataException | IOException e) {
             Log.e(MoppyMediaService.class.getName() + "->onLoadAction", "Unable to load file" + mediaId, e);
             Bundle errorBundle = new Bundle();
@@ -722,21 +665,106 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
             errorBundle.putString(EXTRA_MEDIA_ID, mediaId);
             result.sendError(errorBundle);
             return;
-        } // End try {load(node); play} catch(InvalidMidiData|IO Exception)
+        } // End try {load(node)} catch(InvalidMidiData|IO Exception)
 
         // Load in the file's metadata, and update the notification and playback state
         mediaSession.setMetadata(node.getMetadata());
-        playbackStateBuilder.setState(
-                PlaybackStateCompat.STATE_PLAYING,
-                0,
-                1
-        );
-        togglePlayPauseMediaButton(true, node.getMetadata());
+        playbackStateBuilder.setActions(playbackState.getActions() | PlaybackStateCompat.ACTION_SEEK_TO);
+        if (setToPlaying) {
+            moppyManager.play();
+            playbackStateBuilder.setState(
+                    PlaybackStateCompat.STATE_PLAYING,
+                    moppyManager.getMillisecondsPosition(),
+                    1
+            );
+            togglePlayPauseMediaButton(true, node.getMetadata());
+        } // End if(setToPlaying)
+        else {
+            updateNotificationText(node.getMetadata(), true);
+            playbackStateBuilder.setState(
+                    (playbackState.getState() == PlaybackStateCompat.STATE_NONE ?
+                            PlaybackStateCompat.STATE_STOPPED : playbackState.getState()
+                    ), // End state ternary
+                    moppyManager.getMillisecondsPosition(),
+                    1
+            );
+            mediaSession.setPlaybackState(playbackStateBuilder.build());
+        } // End if(setToPlaying) {} else
 
         Bundle resultBundle = new Bundle();
         resultBundle.putString(EXTRA_MEDIA_ID, mediaId);
         result.sendResult(resultBundle);
-    }
+    } // End onLoadAction method
+
+    // Method to toggle the notification between playing (pause icon) and not-playing (play icon) modes.
+    //
+    // Set metadata to null to put the notification in not-playing mode
+    // Set changeText to true to update the notification text to "No song loaded" or the song name
+    //
+    // Note: Recommended to call playbackStateBuilder.setState before this method to avoid, having to
+    //      call mediaSession.setPlaybackState twice
+    @SuppressLint("RestrictedApi") // IDE doesn't want us to access notificationBuilder.mActions
+    private void togglePlayPauseMediaButton(boolean changeText, MediaMetadataCompat metadata) {
+        // Calculate flags and update session
+        long currentActionFlags = PlaybackStateCompat.ACTION_PLAY_PAUSE |
+                                  PlaybackStateCompat.ACTION_STOP |
+                                  PlaybackStateCompat.ACTION_SEEK_TO |
+                                  PlaybackStateCompat.ACTION_PLAY_FROM_MEDIA_ID |
+                                  PlaybackStateCompat.ACTION_PLAY_FROM_SEARCH |
+                                  ((metadata == null) ?
+                                          PlaybackStateCompat.ACTION_PLAY :
+                                          PlaybackStateCompat.ACTION_PAUSE
+                                  );
+        playbackStateBuilder.setActions(currentActionFlags);
+        mediaSession.setPlaybackState(playbackStateBuilder.build());
+
+        // Replace button icon
+        notificationBuilder.mActions.remove(NOTIFICATION_PLAY_PAUSE_INDEX);
+        if (metadata == null) { // Not-playing mode
+            notificationBuilder.setOngoing(false);
+            notificationBuilder.mActions.add(
+                    NOTIFICATION_PLAY_PAUSE_INDEX,
+                    new NotificationCompat.Action(
+                            R.drawable.ic_play,
+                            "Play",
+                            MediaButtonReceiver.buildMediaButtonPendingIntent(
+                                    MoppyMediaService.this,
+                                    PlaybackStateCompat.ACTION_PLAY_PAUSE
+                            )
+                    ) // End NotificationCompat.Action constructor call
+            ); // End mActions.add call
+        } // End if(metadata == null)
+        else { // Playing mode
+            notificationBuilder.setOngoing(true);
+            notificationBuilder.mActions.add(
+                    NOTIFICATION_PLAY_PAUSE_INDEX,
+                    new NotificationCompat.Action(
+                            R.drawable.ic_pause,
+                            "Pause",
+                            MediaButtonReceiver.buildMediaButtonPendingIntent(
+                                    MoppyMediaService.this,
+                                    PlaybackStateCompat.ACTION_PLAY_PAUSE
+                            )
+                    ) // End NotificationCompat.Action constructor call
+            ); // End mActions.add call
+        } // End if(metadata == null) {} else
+        if (changeText) { updateNotificationText(metadata, false); }
+
+        notificationManager.notify(NOTIFICATION_ID, notificationBuilder.build());
+    } // End togglePlayPauseMediaButton method
+
+    // Updates the text of the playing notification to "No file loaded" or the provided metadata's title.
+    // If pushNewNotification is true, the updated notification is also pushed
+    private void updateNotificationText(MediaMetadataCompat metadata, boolean pushNewNotification) {
+        if (metadata == null) { notificationBuilder.setContentTitle("No file loaded"); }
+        else {
+            notificationBuilder.setContentTitle(metadata.getString(MediaMetadataCompat.METADATA_KEY_TITLE));
+        }
+
+        if (pushNewNotification) {
+            notificationManager.notify(NOTIFICATION_ID, notificationBuilder.build());
+        }
+    } // End updateNotificationText method
 
     // Callbacks for media button events. All callbacks are disabled if their associated action is not supported
     private class MediaCallback extends MediaSessionCompat.Callback {
@@ -761,7 +789,9 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
         @Override
         public void onPlayFromMediaId(String mediaId, Bundle extras) {
             PlaybackStateCompat playbackState = mediaController.getPlaybackState();
-            if ((playbackState.getActions() & PlaybackStateCompat.ACTION_PLAY) == 0) { return; }
+            if ((playbackState.getActions() & PlaybackStateCompat.ACTION_PLAY_FROM_MEDIA_ID) == 0) {
+                return;
+            }
 
             // Create the MIDI library if needed and retrieve the requested file
             if (midiLibrary == null) {
@@ -786,22 +816,16 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
                 return;
             } // End try {load(node); play} catch(InvalidMidiData|IO Exception)
 
-            // Load in the file's metadata, and update the notification and playback state
-            mediaSession.setMetadata(node.getMetadata());
-            playbackStateBuilder.setState(
-                    PlaybackStateCompat.STATE_PLAYING,
-                    0,
-                    1
-            );
-            togglePlayPauseMediaButton(true, node.getMetadata());
-
+            onPlay();
             super.onPlayFromMediaId(mediaId, extras);
         } // End onPlayFromMediaId method
 
         @Override
         public void onPlayFromSearch(String query, Bundle extras) {
             PlaybackStateCompat playbackState = mediaController.getPlaybackState();
-            if ((playbackState.getActions() & PlaybackStateCompat.ACTION_PLAY) == 0) { return; }
+            if ((playbackState.getActions() & PlaybackStateCompat.ACTION_PLAY_FROM_SEARCH) == 0) {
+                return;
+            }
 
             MidiLibrary.MidiFile file;
             String mediaFocus = extras.getString(MediaStore.EXTRA_MEDIA_FOCUS);

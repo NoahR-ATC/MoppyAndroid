@@ -163,7 +163,7 @@ public class MidiLibrary implements Map<String, MidiLibrary.MapNode> {
                     try {
                         pathFolder.createFolder(path).createFile(contentUri, name, duration, artist, album);
                     }
-                    catch (InvalidPathException e) {
+                    catch (InvalidPathException e) { // TODO: Rename both files
                         String newName = name + " (" + path + ")";
                         pathFolder.createFolder(path).createFile(contentUri, newName, duration, artist, album);
                     }
