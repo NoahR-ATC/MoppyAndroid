@@ -58,16 +58,13 @@ import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.IntentFilter;
-import android.content.res.ColorStateList;
 import android.database.Cursor;
-import android.graphics.Color;
 import android.hardware.usb.UsbDevice;
 import android.hardware.usb.UsbManager;
 import android.net.Uri;
 import android.os.Handler;
 import android.os.RemoteException;
 import android.os.SystemClock;
-import android.provider.Browser;
 import android.provider.OpenableColumns;
 import android.support.v4.media.MediaBrowserCompat;
 import android.support.v4.media.MediaMetadataCompat;
@@ -79,7 +76,6 @@ import android.view.ViewGroup;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.ImageButton;
-import android.widget.ProgressBar;
 import android.widget.RelativeLayout;
 import android.widget.SeekBar;
 import android.widget.Spinner;
@@ -101,7 +97,6 @@ import java.io.FileNotFoundException;
 import java.io.InputStream;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Timer;
@@ -121,7 +116,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
     private SeekBar songSlider;
     private Spinner deviceBox;
     private RecyclerView libraryRecycler;
-    private AlertDialog progressBar; // TODO: Make look better
+    private AlertDialog loadingBar;
     private SongTimerTask songTimerTask;
     private Handler uiHandler;
     private UsbManager usbManager;
@@ -163,6 +158,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
     }; // End new BroadcastReceiver
 
     // Method triggered upon activity creation
+    @SuppressLint("InflateParams") // Not applicable to inflation for AlertDialog
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -203,20 +199,17 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         toolbarLayout.measure(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
         panelLayout.setPanelHeight(toolbarLayout.getMeasuredHeight());
 
+        // Create the loading bar from an alert dialog containing loading_dialog_layout
         AlertDialog.Builder alertBuilder = new AlertDialog.Builder(this);
         alertBuilder.setCancelable(false);
-        ProgressBar pb = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
-        pb.setIndeterminate(true);
-        pb.setIndeterminateTintList(ColorStateList.valueOf(Color.GREEN));
-        alertBuilder.setView(pb);
-        progressBar = alertBuilder.create();
+        alertBuilder.setView(getLayoutInflater().inflate(R.layout.loading_dialog_layout, null));
+        loadingBar = alertBuilder.create();
 
         // Set this activity to be called when the USB device spinner or the song slider have a selection event
         deviceBox.setOnItemSelectedListener(this);
         songSlider.setOnSeekBarChangeListener(this);
 
-        // Define the listener lambdas for the load, play, and stop buttons
-        // findViewById(R.id.load_button).setOnClickListener((View v) -> onLoadButton()); // TODO: Implement new loading method
+        // Define the listener lambdas for the play and pause/stop buttons
         findViewById(R.id.play_button).setOnClickListener((View v) -> onPlayButton());
         findViewById(R.id.pause_button).setOnClickListener((View v) -> onPauseButton());
 
@@ -388,7 +381,8 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
             closeBridge(true);
 
             // Get the requested UsbDevice
-            String bridgeIdentifier = spinnerHashMap.get((String) parent.getItemAtPosition(position));
+            //noinspection SuspiciousMethodCalls
+            String bridgeIdentifier = spinnerHashMap.get(parent.getItemAtPosition(position));
             UsbDevice device = usbManager.getDeviceList().get(bridgeIdentifier);
             if (device == null) {
                 requestDevicesRefresh();
@@ -435,7 +429,10 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
             permissionStatuses.replace(pos, true);
             openBridge(statusDeviceIds.get(pos));
         } // End if(EXTRA_PERMISSION_GRANTED)
-        else { deviceBox.setSelection(0); }
+        else {
+            deviceBox.setSelection(0);
+            showMessageDialog("USB permission is required to connect.", null);
+        }
         closeProgressBar();
     } // End onUsbPermissionIntent method
 
@@ -449,15 +446,6 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         // Refresh the netManger device lists, waiting for the message box to be acknowledged before refreshing ours
         requestDevicesRefresh();
     } // End onUsbDeviceDetachedIntent method
-
-    // Method triggered when load button pressed
-    private void onLoadButton() {
-        // Trigger the open document dialog of the Android system, looking for MIDI files
-        Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
-        intent.addCategory(Intent.CATEGORY_OPENABLE);
-        intent.setType("audio/midi");
-        startActivityForResult(intent, REQUEST_LOAD_FILE);
-    } // End onLoadButton method
 
     // Method triggered when play button pressed
     private void onPlayButton() { transportControls.play(); }
@@ -783,13 +771,13 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
     private void showProgressBar() {
         if (progressBarRequests++ == 0) {
             //getWindow().setFlags(WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE, WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE);
-            progressBar.show();
+            loadingBar.show();
         }
     } // End showProgressBar method
 
     private void closeProgressBar() {
         if (--progressBarRequests == 0) {
-            progressBar.dismiss();
+            loadingBar.dismiss();
             //getWindow().clearFlags(WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE);
         }
     } // End closeProgressBar method
