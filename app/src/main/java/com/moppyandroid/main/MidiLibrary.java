@@ -11,6 +11,7 @@ import android.database.Cursor;
 import android.net.Uri;
 import android.provider.MediaStore;
 import android.support.v4.media.MediaMetadataCompat;
+import android.util.Log;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -157,46 +158,23 @@ public class MidiLibrary implements Map<String, MidiLibrary.MapNode> {
                     Uri contentUri = ContentUris.withAppendedId(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, id);
 
                     // Use the retrieved information to create a MidiFile in each folder category
-                    // Note: If an InvalidPathException is raised (likely because a file with that name already exists)
-                    //      then the file is re-added to that category with it's path appended to its name
-                    // Path category
-                    try {
-                        pathFolder.createFolder(path).createFile(contentUri, name, duration, artist, album);
-                    }
-                    catch (InvalidPathException e) { // TODO: Rename both files
-                        String newName = name + " (" + path + ")";
-                        pathFolder.createFolder(path).createFile(contentUri, newName, duration, artist, album);
-                    }
-                    // Artist category
-                    try {
-                        artistFolder.createFolder(artist, ARTIST_ICON_URI).createFile(contentUri, name, duration, artist, album);
-                    }
-                    catch (InvalidPathException e) {
-                        String newName = name + " (" + path + ")";
-                        artistFolder.createFolder(artist, ARTIST_ICON_URI).createFile(contentUri, newName, duration, artist, album);
-                    }
-                    // Album category
-                    try {
-                        albumFolder.createFolder(album, ALBUM_ICON_URI).createFile(contentUri, name, duration, artist, album);
-                    }
-                    catch (InvalidPathException e) {
-                        String newName = name + " (" + path + ")";
-                        albumFolder.createFolder(album, ALBUM_ICON_URI).createFile(contentUri, newName, duration, artist, album);
-                    }
+                    createFileInFolder(pathFolder, path, contentUri, name, duration, artist, album);
+                    createFileInFolder(artistFolder, ARTIST_ICON_URI, artist, contentUri, name, duration, artist, album);
+                    createFileInFolder(albumFolder, ALBUM_ICON_URI, album, contentUri, name, duration, artist, album);
                 } // End while(cursor.next)
             } // End if(cursor != null)
         } // End try(cursor = query(EXTERNAL_CONTENT_URI)
 
         // Create and return the MidiLibrary object
         return new MidiLibrary(realRootFolder);
-    }
+    } // End getMidiLibrary method
 
     public static void getMidiLibraryAsync(Context context, MidiLibrary.Callback callback) {
         new Thread() {
             @Override
             public void run() { callback.onLoadCompletion(getMidiLibrary(context)); }
         }.start();
-    } // End getMIDILibraryAsync method
+    } // End getMidiLibraryAsync method
 
     // Constructs a MIDI library with the passed root folder. See getMidiLibrary for explanation about root folder to pass
     private MidiLibrary(Folder rootFolder) { this.rootFolder = rootFolder; }
@@ -402,6 +380,59 @@ public class MidiLibrary implements Map<String, MidiLibrary.MapNode> {
         return null;
     } // End searchFuzzy(String, String) method
 
+    // Calls other createFileInFolder overload with a null icon
+    private static boolean createFileInFolder(Folder folder, String path, Uri contentUri, String name, int duration, String artist, String album) throws InvalidPathException {
+        return createFileInFolder(folder, null, path, contentUri, name, duration, artist, album);
+    }
+
+    // Creates a new MidiFile in the provided folder, attempting to resolve a raised InvalidPathException by
+    // appending the corresponding paths to the name of both conflicting MidiFiles
+    private static boolean createFileInFolder(Folder folder, String iconUri, String path, Uri contentUri, String name, int duration, String artist, String album) throws InvalidPathException {
+        // Attempt to create the file as provided
+        try {
+            folder.createFolder(path, iconUri).createFile(contentUri, name, duration, artist, album, path);
+        }
+        catch (InvalidPathException e) { // Likely raised because a file with that name already exists
+            MapNode conflictingNode = folder.get(path + "/" + name);
+            if (conflictingNode == null) {
+                Log.e(CLASS_NAME + "->createFileInFolder", "Unable to resolve InvalidPathException", e);
+                return false;
+            }
+
+            if (!(conflictingNode instanceof MidiFile)) { // File with same name as folder? How on earth did that happen?
+                // Log what shouldn't have happened and continue
+                // Situation probably calls for Log.wtf, but I don't want to close the app
+                Log.e(CLASS_NAME + "->createFileInFolder",
+                        "File discovered with same name as non-MidiFile object: " +
+                        conflictingNode.getNameGlobal() + " (non-MidiFile), " + // getNameGlobal closest thing to path we can track
+                        path + "/" + name + " (discovered MidiFile)",
+                        e
+                ); // End Log.e call
+                return false;
+            } // End if(conflictingNode ∉ MidiFile)
+
+            // Create new names for the old (original) and new MidiFiles by adding their path on, and remove the old one
+            MidiFile old = (MidiFile) conflictingNode;
+            String newName = name + " (" + path + ")";
+            String newNameForOld = old.getName() + " (" + old.getPath() + ")";
+            folder.remove(path + "/" + name);
+
+            // Add the both files back with their new names
+            // Note: If these calls raise another InvalidPathException we have bigger issues than I can
+            //      deal with here so we'll just let the exception continue up the call stack
+            try {
+                folder.createFolder(path, iconUri).createFile(old.getUri(), newNameForOld, old.getDuration(), old.getArtist(), old.getAlbum(), old.getPath());
+                folder.createFolder(path, iconUri).createFile(contentUri, newName, duration, artist, album, path);
+            } // End try {createFile(newNameForOld); createFile(newName)}
+            catch (InvalidPathException e2) {
+                Log.e(CLASS_NAME + "->createFileInFolder", "Unable to resolve InvalidPathException", e2);
+                return false;
+            } // End try {createFile(newNameForOld); createFile(newName)} catch(InvalidPathException)
+        } // End try {createFolder} catch(InvalidPathException)
+
+        return true;
+    } // End createFileInFolder method
+
     /**
      * Callback interface used for running code upon completion of asynchronous {@link MidiLibrary} creation
      *
@@ -423,6 +454,7 @@ public class MidiLibrary implements Map<String, MidiLibrary.MapNode> {
         private final String parentName;
         private final String globalName;
         private final MediaMetadataCompat metadata;
+        private final String path;
 
         /**
          * Constructs a {@code MidiFile} object.
@@ -434,7 +466,7 @@ public class MidiLibrary implements Map<String, MidiLibrary.MapNode> {
          * @param album      the file's album
          * @param parentName the fully-qualified name of the parent {@link Folder}, use {@code null} if there is no parent
          */
-        public MidiFile(Uri uri, String name, int duration, String artist, String album, String parentName) {
+        public MidiFile(Uri uri, String name, int duration, String artist, String album, String parentName, String path) {
             this.uri = uri;
             this.name = name;
             this.duration = duration; // Duration is in milliseconds
@@ -442,6 +474,7 @@ public class MidiLibrary implements Map<String, MidiLibrary.MapNode> {
             this.album = album;
             this.parentName = parentName;
             this.globalName = ((parentName != null) ? parentName + "/" : "") + name;
+            this.path = path;
 
             // Create the metadata
             MediaMetadataCompat.Builder metaBuilder = new MediaMetadataCompat.Builder();
@@ -492,11 +525,17 @@ public class MidiLibrary implements Map<String, MidiLibrary.MapNode> {
 
         /**
          * Gets the album this {@code MidiFile} belongs to.
-         * <p>
          *
          * @return the album
          */
         public String getAlbum() { return album; }
+
+        /**
+         * Gets the device path this file was found in.
+         *
+         * @return the path as a {@link String}
+         */
+        public String getPath() { return path; }
 
 
         // Implement interface methods
@@ -617,9 +656,10 @@ public class MidiLibrary implements Map<String, MidiLibrary.MapNode> {
          * @param midiFile the file to create folders to contain
          * @param iconUri  the URI {@link String} of the icon to use for the folders; use {@code null} for default icon
          * @return {@code null} if no folders are in file path
+         * @throws InvalidPathException if a segment of the path is blank
          */
         @Nullable
-        public static Folder createFolderStructureWithFile(MidiFile midiFile, String iconUri) {
+        public static Folder createFolderStructureWithFile(MidiFile midiFile, String iconUri) throws InvalidPathException {
             // Break up the fully-qualified name of the file and ensure it is valid. Size must be 2 or greater, since
             // segments ∋ {..., parentNameSegment, folderName}, as less than 2 elements would mean a name is missing
             List<String> segments = Arrays.asList(midiFile.getNameGlobal().split("/"));
@@ -700,9 +740,11 @@ public class MidiLibrary implements Map<String, MidiLibrary.MapNode> {
          * @param folderName the requested folder name
          * @param parentName the fully-qualified name of the parent folder
          * @return the processed folder name
+         * @throws IllegalArgumentException if {@code folderName} is null
+         * @throws InvalidPathException     if a segment of {@code folderName} already represents a non-{@code Folder} entry
          * @see RootFolder
          */
-        protected String validateFolderNames(String folderName, String parentName) {
+        protected String validateFolderNames(String folderName, String parentName) throws InvalidPathException {
             if (folderName == null) {
                 throw new IllegalArgumentException("folder name cannot be null");
             }
@@ -727,6 +769,7 @@ public class MidiLibrary implements Map<String, MidiLibrary.MapNode> {
          *
          * @param folderName the name or relative path of the folder to create
          * @return the created/found {@code Folder}
+         * @throws InvalidPathException if {@code folderName} already is a non-{@code Folder} entry
          * @see Folder#createFolder(String, String)
          */
         public Folder createFolder(String folderName) { return createFolder(folderName, null); }
@@ -738,8 +781,9 @@ public class MidiLibrary implements Map<String, MidiLibrary.MapNode> {
          * @param folderName the name or relative path of the folder to create
          * @param iconUri    the URI {@link String} of the icon to use for the folders; use {@code null} for default icon
          * @return the created/found {@code Folder}
+         * @throws InvalidPathException if {@code folderName} already is a non-{@code Folder} entry
          */
-        public Folder createFolder(String folderName, String iconUri) {
+        public Folder createFolder(String folderName, String iconUri) throws InvalidPathException {
             // Remove trailing slash if necessary
             if (folderName.endsWith("/")) {
                 folderName = folderName.substring(0, folderName.length() - 1);
@@ -771,9 +815,10 @@ public class MidiLibrary implements Map<String, MidiLibrary.MapNode> {
          * @param artist   the file's artist
          * @param album    the file's album
          * @return the created file
+         * @throws InvalidPathException if {@code fileName} already exists
          */
-        public MidiFile createFile(Uri uri, String fileName, int duration, String artist, String album) {
-            MidiFile midiFile = new MidiFile(uri, fileName, duration, artist, album, this.getNameGlobal());
+        public MidiFile createFile(Uri uri, String fileName, int duration, String artist, String album, String path) throws InvalidPathException {
+            MidiFile midiFile = new MidiFile(uri, fileName, duration, artist, album, this.getNameGlobal(), path);
             addChild(midiFile);
             return midiFile;
         } // End createFile method
@@ -784,8 +829,9 @@ public class MidiLibrary implements Map<String, MidiLibrary.MapNode> {
          * are not both {@code Folder}s, an {@link InvalidPathException} is raised.
          *
          * @param node the {@code MapNode} to be added
+         * @throws InvalidPathException if {@code node} already exists and both aren't {@code Folder}s
          */
-        public void addChild(@Nullable MapNode node) {
+        public void addChild(@Nullable MapNode node) throws InvalidPathException {
             if (node == null) { return; }
             // Attempt to merge nodes if the node to be added already exists, otherwise add it
             if (children.containsKey(node.getName())) {
@@ -816,6 +862,20 @@ public class MidiLibrary implements Map<String, MidiLibrary.MapNode> {
             if (!(node instanceof Folder)) { return null; }
             return ((Folder) node).get(key.substring(index + 1));
         } // End get method
+
+        /**
+         * Removes a child of this {@code Folder}.
+         *
+         * @param key the name or relative path of the item to be removed
+         * @return {@code null} if the item wasn't found, otherwise the removed item as a {@code MapNode}
+         */
+        public MapNode remove(String key) {
+            int index = key.indexOf("/");
+            if (index == -1 || index + 1 >= key.length()) { return children.remove(key); }
+            MapNode node = children.get(key.substring(0, index));
+            if (node == null) { return null; } // Not found
+            return ((Folder) node).remove(key.substring(index + 1));
+        } // End remove method
 
         /**
          * Checks if a {@link String} is the name of an item that is a direct child of this {@code Folder}.
