@@ -27,7 +27,7 @@
         </activity>
 
         <service
-            android:name=".MoppyMediaService"
+            android:name=".service.MoppyMediaService"
             android:enabled="true"
             android:exported="true"
             android:stopWithTask="false">

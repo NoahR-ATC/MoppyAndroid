@@ -1,4 +1,4 @@
-package com.moppyandroid.main;
+package com.moppyandroid.main.service;
 
 import android.content.Context;
 import android.util.Log;

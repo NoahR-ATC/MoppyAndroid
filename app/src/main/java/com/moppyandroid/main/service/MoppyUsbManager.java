@@ -1,7 +1,7 @@
 // A streamlined version of com.moppy.control.NetworkManager from Moppy2 adapted to run on Android.
 // NetworkManager author: Sam Archer https://github.com/SammyIAm
 
-package com.moppyandroid.main;
+package com.moppyandroid.main.service;
 
 import android.content.Context;
 import android.hardware.usb.UsbDevice;
@@ -9,7 +9,6 @@ import android.hardware.usb.UsbManager;
 import android.util.Log;
 
 import java.io.IOException;
-import java.lang.reflect.Array;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;

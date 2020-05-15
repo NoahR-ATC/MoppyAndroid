@@ -1,4 +1,4 @@
-package com.moppyandroid.main;
+package com.moppyandroid.main.service;
 
 import android.Manifest;
 import android.annotation.SuppressLint;
@@ -22,6 +22,7 @@ import androidx.media.MediaBrowserServiceCompat;
 import androidx.media.session.MediaButtonReceiver;
 
 import com.moppy.core.comms.bridge.BridgeSerial;
+import com.moppyandroid.main.R;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -67,7 +68,7 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
      *
      * @see #onCustomAction(String, Bundle, androidx.media.MediaBrowserServiceCompat.Result) onCustomAction
      */
-    public static final String ACTION_ADD_DEVICE = "com.moppyandroid.main.MoppyMediaService.ADD_DEVICE";
+    public static final String ACTION_ADD_DEVICE = "com.moppyandroid.main.service.MoppyMediaService.ADD_DEVICE";
     /**
      * The custom action for removing a Moppy device.
      * <p>
@@ -87,7 +88,7 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
      *
      * @see #onCustomAction(String, Bundle, androidx.media.MediaBrowserServiceCompat.Result) onCustomAction
      */
-    public static final String ACTION_REMOVE_DEVICE = "com.moppyandroid.main.MoppyMediaService.REMOVE_DEVICE";
+    public static final String ACTION_REMOVE_DEVICE = "com.moppyandroid.main.service.MoppyMediaService.REMOVE_DEVICE";
     /**
      * The custom action for triggering media library creation if not done so already. Strongly recommended to send
      * this action after {@link Manifest.permission#READ_EXTERNAL_STORAGE} has been granted to the {@link android.app.Activity}.
@@ -105,7 +106,7 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
      *
      * @see #onCustomAction(String, Bundle, androidx.media.MediaBrowserServiceCompat.Result) onCustomAction
      */
-    public static final String ACTION_INIT_LIBRARY = "com.moppyandroid.main.MoppyMediaService.INIT_LIBRARY";
+    public static final String ACTION_INIT_LIBRARY = "com.moppyandroid.main.service.MoppyMediaService.INIT_LIBRARY";
     /**
      * The custom action for refreshing the available USB devices. Replicates {@link #ACTION_GET_DEVICES} upon completion.
      * Guaranteed to not send an error.
@@ -124,7 +125,7 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
      *
      * @see #onCustomAction(String, Bundle, androidx.media.MediaBrowserServiceCompat.Result) onCustomAction
      */
-    public static final String ACTION_REFRESH_DEVICES = "com.moppyandroid.main.MoppyMediaService.REFRESH_DEVICES";
+    public static final String ACTION_REFRESH_DEVICES = "com.moppyandroid.main.service.MoppyMediaService.REFRESH_DEVICES";
     /**
      * The custom action for refreshing the available USB devices. Guaranteed to not send an error.
      * <p>
@@ -147,7 +148,7 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
      *
      * @see #onCustomAction(String, Bundle, androidx.media.MediaBrowserServiceCompat.Result) onCustomAction
      */
-    public static final String ACTION_GET_DEVICES = "com.moppyandroid.main.MoppyMediaService.GET_DEVICES";
+    public static final String ACTION_GET_DEVICES = "com.moppyandroid.main.service.MoppyMediaService.GET_DEVICES";
     /**
      * The custom action for loading a file.
      * <p>
@@ -162,7 +163,7 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
      * @see #onLoadChildren(String, androidx.media.MediaBrowserServiceCompat.Result) onLoadChildren
      * @see #onCustomAction(String, Bundle, androidx.media.MediaBrowserServiceCompat.Result) onCustomAction
      */
-    public static final String ACTION_LOAD_ITEM = "com.moppyandroid.main.MoppyMediaService.LOAD_FILE";
+    public static final String ACTION_LOAD_ITEM = "com.moppyandroid.main.service.MoppyMediaService.LOAD_FILE";
 
     /**
      * {@link String} extra field for the port name associated with a {@link #ACTION_ADD_DEVICE} or {@link #ACTION_REMOVE_DEVICE} event.

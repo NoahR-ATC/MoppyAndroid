@@ -1,4 +1,4 @@
-package com.moppyandroid.main;
+package com.moppyandroid.main.service;
 
 import android.Manifest;
 import android.annotation.SuppressLint;
@@ -18,6 +18,8 @@ import androidx.annotation.Nullable;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 
+import com.moppyandroid.main.BuildConfig;
+
 import java.nio.file.InvalidPathException;
 import java.util.Arrays;
 import java.util.Collection;
@@ -35,7 +37,7 @@ public class MidiLibrary implements Map<String, MidiLibrary.MapNode> {
     /**
      * The package and name of the {@code MidiLibrary} class. Refactors <b>must</b> ensure this is accurate.
      */
-    protected static final String CLASS_NAME = "com.moppyandroid.main.MidiLibrary";
+    protected static final String CLASS_NAME = "com.moppyandroid.main.service.MidiLibrary";
     /**
      * The ID of the root folder.
      */
