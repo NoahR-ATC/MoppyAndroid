@@ -158,9 +158,9 @@ public class MidiLibrary implements Map<String, MidiLibrary.MapNode> {
                     Uri contentUri = ContentUris.withAppendedId(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, id);
 
                     // Use the retrieved information to create a MidiFile in each folder category
-                    createFileInFolder(pathFolder, path, contentUri, name, duration, artist, album);
-                    createFileInFolder(artistFolder, ARTIST_ICON_URI, artist, contentUri, name, duration, artist, album);
-                    createFileInFolder(albumFolder, ALBUM_ICON_URI, album, contentUri, name, duration, artist, album);
+                    createFileInFolder(pathFolder, path, contentUri, name, duration, artist, album, path);
+                    createFileInFolder(artistFolder, ARTIST_ICON_URI, artist, contentUri, name, duration, artist, album, path);
+                    createFileInFolder(albumFolder, ALBUM_ICON_URI, album, contentUri, name, duration, artist, album, path);
                 } // End while(cursor.next)
             } // End if(cursor != null)
         } // End try(cursor = query(EXTERNAL_CONTENT_URI)
@@ -381,19 +381,38 @@ public class MidiLibrary implements Map<String, MidiLibrary.MapNode> {
     } // End searchFuzzy(String, String) method
 
     // Calls other createFileInFolder overload with a null icon
-    private static boolean createFileInFolder(Folder folder, String path, Uri contentUri, String name, int duration, String artist, String album) throws InvalidPathException {
-        return createFileInFolder(folder, null, path, contentUri, name, duration, artist, album);
+    private static boolean createFileInFolder(
+            Folder folder,      // The Folder to create the file in
+            String folderPath,  // The path to put the file in
+            Uri contentUri,     // The Uri of the file content
+            String name,        // The name of the file
+            int duration,       // The duration of the file
+            String artist,      // The artist of the file
+            String album,       // The album of the file
+            String filePath     // The path of the file
+    ) throws InvalidPathException {
+        return createFileInFolder(folder, null, folderPath, contentUri, name, duration, artist, album, filePath);
     }
 
     // Creates a new MidiFile in the provided folder, attempting to resolve a raised InvalidPathException by
     // appending the corresponding paths to the name of both conflicting MidiFiles
-    private static boolean createFileInFolder(Folder folder, String iconUri, String path, Uri contentUri, String name, int duration, String artist, String album) throws InvalidPathException {
+    private static boolean createFileInFolder(
+            Folder folder,      // The Folder to create the file in
+            String iconUri,     // The URI of the icon to use if the Folder tree needs to be created
+            String folderPath,  // The path to put the file in
+            Uri contentUri,     // The Uri of the file content
+            String name,        // The name of the file
+            int duration,       // The duration of the file
+            String artist,      // The artist of the file
+            String album,       // The album of the file
+            String filePath     // The path of the file
+    ) throws InvalidPathException {
         // Attempt to create the file as provided
         try {
-            folder.createFolder(path, iconUri).createFile(contentUri, name, duration, artist, album, path);
+            folder.createFolder(folderPath, iconUri).createFile(contentUri, name, duration, artist, album, filePath);
         }
         catch (InvalidPathException e) { // Likely raised because a file with that name already exists
-            MapNode conflictingNode = folder.get(path + "/" + name);
+            MapNode conflictingNode = folder.get(folderPath + "/" + name);
             if (conflictingNode == null) {
                 Log.e(CLASS_NAME + "->createFileInFolder", "Unable to resolve InvalidPathException", e);
                 return false;
@@ -405,24 +424,45 @@ public class MidiLibrary implements Map<String, MidiLibrary.MapNode> {
                 Log.e(CLASS_NAME + "->createFileInFolder",
                         "File discovered with same name as non-MidiFile object: " +
                         conflictingNode.getNameGlobal() + " (non-MidiFile), " + // getNameGlobal closest thing to path we can track
-                        path + "/" + name + " (discovered MidiFile)",
+                        folderPath + "/" + name + " (discovered MidiFile)",
                         e
                 ); // End Log.e call
                 return false;
             } // End if(conflictingNode ∉ MidiFile)
 
-            // Create new names for the old (original) and new MidiFiles by adding their path on, and remove the old one
+            // Create new names for the old (original) and new MidiFiles by adding their path with '->', and remove the old one
             MidiFile old = (MidiFile) conflictingNode;
-            String newName = name + " (" + path + ")";
-            String newNameForOld = old.getName() + " (" + old.getPath() + ")";
-            folder.remove(path + "/" + name);
+            String pathForOld = old.getPath();
+            StringBuilder nameBuilder = new StringBuilder();
+            StringBuilder nameForOldBuilder = new StringBuilder();
+
+            nameBuilder.append(name).append(" (");
+            for (int i = 0; i < filePath.length(); ++i) {
+                if (filePath.charAt(i) != '/') { nameBuilder.append(filePath.charAt(i)); }
+                else { nameBuilder.append("⧸"); }
+            }
+            nameBuilder.append(")");
+
+            nameForOldBuilder.append(name).append(" (");
+            for (int i = 0; i < pathForOld.length(); ++i) {
+                if (pathForOld.charAt(i) != '/') { nameForOldBuilder.append(pathForOld.charAt(i)); }
+                else { nameForOldBuilder.append("⧸"); }
+            }
+            nameForOldBuilder.append(")");
+
+            folder.remove(folderPath + "/" + name);
 
             // Add the both files back with their new names
             // Note: If these calls raise another InvalidPathException we have bigger issues than I can
             //      deal with here so we'll just let the exception continue up the call stack
             try {
-                folder.createFolder(path, iconUri).createFile(old.getUri(), newNameForOld, old.getDuration(), old.getArtist(), old.getAlbum(), old.getPath());
-                folder.createFolder(path, iconUri).createFile(contentUri, newName, duration, artist, album, path);
+                folder.createFolder(folderPath, iconUri).createFile(old.getUri(),
+                        nameForOldBuilder.toString(), old.getDuration(), old.getArtist(),
+                        old.getAlbum(), old.getPath()
+                ); // End createFile(nameForOld) call
+                folder.createFolder(folderPath, iconUri).createFile(contentUri,
+                        nameBuilder.toString(), duration, artist, album, filePath
+                ); // End createFile(newName) call
             } // End try {createFile(newNameForOld); createFile(newName)}
             catch (InvalidPathException e2) {
                 Log.e(CLASS_NAME + "->createFileInFolder", "Unable to resolve InvalidPathException", e2);
