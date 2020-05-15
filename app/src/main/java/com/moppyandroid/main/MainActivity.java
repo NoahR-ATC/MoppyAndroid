@@ -6,6 +6,7 @@ Author: Noah Reeder, noahreederatc@gmail.com
 Known bugs:
 TODO: Setup instance state to reshow connected device if app is destroyed, keyboard/mouse plugged in, rotation, etc.
 TODO: "W/ActivityThread: handleWindowVisibilty: no activity for token" in log when starting BrowserActivity, unable to find reason
+TODO: Marquee file name in toolbar
 
 Known problems:
     - Hard to use track slider in slide menu (adjust slide menu sensitivity?)
@@ -23,9 +24,6 @@ Features to implement:
 Scope creep is getting really bad... let's make a list of nice-to-have-but-slightly-out-of-scope features:
     - Sigh... Another port of MIDISplitter
     - Visualization
-    - Media control notification. Requires project restructure into UI/Service model
-        • Solves most issues with application lifetime, but exaggerates issues with device disconnection
-        • Use a foreground service to run sequencer and interact with Intents/StatusConsumer updates
 
 
 Regexes:
@@ -49,7 +47,6 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.recyclerview.widget.RecyclerView;
 
 import android.annotation.SuppressLint;
-import android.app.Activity;
 import android.app.AlertDialog;
 import android.app.PendingIntent;
 import android.content.BroadcastReceiver;
@@ -58,14 +55,11 @@ import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.IntentFilter;
-import android.database.Cursor;
 import android.hardware.usb.UsbDevice;
 import android.hardware.usb.UsbManager;
-import android.net.Uri;
 import android.os.Handler;
 import android.os.RemoteException;
 import android.os.SystemClock;
-import android.provider.OpenableColumns;
 import android.support.v4.media.MediaBrowserCompat;
 import android.support.v4.media.MediaMetadataCompat;
 import android.support.v4.media.session.MediaControllerCompat;
@@ -90,12 +84,6 @@ import com.moppy.core.comms.bridge.BridgeSerial;
 import com.sothree.slidinguppanel.SlidingUpPanelLayout;
 import com.sothree.slidinguppanel.SlidingUpPanelLayout.PanelState;
 
-import jp.kshoji.javax.sound.midi.io.StandardMidiFileReader;
-import jp.kshoji.javax.sound.midi.spi.MidiFileReader;
-
-import java.io.FileNotFoundException;
-import java.io.InputStream;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -104,7 +92,6 @@ import java.util.TimerTask;
 
 public class MainActivity extends AppCompatActivity implements AdapterView.OnItemSelectedListener, SeekBar.OnSeekBarChangeListener {
     private static final String EXTRA_DEVICE_INDEX = "DEVICE_INDEX";
-    private static final int REQUEST_LOAD_FILE = 0;
     private static final int REQUEST_READ_STORAGE = 1;
     private static final int REQUEST_BROWSE_ACTIVITY = 2;
 
@@ -146,7 +133,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
                     break;
                 } // End case ACTION_USB_PERMISSION
                 case UsbManager.ACTION_USB_DEVICE_ATTACHED: {
-                    onUsbDeviceAttachedIntent(intent);
+                    onUsbDeviceAttachedIntent();
                     break;
                 } // End case ACTION_USB_DEVICE_ATTACHED
                 case UsbManager.ACTION_USB_DEVICE_DETACHED: {
@@ -262,71 +249,9 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
     public void onActivityResult(int requestCode, int resultCode, Intent resultData) {
         super.onActivityResult(requestCode, resultCode, resultData);
 
-        // Check if the request was a load file request made by us
-        if (requestCode == REQUEST_LOAD_FILE) {
-            String midiFileName;
-
-            // Check if the request went through without issues (e.g. wasn't cancelled)
-            if (resultCode == Activity.RESULT_OK) {
-                // Exit method if the result data is invalid
-                if (resultData == null) { return; }
-
-                // Retrieve the URI of the selected file
-                Uri midiFileUri = resultData.getData();
-
-                // Exit method if the file's URI is invalid
-                if (midiFileUri == null || midiFileUri.getPath() == null) { return; }
-
-                // Query the URI for the name of the MIDI file
-                Cursor midiFileQueryCursor = getContentResolver().query(midiFileUri, null, null, null, null);
-                if (midiFileQueryCursor != null) {
-                    int index = midiFileQueryCursor.getColumnIndex(OpenableColumns.DISPLAY_NAME);
-                    midiFileQueryCursor.moveToFirst();
-                    midiFileName = midiFileQueryCursor.getString(index);
-                    midiFileQueryCursor.close();
-                } // End if(midiFileQueryCursor != null)
-                else { midiFileName = ""; }
-
-                // Attempt to load the file
-                try {
-                    // Get an input stream for the file and read it, raising an exception if the stream is invalid
-                    InputStream stream = getContentResolver().openInputStream(midiFileUri);
-                    MidiFileReader reader = new StandardMidiFileReader();
-                    if (stream == null) { throw new IOException("Unable to open file"); }
-                    //seq.loadSequence(reader.getSequence(stream));
-                } // End try {loadSequence}
-                catch (FileNotFoundException e) {
-                    // Show a message box and exit method
-                    showMessageDialog(
-                            "File" + (midiFileName.equals("") ? "" : " " + midiFileName) + " not found",
-                            null
-                    ); // End showMessageDialog call
-                    return;
-                } // End try {loadSequence} catch(FileNotFoundException)
-                catch (IOException e) {
-                    // Show a message box and exit method
-                    showMessageDialog(
-                            "Unable to load file" + (midiFileName.equals("") ? "" : ": " + midiFileName),
-                            null
-                    ); // End showMessageDialog call
-                    return;
-                } // End try {loadSequence} catch(IOException)
-                // End try {loadSequence} catch(IOException)
-
-                // If an exception wasn't raised (in which case control would have returned), set the song title
-                setSongName(midiFileName);
-
-                // Mark that a sequence has been loaded, and enable the play button and song slider if necessary
-                if (!songSlider.isEnabled() && metadata != null) {
-                    setControlState(false);
-                } // End if(!songSlider.enabled && fileLoaded)
-            } // End if(result == OK)
-        } // End if(request == LOAD_FILE)
-        else if (requestCode == REQUEST_BROWSE_ACTIVITY) { // TODO: Handle errors and implement loading
-            if (resultCode == RESULT_OK) {
-                MediaBrowserCompat.MediaItem i = resultData.getParcelableExtra(BrowserActivity.EXTRA_SELECTED_FILE);
-                if (i != null) { Log.i("MainActivity", i.toString()); }
-            }
+        // Check if the request was a file load made by us
+        if (requestCode == REQUEST_BROWSE_ACTIVITY && resultCode == RESULT_OK) {
+            loadItem(resultData.getParcelableExtra(BrowserActivity.EXTRA_SELECTED_FILE));
         }
     } // End onActivityResult method
 
@@ -437,7 +362,9 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
     } // End onUsbPermissionIntent method
 
     // Method triggered when a USB device is attached
-    private void onUsbDeviceAttachedIntent(Intent intent) {
+    // Note: If multiple devices are connected at once (e.g. USB hub connected) this method is called
+    //      multiple times and may impact performance
+    private void onUsbDeviceAttachedIntent() {
         requestDevicesRefresh();
     } // End onUsbDeviceAttachedIntent method
 
@@ -513,7 +440,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
                         // Start the browser activity and unsubscribe from the loaded item
                         MainActivity.this.startActivityForResult(startIntent, REQUEST_BROWSE_ACTIVITY);
                     } // End if(item.isBrowsable)
-                    // TODO: Implement if(itemBrowsable) {} else
+                    else { loadItem(item); } // Request to load the item if it isn't a folder
                 })); // End LibraryAdapter.ClickListener lambda
             } // End subscribe(ROOT)->onChildrenLoaded method
         }); // End SubscriptionCallback implementation
@@ -521,6 +448,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         initialized = true;
     } // End init method
 
+    // Requests the MoppyMediaService to refresh its device lists and updates ours upon completion
     private void requestDevicesRefresh() {
         mediaBrowser.sendCustomAction(MoppyMediaService.ACTION_REFRESH_DEVICES, null, new MediaBrowserCompat.CustomActionCallback() {
             @Override
@@ -532,6 +460,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         }); // End ACTION_REFRESH_DEVICES callback
     } // End requestDevicesRefresh method
 
+    // Requests the device lists from the MoppyMediaService and updates our lists upon completion
     private void updateDevicesUI() {
         mediaBrowser.sendCustomAction(MoppyMediaService.ACTION_GET_DEVICES, null, new MediaBrowserCompat.CustomActionCallback() {
             @Override
@@ -611,6 +540,24 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         deviceBox.setSelection(index);
     } // End updateDevicesUI(ArrayList<ArrayList<String>>) method
 
+    // Requests the MoppyMediaService to load a MediaItem
+    private void loadItem(MediaBrowserCompat.MediaItem item) {
+        if (item == null) { return; }
+
+        // Request the load action
+        Bundle loadExtras = new Bundle();
+        loadExtras.putString(MoppyMediaService.EXTRA_MEDIA_ID, item.getMediaId());
+        mediaBrowser.sendCustomAction(MoppyMediaService.ACTION_LOAD_ITEM, loadExtras, new MediaBrowserCompat.CustomActionCallback() {
+            // After-load processing handled through the media controller metadata change listener
+
+            @Override
+            public void onError(String action, Bundle extras, Bundle data) {
+                showMessageDialog("Unable to load '" + item.getDescription().getTitle() + "'", null);
+                super.onError(action, extras, data);
+            } // End ACTION_LOAD_ITEM.onError method
+        }); // End CustomActionCallback implementation
+    } // End onLoadFile method
+
     // Opens a specific bridge
     private void openBridge(String bridgeIdentifier) {
         Bundle connectBundle = new Bundle();
@@ -641,9 +588,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
     // Closes the currently connected bridge, resetting currentBridgeIdentifier to null if passed true
     private void closeBridge(boolean resetIdentifier) {
         // Return if there isn't a bridge to close
-        if (currentBridgeIdentifier == null) {
-            return;
-        }
+        if (currentBridgeIdentifier == null) { return; }
 
         // Send intent to close the current bridge
         Bundle disconnectBundle = new Bundle();
@@ -916,6 +861,8 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
             if (playbackState != null && playbackState.getState() == PlaybackStateCompat.STATE_PLAYING) {
                 songTimerTask.unpause();
             }
+
+            setSongName(metadata.getString(MediaMetadataCompat.METADATA_KEY_TITLE));
 
             super.onMetadataChanged(metadata);
         } // End onMetadataChanged method
