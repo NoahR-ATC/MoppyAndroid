@@ -14,7 +14,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * {@link List}{{@code @literal <}}{@link android.support.v4.media.MediaBrowserCompat.MediaItem}{{@code @literal >}}
+ * {@link List}{@code <}{@link android.support.v4.media.MediaBrowserCompat.MediaItem}{@code >}
  * adapter for a {@link RecyclerView} that displays each item's title and icon as a grid card.
  */
 public class LibraryAdapter extends RecyclerView.Adapter<LibraryAdapter.Holder> {

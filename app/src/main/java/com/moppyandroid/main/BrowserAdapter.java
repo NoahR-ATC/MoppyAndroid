@@ -14,7 +14,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * {@link List}{{@code @literal <}}{@link android.support.v4.media.MediaBrowserCompat.MediaItem}{{@code @literal >}}
+ * {@link List}{@code <}{@link android.support.v4.media.MediaBrowserCompat.MediaItem}{@code >}
  * adapter for a {@link RecyclerView} that displays each item's icon, title, and subtitle as a list entry.
  */
 public class BrowserAdapter extends RecyclerView.Adapter<BrowserAdapter.Holder> {

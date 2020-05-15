@@ -118,6 +118,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
     private MediaControllerCompat.TransportControls transportControls;
     private PlaybackStateCompat playbackState;
     private MediaMetadataCompat metadata;
+    private DeviceSelectorDialog selectorDialog;
 
     public static final String ACTION_USB_PERMISSION = "com.moppyandroid.USB_PERMISSION";
 
@@ -255,6 +256,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         if (requestCode == REQUEST_BROWSE_ACTIVITY && resultCode == RESULT_OK) {
             loadItem(resultData.getParcelableExtra(BrowserActivity.EXTRA_SELECTED_FILE));
         }
+        else {selectorDialog.show();} // TODO: Remove, used to test selector UI
     } // End onActivityResult method
 
     @Override
@@ -330,7 +332,6 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         else { // "NONE" selected
             // Set the buttons to be disabled
             setControlState(true);
-
             closeBridge(true);
         } // End if(position != 0) {} else
     } // End onItemSelected method
@@ -446,6 +447,8 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
                 })); // End LibraryAdapter.ClickListener lambda
             } // End subscribe(ROOT)->onChildrenLoaded method
         }); // End SubscriptionCallback implementation
+
+        selectorDialog = new DeviceSelectorDialog(this);
 
         initialized = true;
     } // End init method

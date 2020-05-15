@@ -9,11 +9,10 @@ import android.widget.TextView;
 import androidx.recyclerview.widget.RecyclerView;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 
 /**
- * {@link List}{{@code @literal <}}{@link String}{{@code @literal >}} adapter for a {@link RecyclerView}
+ * {@link List}{@code <}{@link String}{@code >} adapter for a {@link RecyclerView}
  * that displays an arrow and each item's title.
  */
 public class PathAdapter extends RecyclerView.Adapter<PathAdapter.Holder> {
@@ -21,7 +20,7 @@ public class PathAdapter extends RecyclerView.Adapter<PathAdapter.Holder> {
     private ClickListener clickListener;
 
     /**
-     * Constructs a {@code PathAdapter} with a {@link List}{@code {@literal <}}{@link String}{@code {@literal >}}
+     * Constructs a {@code PathAdapter} with a {@link List}{@code <}{@link String}{@code >}
      * of the path segments to display.
      *
      * @param pathSegments the {@link List} of path segments to show
