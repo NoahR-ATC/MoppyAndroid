@@ -173,54 +173,29 @@ public class MoppyUsbManager {
     public List<String> getConnectedIdentifiers() { return connectedIdentifiers; }
 
     /**
-     * Uses the identifier of a device to get the following information in an {@link ArrayList}:
-     * {port name, product name, manufacturer name, hex vendor ID, hex product ID}.
-     * {@code ArrayList} returned rather than {@link List} because it implements {@link java.io.Serializable}.
+     * Uses the identifier of a device to get the associated {@link UsbDevice}, which should <i>only</i>
+     * be used to find information about the device. Attempting to connect to the device may hamper
+     * {@code MoppyUsbManager} operation.
      *
      * @param identifier the identifier of the device to find information on
-     * @return an {@code ArrayList<String>} with the device information
+     * @return {@code null} if not found, otherwise the associated {@code UsbDevice}
      */
-    public ArrayList<String> getDeviceInfo(String identifier) {
-        ArrayList<String> info = new ArrayList<>(5);
-        info.add(identifier);
-
-        // Try to retrieve the UsbDevice object for the current device. NOTE: null if not found
-        UsbDevice usbDevice = androidUsbManager.getDeviceList().get(identifier);
-
-        // If we received a UsbDevice object add information of interest to the array
-        if (usbDevice != null) {
-            if (usbDevice.getProductName() != null) { info.add(usbDevice.getProductName()); }
-            else { info.add(null); }
-
-            if (usbDevice.getManufacturerName() != null) {
-                info.add(usbDevice.getManufacturerName());
-            }
-            else { info.add(null); }
-
-            info.add("0x" + String.format("%1$04X", usbDevice.getVendorId()));
-            info.add("0x" + String.format("%1$04X", usbDevice.getProductId()));
-        } // End if(usbDevice != null)
-        else {
-            // Fill information array with null if device not found
-            info.add(null);
-            info.add(null);
-            info.add(null);
-            info.add(null);
-        } // End if(usbDevice != null) {} else
-
-        return info;
-    } // End getDeviceInfo method
+    public UsbDevice getDeviceInfo(String identifier) { return androidUsbManager.getDeviceList().get(identifier); }
 
     /**
-     * Retrieves the following information for all devices in an {@link ArrayList}:
-     * {port name, product name, manufacturer name, hex vendor ID, hex product ID}.
-     * {@code ArrayList} returned rather than {@link List} because it implements {@link java.io.Serializable}.
+     * Retrieves the associated {@link UsbDevice} instance for all devices, which should <i>only</i>
+     * be used to find information about the device. {@code ArrayList} returned rather than
+     * {@link List} because it implements {@link java.io.Serializable}.
      *
-     * @return an {@code ArrayList<ArrayList<String>>} of the information for all available devices
+     * @return an {@code ArrayList<UsbDevice>} containing all available devices
+     * @see #getDeviceInfo(String)
      */
-    public ArrayList<ArrayList<String>> getDeviceInfoForAll() {
-        ArrayList<ArrayList<String>> result = new ArrayList<>();
-        for (String identifier : bridgeIdentifiers) { result.add(getDeviceInfo(identifier)); }
+    public ArrayList<UsbDevice> getDeviceInfoForAll() {
+        ArrayList<UsbDevice> result = new ArrayList<>();
+        for (String identifier : bridgeIdentifiers) {
+            UsbDevice device = getDeviceInfo(identifier);
+            if (device != null) { result.add(device); }
+        }
         return result;
     } // End getDeviceInfoForAll method
 } // End MoppyUsbManager class

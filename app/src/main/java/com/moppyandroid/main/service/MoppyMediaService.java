@@ -7,6 +7,7 @@ import android.app.NotificationManager;
 import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
+import android.hardware.usb.UsbDevice;
 import android.os.Bundle;
 import android.provider.MediaStore;
 import android.support.v4.media.MediaBrowserCompat;
@@ -25,6 +26,7 @@ import com.moppy.core.comms.bridge.BridgeSerial;
 import com.moppyandroid.main.R;
 
 import java.io.IOException;
+import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
@@ -139,10 +141,15 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
      *         </tr>
      *         <tr>
      *             <td>(Result only) {@link #EXTRA_DEVICE_INFOS}</td>
-     *             <td>{@link ArrayList}{@code {@literal <ArrayList<}{@link String}{@literal>>}}</td>
+     *             <td>{@link ArrayList}{@code <}{@link UsbDevice}{@code >}</td>
      *             <td>The list of device information lists</td>
      *         </tr>
      *         <tr><td>(Result only) {@link #EXTRA_NUM_CONNECTED}</td><td>{@code int}</td><td>The number of currently connected devices</td></tr>
+     *         <tr>
+     *             <td>(Result only) {@link #EXTRA_DEVICES_CONNECTED}</td>
+     *             <td>{@link ArrayList}{@code <}{@link String}{@code >}</td>
+     *             <td>The list of connected device identifiers</td>
+     *         </tr>
      *     </table>
      * </p>
      *
@@ -174,11 +181,12 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
      */
     public static final String EXTRA_LIBRARY_CREATED = "MOPPY_LIBRARY_CREATED";
     /**
-     * {@link ArrayList} extra field for the available device names.
+     * {@link ArrayList}{@code <}{@link String>}{@code >} extra field for the available device names.
      */
     public static final String EXTRA_DEVICE_NAMES = "MOPPY_DEVICE_NAMES";
     /**
-     * {@link ArrayList}{@code {@literal <ArrayList<String>}} extra field for the information available for each device.
+     * {@link ArrayList}{@code <}{@link UsbDevice>}{@code >} (stored as
+     * {@code ArrayList<}{@link android.os.Parcelable}){@code >}) extra field containing all available devices.
      *
      * @see MoppyUsbManager#getDeviceInfoForAll()
      */
@@ -187,6 +195,10 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
      * {@code int} extra field for the number of connected devices.
      */
     public static final String EXTRA_NUM_CONNECTED = "MOPPY_NUMBER_CONNECTED";
+    /**
+     * {@link String} extra field for the identifiers of connected devices.
+     */
+    public static final String EXTRA_DEVICES_CONNECTED = "MOPPY_NUMBER_CONNECTED";
     /**
      * {@link String} extra field for the media ID of the file to load.
      */
@@ -197,7 +209,7 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
      */
     public static final String EXTRA_PLAY = "MOPPY_PLAY";
     /**
-     * {@link Exception} extra field for a bundled exception.
+     * {@link Exception} extra field (stored as {@link Serializable}) for a bundled exception.
      */
     public static final String EXTRA_EXCEPTION = "MOPPY_EXTRA_EXCEPTION";
     /**
@@ -597,13 +609,16 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
 
         // Get the device names from the device infos just in case a race de-syncs the results of
         // MoppyUsbManager.getDeviceInfoForAll() and MoppyUsbManager.getDevices()
-        ArrayList<ArrayList<String>> deviceInfos = moppyManager.getUsbManager().getDeviceInfoForAll();
+        ArrayList<UsbDevice> deviceInfos = moppyManager.getUsbManager().getDeviceInfoForAll();
         ArrayList<String> deviceNames = new ArrayList<>();
-        for (ArrayList<String> deviceInfo : deviceInfos) { deviceNames.add(deviceInfo.get(0)); }
+        for (UsbDevice deviceInfo : deviceInfos) { deviceNames.add(deviceInfo.getDeviceName()); }
 
         resultBundle.putStringArrayList(EXTRA_DEVICE_NAMES, deviceNames);
-        resultBundle.putSerializable(EXTRA_DEVICE_INFOS, moppyManager.getUsbManager().getDeviceInfoForAll());
+        resultBundle.putParcelableArrayList(EXTRA_DEVICE_INFOS, deviceInfos);
         resultBundle.putInt(EXTRA_NUM_CONNECTED, moppyManager.getUsbManager().getNumberConnected());
+        resultBundle.putStringArrayList(EXTRA_DEVICES_CONNECTED,
+                new ArrayList<>(moppyManager.getUsbManager().getConnectedIdentifiers())
+        );
         result.sendResult(resultBundle);
     }
 
