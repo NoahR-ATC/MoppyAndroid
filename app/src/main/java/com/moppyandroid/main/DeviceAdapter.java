@@ -1,9 +1,11 @@
 package com.moppyandroid.main;
 
+import android.hardware.usb.UsbDevice;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.CheckBox;
+import android.widget.CompoundButton;
 import android.widget.TextView;
 
 import androidx.constraintlayout.widget.ConstraintLayout;
@@ -17,18 +19,20 @@ import java.util.List;
  * that displays a {@link CheckBox}, one of the provided {@code String}s, and an info icon as a list entry.
  */
 public class DeviceAdapter extends RecyclerView.Adapter<DeviceAdapter.Holder> {
-    private List<String> dataset;
-    private ClickListener clickListener;
+    private List<UsbDevice> dataset;
+    private InfoClickListener infoClickListener;
+    private CheckBoxListener checkboxListener;
 
     /**
      * Constructs a {@code DeviceAdapter} with a {@link List} of names to display.
      *
      * @param dataset the {@link List} to show
      */
-    public DeviceAdapter(List<String> dataset, ClickListener clickListener) {
+    public DeviceAdapter(List<UsbDevice> dataset, InfoClickListener infoClickListener, CheckBoxListener checkboxListener) {
         if (dataset == null) { this.dataset = new ArrayList<>(); }
         else { this.dataset = dataset; }
-        this.clickListener = clickListener;
+        this.infoClickListener = infoClickListener;
+        this.checkboxListener = checkboxListener;
     } // End DeviceAdapter(List<String>) constructor
 
     /**
@@ -49,7 +53,7 @@ public class DeviceAdapter extends RecyclerView.Adapter<DeviceAdapter.Holder> {
      */
     @Override
     public void onBindViewHolder(DeviceAdapter.Holder holder, int position) {
-        holder.deviceNameView.setText(dataset.get(position));
+        holder.deviceNameView.setText(dataset.get(position).getDeviceName()); // Device path, e.g. /dev/bus/usb/001/004
         holder.deviceNameView.setSelected(true); // Enable marquee
     } // End onBindViewHolder method
 
@@ -64,7 +68,7 @@ public class DeviceAdapter extends RecyclerView.Adapter<DeviceAdapter.Holder> {
     /**
      * Represents an entry in a {@link com.moppyandroid.main.DeviceAdapter}.
      */
-    public class Holder extends RecyclerView.ViewHolder implements View.OnClickListener {
+    public class Holder extends RecyclerView.ViewHolder implements View.OnClickListener, CompoundButton.OnCheckedChangeListener {
         /**
          * The {@link CheckBox} displayed at the left of the entry
          */
@@ -83,7 +87,8 @@ public class DeviceAdapter extends RecyclerView.Adapter<DeviceAdapter.Holder> {
             super(v);
             checkBox = v.findViewById(R.id.entry_device_checkbox);
             deviceNameView = v.findViewById(R.id.entry_device_text);
-            v.setOnClickListener(this);
+            v.findViewById(R.id.entry_name_and_icon_layout).setOnClickListener(this);
+            checkBox.setOnCheckedChangeListener(this);
         } // End DeviceAdapter.Holder(ConstraintLayout) constructor
 
         /**
@@ -91,17 +96,38 @@ public class DeviceAdapter extends RecyclerView.Adapter<DeviceAdapter.Holder> {
          */
         @Override
         public void onClick(View v) {
-            if (clickListener != null) { clickListener.onClick(); }
+            if (infoClickListener != null) {
+                infoClickListener.onClick(dataset.get(getAdapterPosition()));
+            }
         } // End onClick method
+
+        @Override
+        public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
+            if (checkboxListener != null) {
+                checkboxListener.onCheckChanged((CheckBox) buttonView, isChecked);
+            }
+        } // End onCheckedChanged method
     } // End DeviceAdapter.Holder class
 
     /**
-     * Used to notify clients of click events
+     * Used to notify clients of info button click events
      */
-    interface ClickListener {
+    interface InfoClickListener {
         /**
-         * Triggered when a {@code device_entry_layout} is clicked.
+         * Triggered when {@code entry_name_and_icon_layout} is clicked.
+         *
+         * @param device the {@link UsbDevice} for the clicked entry
          */
-        void onClick();
-    } // End BrowserAdapter.ClickListener interface
+        void onClick(UsbDevice device);
+    } // End DeviceAdapter.InfoClickListener interface
+
+    /**
+     * Used to notify clients of checking events
+     */
+    interface CheckBoxListener {
+        /**
+         * Triggered when {@code entry_device_checkbox} has its state changed.
+         */
+        void onCheckChanged(CheckBox checkBox, boolean isChecked);
+    } // End DeviceAdapter.CheckBoxListener interface
 } // End BrowserAdapter class

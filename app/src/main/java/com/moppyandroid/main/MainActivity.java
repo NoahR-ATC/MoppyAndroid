@@ -366,7 +366,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
 
     // Method triggered when a USB device is attached
     // Note: If multiple devices are connected at once (e.g. USB hub connected) this method is called
-    //      multiple times and may impact performance
+    //      multiple times and may impact performance, however I can't think of any ways to prevent this
     private void onUsbDeviceAttachedIntent() {
         requestDevicesRefresh();
     } // End onUsbDeviceAttachedIntent method
@@ -457,9 +457,9 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
     private void requestDevicesRefresh() {
         mediaBrowser.sendCustomAction(MoppyMediaService.ACTION_REFRESH_DEVICES, null, new MediaBrowserCompat.CustomActionCallback() {
             @Override
-            @SuppressWarnings("unchecked cast")
             public void onResult(String action, Bundle extras, Bundle resultData) {
-                updateDevicesUI((ArrayList<ArrayList<String>>) resultData.getSerializable(MoppyMediaService.EXTRA_DEVICE_INFOS));
+                updateDevicesUI(resultData.getParcelableArrayList(MoppyMediaService.EXTRA_DEVICE_INFOS));
+                selectorDialog.updateDevices();
                 super.onResult(action, extras, resultData);
             }
         }); // End ACTION_REFRESH_DEVICES callback
@@ -469,16 +469,15 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
     private void updateDevicesUI() {
         mediaBrowser.sendCustomAction(MoppyMediaService.ACTION_GET_DEVICES, null, new MediaBrowserCompat.CustomActionCallback() {
             @Override
-            @SuppressWarnings("unchecked cast")
             public void onResult(String action, Bundle extras, Bundle resultData) {
-                updateDevicesUI((ArrayList<ArrayList<String>>) resultData.getSerializable(MoppyMediaService.EXTRA_DEVICE_INFOS));
+                updateDevicesUI(resultData.getParcelableArrayList(MoppyMediaService.EXTRA_DEVICE_INFOS));
                 super.onResult(action, extras, resultData);
             }
         }); // End ACTION_GET_DEVICES callback
     } // End updateDevicesUI(void) method
 
     // Refresh the device box and related lists
-    private void updateDevicesUI(ArrayList<ArrayList<String>> deviceInfos) {
+    private void updateDevicesUI(List<UsbDevice> deviceInfos) {
         if (deviceInfos == null) { return; }
 
         // Note: If this was called as a result of a device detachment then the service would have
@@ -490,31 +489,26 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
 
         // Get the list of Moppy devices from the network manager and iterate over it
         ArrayList<String> deviceDescriptors = new ArrayList<>();
-        for (ArrayList<String> currentDeviceInfo : deviceInfos) {
-            if (currentDeviceInfo == null || currentDeviceInfo.get(0) == null) { continue; }
-            String portName = currentDeviceInfo.get(0);
-            String productName = currentDeviceInfo.get(1);
-            String manufacturer = currentDeviceInfo.get(2);
-            String vendorId = currentDeviceInfo.get(3);
-            String productId = currentDeviceInfo.get(4);
-
+        for (UsbDevice device : deviceInfos) {
             // Start building a string to act as the device description
             StringBuilder deviceDescription = new StringBuilder();
-            deviceDescription.append(portName);
+            deviceDescription.append(device.getDeviceName());
 
+            // TODO: Remove this when dialog ready. Note: UsbDevice always exists because ACTION_GET_DEVICES won't add null devices
             // Since an int cannot be null, the only way the vendor ID string can be null is if the UsbDevice didn't exist
-            if (vendorId != null) {
+            //if (device.get != null) {
                 // Attach a comma to the end, and if available add the product name
                 deviceDescription.append(", ");
-                if (productName != null) { deviceDescription.append(productName).append(", "); }
+                if (device.getProductName() != null) { deviceDescription.append(device.getProductName()).append(", "); }
                 else { deviceDescription.append("unknown product, "); }
-                if (manufacturer != null) { deviceDescription.append(manufacturer).append(", "); }
+                if (device.getManufacturerName() != null) { deviceDescription.append(device.getManufacturerName()).append(", "); }
                 else { deviceDescription.append("unknown manufacturer, "); }
-                deviceDescription.append(vendorId).append("/").append(productId);
-            } // End if(usbDevice != null)
+                deviceDescription.append("0x").append(String.format("%1$04X", device.getVendorId())).append("/")
+                        .append("0x").append(String.format("%1$04X", device.getProductId()));
+            //} // End if(usbDevice != null)
 
             // Add the device description to the hashmap for the spinner, and update our copy of the device list
-            spinnerHashMap.put(deviceDescription.toString(), portName);
+            spinnerHashMap.put(deviceDescription.toString(), device.getDeviceName());
             deviceDescriptors.add(deviceDescription.toString());
         } // End for(i < deviceInfos.size)
 
@@ -560,7 +554,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
                 showMessageDialog("Unable to load '" + item.getDescription().getTitle() + "'", null);
                 super.onError(action, extras, data);
             } // End ACTION_LOAD_ITEM.onError method
-        }); // End CustomActionCallback implementation
+        }); // End ACTION_LOAD_ITEM callback
     } // End onLoadFile method
 
     // Opens a specific bridge
