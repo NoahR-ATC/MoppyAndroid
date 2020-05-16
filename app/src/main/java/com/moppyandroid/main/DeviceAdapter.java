@@ -20,6 +20,7 @@ import java.util.List;
  */
 public class DeviceAdapter extends RecyclerView.Adapter<DeviceAdapter.Holder> {
     private List<UsbDevice> dataset;
+    private boolean[] connectedDataset;
     private InfoClickListener infoClickListener;
     private CheckBoxListener checkboxListener;
 
@@ -28,9 +29,18 @@ public class DeviceAdapter extends RecyclerView.Adapter<DeviceAdapter.Holder> {
      *
      * @param dataset the {@link List} to show
      */
-    public DeviceAdapter(List<UsbDevice> dataset, InfoClickListener infoClickListener, CheckBoxListener checkboxListener) {
+    public DeviceAdapter(List<UsbDevice> dataset, List<String> connectedIdentifiers, InfoClickListener infoClickListener, CheckBoxListener checkboxListener) {
         if (dataset == null) { this.dataset = new ArrayList<>(); }
         else { this.dataset = dataset; }
+
+        // Construct an array of connected statuses matching the dataset
+        connectedDataset = new boolean[this.dataset.size()];
+        if (connectedIdentifiers != null && connectedIdentifiers.size() > 0) {
+            for (int i = 0; i < this.dataset.size(); ++i) {
+                connectedDataset[i] = connectedIdentifiers.contains(this.dataset.get(i).getDeviceName());
+            }
+        } // End if(connectedIdentifiers.size > 0)
+
         this.infoClickListener = infoClickListener;
         this.checkboxListener = checkboxListener;
     } // End DeviceAdapter(List<String>) constructor
@@ -55,6 +65,7 @@ public class DeviceAdapter extends RecyclerView.Adapter<DeviceAdapter.Holder> {
     public void onBindViewHolder(DeviceAdapter.Holder holder, int position) {
         holder.deviceNameView.setText(dataset.get(position).getDeviceName()); // Device path, e.g. /dev/bus/usb/001/004
         holder.deviceNameView.setSelected(true); // Enable marquee
+        holder.checkBox.setChecked(connectedDataset[position]);
     } // End onBindViewHolder method
 
     /**

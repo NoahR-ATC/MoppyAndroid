@@ -31,7 +31,7 @@ public class DeviceSelectorDialog implements AutoCloseable {
         View v = LayoutInflater.from(context).inflate(R.layout.selector_dialog_layout, null);
         deviceRecycler = v.findViewById(R.id.device_recycler);
         deviceRecycler.setLayoutManager(new LinearLayoutManager(context));
-        deviceRecycler.setAdapter(new DeviceAdapter(null, null, null));
+        deviceRecycler.setAdapter(new DeviceAdapter(null, null, null, null));
 
         // Connect to the media service for media tree loading
         mediaBrowser = new MediaBrowserCompat(
@@ -76,6 +76,7 @@ public class DeviceSelectorDialog implements AutoCloseable {
                     // Sort by port name and recreate the adapter
                     list.sort((o1, o2) -> o1.getDeviceName().compareTo(o2.getDeviceName()));
                     deviceRecycler.setAdapter(new DeviceAdapter(list,
+                            resultData.getStringArrayList(MoppyMediaService.EXTRA_DEVICES_CONNECTED),
                             DeviceSelectorDialog.this::showDeviceInfo,
                             null //TODO implement listener
                     ));
