@@ -832,6 +832,10 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
                 return;
             } // End try {load(node); play} catch(InvalidMidiData|IO Exception)
 
+            // Load in the file's metadata. Note: playback state updated in onPlay
+            mediaSession.setMetadata(node.getMetadata());
+            playbackStateBuilder.setActions(playbackState.getActions() | PlaybackStateCompat.ACTION_SEEK_TO);
+
             onPlay();
             super.onPlayFromMediaId(mediaId, extras);
         } // End onPlayFromMediaId method
