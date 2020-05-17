@@ -15,7 +15,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * {@link List}{@code <}{@link String}{@code >} adapter for a {@link RecyclerView}
+ * {@link List}{@code <}{@link UsbDevice}{@code >} adapter for a {@link RecyclerView}
  * that displays a {@link CheckBox}, one of the provided {@code String}s, and an info icon as a list entry.
  */
 public class DeviceAdapter extends RecyclerView.Adapter<DeviceAdapter.Holder> {
@@ -25,7 +25,7 @@ public class DeviceAdapter extends RecyclerView.Adapter<DeviceAdapter.Holder> {
     private CheckBoxListener checkboxListener;
 
     /**
-     * Constructs a {@code DeviceAdapter} with a {@link List} of names to display.
+     * Constructs a {@code DeviceAdapter} with a {@link List} of devices to display.
      *
      * @param dataset the {@link List} to show
      */
@@ -115,7 +115,7 @@ public class DeviceAdapter extends RecyclerView.Adapter<DeviceAdapter.Holder> {
         @Override
         public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
             if (checkboxListener != null) {
-                checkboxListener.onCheckChanged((CheckBox) buttonView, isChecked);
+                checkboxListener.onCheckChanged(dataset.get(getAdapterPosition()), (CheckBox) buttonView, isChecked);
             }
         } // End onCheckedChanged method
     } // End DeviceAdapter.Holder class
@@ -139,6 +139,6 @@ public class DeviceAdapter extends RecyclerView.Adapter<DeviceAdapter.Holder> {
         /**
          * Triggered when {@code entry_device_checkbox} has its state changed.
          */
-        void onCheckChanged(CheckBox checkBox, boolean isChecked);
+        void onCheckChanged(UsbDevice device, CheckBox checkBox, boolean isChecked);
     } // End DeviceAdapter.CheckBoxListener interface
-} // End BrowserAdapter class
+} // End DeviceAdapter class
