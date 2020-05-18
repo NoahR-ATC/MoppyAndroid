@@ -131,6 +131,7 @@ public class MainActivity extends AppCompatActivity implements SeekBar.OnSeekBar
             // Determine action and process accordingly
             switch (intent.getAction()) {
                 case ACTION_USB_PERMISSION: {
+                    requestDevicesRefresh();
                     if (selectorDialog != null) { selectorDialog.onUsbPermissionIntent(intent); }
                     break;
                 } // End case ACTION_USB_PERMISSION
@@ -351,6 +352,13 @@ public class MainActivity extends AppCompatActivity implements SeekBar.OnSeekBar
 
         initialized = true;
     } // End init method
+
+    // Refreshes the device lists of the MoppyMediaService
+    private void requestDevicesRefresh() {
+        if (mediaBrowser != null && mediaBrowser.isConnected()) {
+            mediaBrowser.sendCustomAction(MoppyMediaService.ACTION_REFRESH_DEVICES, null, null);
+        }
+    } // End requestDevicesRefresh method
 
     // Requests the MoppyMediaService to load a MediaItem
     private void loadItem(MediaBrowserCompat.MediaItem item) {

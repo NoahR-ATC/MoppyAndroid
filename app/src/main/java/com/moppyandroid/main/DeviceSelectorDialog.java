@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Map;
 
 public class DeviceSelectorDialog implements AutoCloseable {
+    private boolean refreshNext = false;
     private boolean initialized = false;
     private int loadingBarRequests;
     private Map<UsbDevice, CheckBox> deviceCheckBoxMap;
@@ -127,6 +128,8 @@ public class DeviceSelectorDialog implements AutoCloseable {
      * {@link UsbManager#ACTION_USB_DEVICE_ATTACHED} or {@link UsbManager#ACTION_USB_DEVICE_DETACHED} occurs.
      */
     public void onDeviceConnectionStateChanged() {
+        // Just in case updateDevices is called before the activity's refresh completes, lets do our own refresh
+        refreshNext = true;
         if (selectorDialog.isShowing() || emptyDialog.isShowing()) { updateDevices(); }
     } // End onDeviceConnectionStateChange method
 
@@ -143,7 +146,8 @@ public class DeviceSelectorDialog implements AutoCloseable {
      */
     public void updateDevices() {
         if (initialized) {
-            mediaBrowser.sendCustomAction(MoppyMediaService.ACTION_GET_DEVICES, null, new MediaBrowserCompat.CustomActionCallback() {
+            String action = refreshNext ? MoppyMediaService.ACTION_REFRESH_DEVICES : MoppyMediaService.ACTION_GET_DEVICES;
+            mediaBrowser.sendCustomAction(action, null, new MediaBrowserCompat.CustomActionCallback() {
                 @Override
                 public void onResult(String action, Bundle extras, Bundle resultData) {
                     List<UsbDevice> list = resultData.getParcelableArrayList(MoppyMediaService.EXTRA_DEVICE_INFOS);
@@ -162,21 +166,22 @@ public class DeviceSelectorDialog implements AutoCloseable {
 
                     // If necessary, switch the selector dialog to the empty dialog or vice versa
                     if (list.size() < 1 && selectorDialog.isShowing()) {
-                        selectorDialog.hide();
+                        selectorDialog.dismiss();
                         emptyDialog.show();
                     } // End if(size < 1 && selectorDialog.showing)
                     else if (list.size() > 1 && emptyDialog.isShowing()) {
-                        emptyDialog.hide();
+                        emptyDialog.dismiss();
                         selectorDialog.show();
                     } // End if(size < 1 && selectorDialog.showing) {} else if (size > 1 && emptyDialog.showing)
 
                     super.onResult(action, extras, resultData);
                 } // End ACTION_GET_DEVICES.onResult method
             }); // End ACTION_GET_DEVICES callback
+            refreshNext = false;
         } // End if(initialized)
         else {
             if (selectorDialog.isShowing()) {
-                selectorDialog.hide();
+                selectorDialog.dismiss();
                 emptyDialog.show();
             } // End if(selectorDialog.isShowing)
         } // End if(initialized) {} else
