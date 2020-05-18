@@ -7,7 +7,6 @@ Known bugs:
 TODO: Setup instance state to reshow connected device if app is destroyed, keyboard/mouse plugged in, rotation, etc.
 TODO: "W/ActivityThread: handleWindowVisibilty: no activity for token" in log when starting BrowserActivity, unable to find reason
 TODO: Marquee file name in toolbar
-TODO: Set file name in init if metadata loaded
 
 Known problems:
     - Hard to use track slider in slide menu (adjust slide menu sensitivity?)
@@ -526,9 +525,10 @@ public class MainActivity extends AppCompatActivity implements SeekBar.OnSeekBar
             MediaControllerCompat.setMediaController(MainActivity.this, mediaController);
             mediaController.registerCallback(mediaControllerCallback);
             playbackState = mediaController.getPlaybackState();
-            metadata = mediaController.getMetadata();
             transportControls = mediaController.getTransportControls();
-            setControlState(false);
+
+            // Load in the current metadata and enable controls accordingly
+            mediaControllerCallback.onMetadataChanged(mediaController.getMetadata());
 
             super.onConnected();
         } // End onConnected method
@@ -595,7 +595,10 @@ public class MainActivity extends AppCompatActivity implements SeekBar.OnSeekBar
         public void onMetadataChanged(MediaMetadataCompat metadata) {
             MainActivity.this.metadata = metadata;
             setControlState(false);
-            long duration = metadata.getLong(MediaMetadataCompat.METADATA_KEY_DURATION);
+
+            long duration;
+            if (metadata == null) { duration = 0; }
+            else { duration = metadata.getLong(MediaMetadataCompat.METADATA_KEY_DURATION); }
 
             // Pause the slider updates while we update the maximum, re-enabling after if necessary
             songTimerTask.pause();
@@ -614,11 +617,14 @@ public class MainActivity extends AppCompatActivity implements SeekBar.OnSeekBar
             timeTextBuilder.append(("00" + temp).substring(temp.length()));
             ((TextView) findViewById(R.id.song_time_text)).setText(timeTextBuilder.toString());
 
+            // Re-enable the song slider ticks if applicable
             if (playbackState != null && playbackState.getState() == PlaybackStateCompat.STATE_PLAYING) {
                 songTimerTask.unpause();
             }
 
-            setSongName(metadata.getString(MediaMetadataCompat.METADATA_KEY_TITLE));
+            // Set the song name to "No song loaded" if metadata is empty, otherwise the title
+            if (metadata == null) { setSongName(getString(R.string.song_title)); }
+            else { setSongName(metadata.getString(MediaMetadataCompat.METADATA_KEY_TITLE)); }
 
             super.onMetadataChanged(metadata);
         } // End onMetadataChanged method
