@@ -1,31 +1,31 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:orientation="vertical">
 
     <androidx.appcompat.widget.Toolbar
         android:id="@+id/main_toolbar"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
+        android:layout_height="?attr/actionBarSize"
+        android:layout_marginBottom="16dp"
         android:background="?attr/colorPrimary"
         android:minHeight="?attr/actionBarSize"
-        app:titleTextColor="@color/colorTitle"
-        android:theme="@style/ActionBarAppTheme" />
+        android:theme="@style/ActionBarAppTheme"
+        app:titleTextColor="@color/colorTitle">
 
-    <TextView
-        android:id="@+id/devices_box_label"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:fontFamily="sans-serif-black"
-        android:text="@string/devices_box_label"
-        android:textSize="18sp" />
-
-    <Spinner
-        android:id="@+id/device_box"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content" />
+        <ImageView
+            android:id="@+id/devices_button"
+            android:layout_width="wrap_content"
+            android:layout_height="match_parent"
+            android:layout_gravity="end"
+            android:adjustViewBounds="true"
+            android:contentDescription="@string/devices_button_description"
+            android:cropToPadding="false"
+            android:padding="12dp"
+            app:srcCompat="@drawable/ic_usb" />
+    </androidx.appcompat.widget.Toolbar>
 
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/library_recycler"

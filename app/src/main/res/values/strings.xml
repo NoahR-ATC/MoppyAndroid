@@ -8,5 +8,6 @@
     <string name="song_length">0:00:00/0:00:00</string>
     <string name="devices_box_label">Selected Devices:</string>
     <string name="loading_text">Waiting for USB permission…</string>
+    <string name="devices_button_description">Opens a menu for selecting devices</string>
     <string name="info_button_description">Device information button</string>
 </resources>

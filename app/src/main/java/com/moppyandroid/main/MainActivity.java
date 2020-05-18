@@ -243,7 +243,6 @@ public class MainActivity extends AppCompatActivity implements SeekBar.OnSeekBar
         if (requestCode == REQUEST_BROWSE_ACTIVITY && resultCode == RESULT_OK) {
             loadItem(resultData.getParcelableExtra(BrowserActivity.EXTRA_SELECTED_FILE));
         }
-        else { selectorDialog.show();} // TODO: Remove, used to test selector UI
     } // End onActivityResult method
 
     @Override
@@ -348,6 +347,7 @@ public class MainActivity extends AppCompatActivity implements SeekBar.OnSeekBar
         }); // End SubscriptionCallback implementation
 
         selectorDialog = new DeviceSelectorDialog(this);
+        findViewById(R.id.devices_button).setOnClickListener((view) -> selectorDialog.show());
 
         initialized = true;
     } // End init method
