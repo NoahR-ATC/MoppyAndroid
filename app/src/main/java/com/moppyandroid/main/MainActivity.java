@@ -6,7 +6,6 @@ Author: Noah Reeder, noahreederatc@gmail.com
 Known bugs:
 TODO: Setup instance state to reshow connected device if app is destroyed, keyboard/mouse plugged in, rotation, etc.
 TODO: "W/ActivityThread: handleWindowVisibilty: no activity for token" in log when starting BrowserActivity, unable to find reason
-TODO: Marquee file name in toolbar
 
 Known problems:
     - Hard to use track slider in slide menu (adjust slide menu sensitivity?)
@@ -196,6 +195,11 @@ public class MainActivity extends AppCompatActivity implements SeekBar.OnSeekBar
         libraryRecycler.setHasFixedSize(true);
         libraryRecycler.setLayoutManager(libraryLayout);
         libraryRecycler.setAdapter(new LibraryAdapter(null, null)); // Dummy adapter until items loaded
+
+        // Enable file name/time marquees
+        findViewById(R.id.toolbar_song_title).setSelected(true);
+        findViewById(R.id.song_time_text).setSelected(true);
+        findViewById(R.id.song_title).setSelected(true);
 
         mediaBrowser.connect();
     } // End onCreate method
