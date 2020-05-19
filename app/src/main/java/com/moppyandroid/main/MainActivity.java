@@ -4,7 +4,6 @@ package com.moppyandroid.main;
 Author: Noah Reeder, noahreederatc@gmail.com
 
 Known bugs:
-TODO: Setup instance state to reshow connected device if app is destroyed, keyboard/mouse plugged in, rotation, etc.
 TODO: "W/ActivityThread: handleWindowVisibilty: no activity for token" in log when starting BrowserActivity, unable to find reason
 
 Known problems:
@@ -88,6 +87,10 @@ import java.util.TimerTask;
 
 public class MainActivity extends AppCompatActivity implements SeekBar.OnSeekBarChangeListener {
     /**
+     * Tag for the {@link DeviceSelectorDialog} fragment used.
+     */
+    public static final String TAG_DEVICE_DIALOG = "MOPPY_DEVICE_SELECTOR_DIALOG";
+    /**
      * Action used with {@link UsbManager#requestPermission(UsbDevice, PendingIntent)}.
      */
     public static final String ACTION_USB_PERMISSION = "com.moppyandroid.USB_PERMISSION";
@@ -117,7 +120,7 @@ public class MainActivity extends AppCompatActivity implements SeekBar.OnSeekBar
     private MediaControllerCompat.TransportControls transportControls;
     private PlaybackStateCompat playbackState;
     private MediaMetadataCompat metadata;
-    private DeviceSelectorDialog selectorDialog;
+    private DeviceSelectorDialogManager deviceDialogManager;
 
     // Define the receiver to process relevant intent messages
     private BroadcastReceiver broadcastReceiver = new BroadcastReceiver() {
@@ -130,14 +133,18 @@ public class MainActivity extends AppCompatActivity implements SeekBar.OnSeekBar
             switch (intent.getAction()) {
                 case ACTION_USB_PERMISSION: {
                     requestDevicesRefresh();
-                    if (selectorDialog != null) { selectorDialog.onUsbPermissionIntent(intent); }
+                    if (deviceDialogManager != null) {
+                        deviceDialogManager.onUsbPermissionIntent(intent);
+                    }
                     break;
                 } // End case ACTION_USB_PERMISSION
                 case UsbManager.ACTION_USB_DEVICE_ATTACHED: // Fall through
                 case UsbManager.ACTION_USB_DEVICE_DETACHED: {
                     // Note: If multiple devices are connected at once (e.g. USB hub connected) this broadcast
                     //       is sent for each device
-                    if (selectorDialog != null) { selectorDialog.onDeviceConnectionStateChanged(); }
+                    if (deviceDialogManager != null) {
+                        deviceDialogManager.onDeviceConnectionStateChanged();
+                    }
                     break;
                 } // End case ACTION_USB_DEVICE_DETACHED
             } // End switch(intent.action)
@@ -202,6 +209,9 @@ public class MainActivity extends AppCompatActivity implements SeekBar.OnSeekBar
         findViewById(R.id.song_title).setSelected(true);
 
         mediaBrowser.connect();
+
+        deviceDialogManager = new DeviceSelectorDialogManager(this, getSupportFragmentManager(), TAG_DEVICE_DIALOG);
+        findViewById(R.id.devices_button).setOnClickListener((view) -> deviceDialogManager.show());
     } // End onCreate method
 
     /**
@@ -214,10 +224,10 @@ public class MainActivity extends AppCompatActivity implements SeekBar.OnSeekBar
         }
         if (mediaBrowser.isConnected()) {
             mediaBrowser.unsubscribe(mediaBrowser.getRoot());
-            mediaBrowser.disconnect();
         }
+        mediaBrowser.disconnect();
         if (initialized) { unregisterReceiver(broadcastReceiver); }
-        if (selectorDialog != null) { selectorDialog.close(); }
+        if (deviceDialogManager != null) { deviceDialogManager.close(); }
         super.onDestroy();
     } // End onDestroy method
 
@@ -349,9 +359,6 @@ public class MainActivity extends AppCompatActivity implements SeekBar.OnSeekBar
                 })); // End LibraryAdapter.ClickListener lambda
             } // End subscribe(ROOT)->onChildrenLoaded method
         }); // End SubscriptionCallback implementation
-
-        selectorDialog = new DeviceSelectorDialog(this);
-        findViewById(R.id.devices_button).setOnClickListener((view) -> selectorDialog.show());
 
         initialized = true;
     } // End init method

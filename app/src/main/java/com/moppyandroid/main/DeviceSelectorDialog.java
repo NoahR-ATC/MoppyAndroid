@@ -1,13 +1,16 @@
 package com.moppyandroid.main;
 
+import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
+import androidx.fragment.app.DialogFragment;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
+import android.app.Dialog;
 import android.app.PendingIntent;
 import android.app.Service;
-import android.content.ComponentName;
 import android.content.Context;
+import android.content.DialogInterface;
 import android.content.Intent;
 import android.hardware.usb.UsbDevice;
 import android.hardware.usb.UsbManager;
@@ -17,6 +20,7 @@ import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.widget.CheckBox;
+import android.widget.TextView;
 
 import com.moppyandroid.main.service.MoppyMediaService;
 
@@ -24,73 +28,101 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-public class DeviceSelectorDialog implements AutoCloseable {
+/**
+ * {@link DialogFragment} for selecting Moppy devices to connect/disconnect to.
+ */
+public class DeviceSelectorDialog extends DialogFragment implements DialogInterface.OnShowListener {
     private boolean refreshNext = false;
-    private boolean initialized = false;
+    private boolean emptyShowing = false;
+    private boolean isOpen = false;
     private int loadingBarRequests;
     private Map<UsbDevice, CheckBox> deviceCheckBoxMap;
     private MediaBrowserCompat mediaBrowser;
     private RecyclerView deviceRecycler;
-    private AlertDialog selectorDialog;
-    private AlertDialog emptyDialog;
+    private TextView noDevicesText;
     private AlertDialog loadingBar;
     private Context context;
     private UsbManager usbManager;
+    private Dialog currentDialog;
 
     /**
-     * Constructs a {@code DeviceSelectorDialog} but does not show it.
+     * Creates a new {@code DeviceSelectorDialog}. <b>This is the only way a {@code DeviceSelectorDialog}
+     * should be created</b>. If creation is not done through this method the {@code DeviceSelectorDialog}
+     * will be unable to communicate with the {@link MoppyMediaService} and will be effectively useless.
      *
-     * @param context the context to create the {@code DeviceSelectorDialog} in
+     * @param mediaBrowser the {@link MediaBrowserCompat} used to communicate with the {@code MoppyMediaService}
+     * @return the created {@code DeviceSelectorDialog}
      */
-    public DeviceSelectorDialog(Context context) {
+    public static DeviceSelectorDialog newInstance(MediaBrowserCompat mediaBrowser) {
+        DeviceSelectorDialog dialog = new DeviceSelectorDialog();
+        dialog.mediaBrowser = mediaBrowser;
+        return dialog;
+    } // End newInstance method
+
+    /**
+     * Triggered when this {@code DeviceSelectorDialog} is created.
+     *
+     * @see #onCreateDialog(Bundle)
+     */
+    @Override
+    public void onCreate(@Nullable Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setRetainInstance(true);
+
+        context = getContext();
+        if (context == null) { throw new IllegalStateException("No context available"); }
+
         loadingBarRequests = 0;
         deviceCheckBoxMap = new HashMap<>();
-        this.context = context;
         usbManager = (UsbManager) context.getSystemService(Service.USB_SERVICE);
         assert usbManager != null; // Shouldn't ever arise
-
-        View v = LayoutInflater.from(context).inflate(R.layout.selector_dialog_layout, null);
-        deviceRecycler = v.findViewById(R.id.device_recycler);
-        deviceRecycler.setLayoutManager(new LinearLayoutManager(context));
-        deviceRecycler.setAdapter(new DeviceAdapter(null, null, null, null));
-
-        // Connect to the media service for media tree loading
-        mediaBrowser = new MediaBrowserCompat(
-                context,
-                new ComponentName(context, MoppyMediaService.class),
-                new DeviceSelectorDialog.BrowserConnectionCallback(),
-                null
-        );
-        mediaBrowser.connect();
-
-        AlertDialog.Builder selectorBuilder = new AlertDialog.Builder(context);
-        selectorBuilder.setTitle("Connect to a device");
-        selectorBuilder.setCancelable(true);
-        selectorBuilder.setView(v);
-        selectorDialog = selectorBuilder.create();
-
-        AlertDialog.Builder emptyBuilder = new AlertDialog.Builder(context);
-        emptyBuilder.setTitle("Connect to a device");
-        emptyBuilder.setCancelable(true);
-        emptyBuilder.setMessage("No Moppy devices available");
-        emptyDialog = emptyBuilder.create();
 
         // Create the loading bar from an alert dialog containing loading_dialog_layout
         AlertDialog.Builder alertBuilder = new AlertDialog.Builder(context);
         alertBuilder.setCancelable(false);
         alertBuilder.setView(LayoutInflater.from(context).inflate(R.layout.loading_dialog_layout, null));
         loadingBar = alertBuilder.create();
-    } // End DeviceSelectorDialog(Context) constructor
+
+        isOpen = true;
+    } // End onCreate method
 
     /**
-     * Releases held resources. <b>MUST</b> be called before this {@code DeviceSelectorDialog}'s destruction.
+     * Triggered when the contained dialog is created. If the dialog was recreated due to a configuration
+     * change (e.g. device rotation, mouse plugged in) then this will be called without {@link #onCreate(Bundle)},
+     * otherwise this will be called subsequently to {@code onCreate}.
      */
     @Override
-    public void close() {
-        if (mediaBrowser != null && mediaBrowser.isConnected()) { mediaBrowser.disconnect(); }
-        selectorDialog.dismiss();
-        emptyDialog.dismiss();
-    } // End close method
+    public Dialog onCreateDialog(Bundle savedInstanceState) {
+        View v = LayoutInflater.from(context).inflate(R.layout.selector_dialog_layout, null);
+        noDevicesText = v.findViewById(R.id.no_devices_text);
+        deviceRecycler = v.findViewById(R.id.device_recycler);
+        deviceRecycler.setLayoutManager(new LinearLayoutManager(context));
+        deviceRecycler.setAdapter(new DeviceAdapter(null, null, null, null));
+
+        AlertDialog.Builder selectorBuilder = new AlertDialog.Builder(context);
+        selectorBuilder.setTitle("Connect to a device");
+        selectorBuilder.setCancelable(true);
+        selectorBuilder.setView(v);
+        Dialog thisDialog = selectorBuilder.create();
+        thisDialog.setOnShowListener(this);
+        currentDialog = thisDialog;
+        return currentDialog;
+    } // End onCreateDialog method
+
+    /**
+     * Triggered when the contained dialog is destroyed. If the dialog was destroyed due to a configuration
+     * change (e.g. device rotation, mouse plugged in) then {@link androidx.fragment.app.Fragment#onDestroy()}
+     * will not be called, but if the dialog was destroyed due to dismissal then {@code onDestroy} will be called.
+     */
+    @Override
+    public void onDestroyView() { // Seriously? Issue from 2011 still not fixed...
+        Dialog dialog = getDialog();
+        // handles https://code.google.com/p/android/issues/detail?id=17423
+        if (dialog != null && getRetainInstance()) {
+            dialog.setDismissMessage(null);
+        }
+        super.onDestroyView();
+    } // End onDestroyView method
 
     /**
      * Handles device connection when permission had to be requested first. <b>MUST</b> be called
@@ -130,62 +162,72 @@ public class DeviceSelectorDialog implements AutoCloseable {
     public void onDeviceConnectionStateChanged() {
         // Just in case updateDevices is called before the activity's refresh completes, lets do our own refresh
         refreshNext = true;
-        if (selectorDialog.isShowing() || emptyDialog.isShowing()) { updateDevices(); }
+        if (currentDialog != null && currentDialog.isShowing()) { updateDevices(); }
     } // End onDeviceConnectionStateChange method
 
     /**
-     * Shows this {@code DeviceSelectorDialog}.
+     * Triggered when the contained dialog is shown.
      */
-    public void show() {
-        selectorDialog.show();
-        updateDevices(); // Will close selectorDialog and show emptyDialog if necessary
-    } // End show method
+    @Override
+    public void onShow(DialogInterface dialog) { updateDevices(); }
 
     /**
      * Updates the list of available devices in this {@code DeviceSelectorDialog}.
      */
     public void updateDevices() {
-        if (initialized) {
-            String action = refreshNext ? MoppyMediaService.ACTION_REFRESH_DEVICES : MoppyMediaService.ACTION_GET_DEVICES;
-            mediaBrowser.sendCustomAction(action, null, new MediaBrowserCompat.CustomActionCallback() {
-                @Override
-                public void onResult(String action, Bundle extras, Bundle resultData) {
-                    List<UsbDevice> list = resultData.getParcelableArrayList(MoppyMediaService.EXTRA_DEVICE_INFOS);
-                    assert list != null; // Should be impossible, the service doesn't ever send this action's result without it
+        if (deviceRecycler != null) {
+            if (mediaBrowser != null && mediaBrowser.isConnected()) {
+                String action = refreshNext ? MoppyMediaService.ACTION_REFRESH_DEVICES : MoppyMediaService.ACTION_GET_DEVICES;
+                mediaBrowser.sendCustomAction(action, null, new MediaBrowserCompat.CustomActionCallback() {
+                    @Override
+                    public void onResult(String action, Bundle extras, Bundle resultData) {
+                        List<UsbDevice> list = resultData.getParcelableArrayList(MoppyMediaService.EXTRA_DEVICE_INFOS);
+                        assert list != null; // Should be impossible, the service doesn't ever send this action's result without it
 
-                    // Sort by port name and recreate the adapter
-                    list.sort((o1, o2) -> o1.getDeviceName().compareTo(o2.getDeviceName()));
-                    deviceRecycler.setAdapter(new DeviceAdapter(list,
-                            resultData.getStringArrayList(MoppyMediaService.EXTRA_DEVICES_CONNECTED),
-                            DeviceSelectorDialog.this::showDeviceInfo,
-                            (device, checkBox, isChecked) -> {
-                                if (isChecked) { onConnectDevice(device, checkBox); }
-                                else { onRemoveDevice(device); }
-                            } // End checkBoxListener lambda
-                    )); // End setAdapter call
+                        // Sort by port name and recreate the adapter
+                        list.sort((o1, o2) -> o1.getDeviceName().compareTo(o2.getDeviceName()));
+                        deviceRecycler.setAdapter(new DeviceAdapter(list,
+                                resultData.getStringArrayList(MoppyMediaService.EXTRA_DEVICES_CONNECTED),
+                                DeviceSelectorDialog.this::showDeviceInfo,
+                                (device, checkBox, isChecked) -> {
+                                    if (isChecked) { onConnectDevice(device, checkBox); }
+                                    else { onRemoveDevice(device); }
+                                } // End checkBoxListener lambda
+                        )); // End setAdapter call
 
-                    // If necessary, switch the selector dialog to the empty dialog or vice versa
-                    if (list.size() < 1 && selectorDialog.isShowing()) {
-                        selectorDialog.dismiss();
-                        emptyDialog.show();
-                    } // End if(size < 1 && selectorDialog.showing)
-                    else if (list.size() > 1 && emptyDialog.isShowing()) {
-                        emptyDialog.dismiss();
-                        selectorDialog.show();
-                    } // End if(size < 1 && selectorDialog.showing) {} else if (size > 1 && emptyDialog.showing)
+                        // If necessary, switch the selector dialog to the empty dialog or vice versa
+                        if (list.size() < 1 && !emptyShowing) {
+                            deviceRecycler.setVisibility(View.GONE);
+                            noDevicesText.setVisibility(View.VISIBLE);
+                            emptyShowing = true;
+                        } // End if(size < 1 && selectorDialog.showing)
+                        else if (list.size() > 1 && emptyShowing) {
+                            deviceRecycler.setVisibility(View.VISIBLE);
+                            noDevicesText.setVisibility(View.GONE);
+                            emptyShowing = false;
+                        } // End if(size < 1 && selectorDialog.showing) {} else if (size > 1 && emptyDialog.showing)
 
-                    super.onResult(action, extras, resultData);
-                } // End ACTION_GET_DEVICES.onResult method
-            }); // End ACTION_GET_DEVICES callback
-            refreshNext = false;
-        } // End if(initialized)
-        else {
-            if (selectorDialog.isShowing()) {
-                selectorDialog.dismiss();
-                emptyDialog.show();
-            } // End if(selectorDialog.isShowing)
-        } // End if(initialized) {} else
+                        super.onResult(action, extras, resultData);
+                    } // End ACTION_GET_DEVICES.onResult method
+                }); // End ACTION_GET_DEVICES callback
+                refreshNext = false;
+            } // End if(initialized)
+            else {
+                if (currentDialog != null && currentDialog.isShowing()) {
+                    deviceRecycler.setVisibility(View.GONE);
+                    noDevicesText.setVisibility(View.VISIBLE);
+                    emptyShowing = true;
+                } // End if(selectorDialog.isShowing)
+            } // End if(initialized) {} else
+        } // End if(deviceRecycler != null)
     } // End updateDevices method
+
+    /**
+     * Retrieves the {@link MediaBrowserCompat} this {@code DeviceSelectorDialog} uses to manage devices.
+     *
+     * @return the {@code MediaBrowserCompat} used to communicate with the {@link MoppyMediaService}
+     */
+    public MediaBrowserCompat getMediaBrowser() { return mediaBrowser; }
 
     // Triggered by a device's checkbox being checked. Requests the service to connect a device, requesting
     // USB access permission from the OS if necessary
@@ -232,12 +274,6 @@ public class DeviceSelectorDialog implements AutoCloseable {
         alertBuilder.show();
     } // End showDeviceInfo method
 
-    // Initializes the dialog
-    private void init() {
-        updateDevices();
-        initialized = true;
-    } // End init method
-
     // Requests the service to connect to a device, showing an error and unchecking its box if unsuccessful
     private void connectDevice(UsbDevice device, CheckBox checkBox) {
         Bundle connectBundle = new Bundle();
@@ -281,27 +317,5 @@ public class DeviceSelectorDialog implements AutoCloseable {
         if (--loadingBarRequests == 0) { loadingBar.dismiss(); }
     } // End closeLoadingBar method
 
-    // Receives callbacks about mediaBrowser.connect
-    private class BrowserConnectionCallback extends MediaBrowserCompat.ConnectionCallback {
-        @Override
-        public void onConnected() { // Successful connection
-            // Run the initializer
-            if (!initialized) { init(); }
-            super.onConnected();
-        } // End onConnected method
 
-        @Override
-        public void onConnectionSuspended() { // Server crashed, awaiting restart
-            // Nothing to do here, mediaBrowser is only vulnerably accessed through loadRecyclers and that
-            // ignores the input if not connected
-            super.onConnectionSuspended();
-        } // End onConnectionSuspended method
-
-        @Override
-        public void onConnectionFailed() { // Connection refused
-            // Log what (shouldn't have) happened and close the activity
-            Log.wtf(BrowserActivity.class.getName() + "->onConnectionFailed", "Unable to connect to MoppyMediaService in browser");
-            super.onConnectionFailed();
-        } // End onConnectionFailed method
-    } // End BrowserConnectionCallback class
 } // End DeviceSelectorDialog class
