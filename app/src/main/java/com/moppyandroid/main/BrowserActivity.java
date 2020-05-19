@@ -89,7 +89,7 @@ public class BrowserActivity extends AppCompatActivity {
      */
     @Override
     protected void onDestroy() {
-        if (mediaBrowser != null && mediaBrowser.isConnected()) { mediaBrowser.disconnect(); }
+        if (mediaBrowser != null) { mediaBrowser.disconnect(); }
         super.onDestroy();
     }
 
