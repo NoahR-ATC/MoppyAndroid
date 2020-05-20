@@ -9,18 +9,15 @@ TODO: "W/ActivityThread: handleWindowVisibilty: no activity for token" in log wh
 Known problems:
     - Hard to use track slider in slide menu (adjust slide menu sensitivity?)
     - Must connect to device, disconnect, and connect again for connection to work... sometimes
-    - To fix the app not shutting down properly, I eliminated being able to play songs while the app is
-        minimized or the device is locked. This can be reintroduced by switching to UI/Service model
 
 
 Features to implement:
     - MIDI I/O
+        > Import MidiSplitter
     - Playlist/file queue
-    - Multi-device selection
 
 
 Scope creep is getting really bad... let's make a list of nice-to-have-but-slightly-out-of-scope features:
-    - Sigh... Another port of MIDISplitter
     - Visualization
 
 
