@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<devices>
+    <device
+        manufacturer="MoppyAndroid"
+        product="Moppy MIDI IO">
+        <input-port name="input" />
+        <output-port name="output" />
+    </device>
+</devices>
