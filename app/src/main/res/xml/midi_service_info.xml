@@ -3,7 +3,7 @@
     <device
         manufacturer="MoppyAndroid"
         product="Moppy MIDI IO">
-        <input-port name="input" />
-        <output-port name="output" />
+        <input-port name="Moppy MIDI In" />
+        <output-port name="Moppy MIDI Out" />
     </device>
 </devices>
