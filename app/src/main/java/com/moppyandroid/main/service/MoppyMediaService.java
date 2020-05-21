@@ -255,7 +255,6 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
                         PlaybackStateCompat.ACTION_PLAY |
                         PlaybackStateCompat.ACTION_STOP
                 ) // End setActions call
-                .addCustomAction("initLibrary", "initLibrary", R.drawable.ic_folder)
                 .setState(
                         PlaybackStateCompat.STATE_NONE,
                         PlaybackStateCompat.PLAYBACK_POSITION_UNKNOWN,
