@@ -5,9 +5,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.ServiceConnection;
 import android.media.midi.MidiDeviceService;
-import android.media.midi.MidiManager;
 import android.media.midi.MidiReceiver;
-import android.media.midi.MidiSender;
 import android.os.IBinder;
 import android.util.Log;
 
@@ -93,7 +91,8 @@ public class MoppyMidiService extends MidiDeviceService {
         @Override
         public void onServiceConnected(ComponentName name, IBinder service) {
             mediaService = ((MoppyMediaService.Binder) service).getService();
-            //midiToService.setReceiver(mediaService); // TODO: Setup MIDI IO in MoppyMediaService
+            midiToService.setReceiver(mediaService.getInputReceiver());
+            mediaService.setReceiver(midiFromService);
         } // End onServiceConnected method
 
         /**

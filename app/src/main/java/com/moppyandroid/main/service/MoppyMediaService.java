@@ -9,7 +9,6 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.ServiceConnection;
 import android.hardware.usb.UsbDevice;
-import android.os.Binder;
 import android.os.Bundle;
 import android.os.IBinder;
 import android.provider.MediaStore;
@@ -36,6 +35,7 @@ import java.util.Set;
 
 import jp.kshoji.javax.sound.midi.InvalidMidiDataException;
 import jp.kshoji.javax.sound.midi.MidiUnavailableException;
+import jp.kshoji.javax.sound.midi.Receiver;
 
 /**
  * The media service that controls Moppy playback.
@@ -512,6 +512,29 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
         }
         //super.onCustomAction(action, extras, result); // Just calls result.sendError(null);
     }
+
+    /**
+     * Gets the {@link Receiver} that can be used to send MIDI messages to Moppy.
+     *
+     * @return the {@link Receiver} to send messages to
+     */
+    public Receiver getInputReceiver() { return moppyManager.getInputReceiver(); }
+
+    /**
+     * Gets the {@link Receiver} that messages are forwarded to.
+     *
+     * @return the {@link Receiver} or null if not set
+     * @see #setReceiver(Receiver)
+     */
+    public Receiver getReceiver() { return moppyManager.getReceiver(); }
+
+    /**
+     * Sets the {@link Receiver} to forward all MIDI messages to, regardless of if they originated on
+     * the MIDI wire input or the MIDI file input.
+     *
+     * @param receiver the {@link Receiver} to send messages to
+     */
+    public void setReceiver(Receiver receiver) { moppyManager.setReceiver(receiver); }
 
     // Triggered by ACTION_ADD_DEVICE
     private void onAddDevice(Bundle extras, Result<Bundle> result) {

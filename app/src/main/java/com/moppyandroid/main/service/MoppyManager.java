@@ -22,6 +22,7 @@ import java.util.List;
 import jp.kshoji.javax.sound.midi.InvalidMidiDataException;
 import jp.kshoji.javax.sound.midi.MidiMessage;
 import jp.kshoji.javax.sound.midi.MidiUnavailableException;
+import jp.kshoji.javax.sound.midi.Receiver;
 import jp.kshoji.javax.sound.midi.Sequencer;
 import jp.kshoji.javax.sound.midi.io.StandardMidiFileReader;
 import jp.kshoji.javax.sound.midi.spi.MidiFileReader;
@@ -31,6 +32,7 @@ public class MoppyManager implements com.moppy.core.status.StatusConsumer {
 
     private boolean paused;
     private long currentSequenceLength;
+    private Receiver midiThru;
     private MoppyMIDISequencer seq;
     private MoppyMIDIReceiverSender receiverSender;
     private MoppyUsbManager netManager;
@@ -200,6 +202,32 @@ public class MoppyManager implements com.moppy.core.status.StatusConsumer {
      * @return the loaded {@code MidiFile}
      */
     public MidiLibrary.MidiFile getLoadedFile() { return loadedFile; }
+
+    /**
+     * Gets the {@link Receiver} that can be used to send MIDI messages to Moppy.
+     *
+     * @return the {@link Receiver} to send messages to
+     */
+    public Receiver getInputReceiver() { return receiverSender; }
+
+    /**
+     * Gets the {@link Receiver} that messages are forwarded to.
+     *
+     * @return the {@link Receiver} or null if not set
+     * @see #setReceiver(Receiver)
+     */
+    public Receiver getReceiver() { return midiThru; }
+
+    /**
+     * Sets the {@link Receiver} to forward all MIDI messages to, regardless of if they originated on
+     * the MIDI wire input or the MIDI file input.
+     *
+     * @param receiver the {@link Receiver} to send messages to
+     */
+    public void setReceiver(Receiver receiver) {
+        receiverSender.setMidiThru(receiver);
+        this.midiThru = receiver;
+    } // End setReceiver method
 
     /**
      * Registers a {@link Callback} with this {@code MoppyManager} to receive calls upon method completion.
