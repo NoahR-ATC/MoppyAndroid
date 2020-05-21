@@ -49,7 +49,9 @@ public class MoppyMidiService extends MidiDeviceService {
         });
 
         moppyServiceConnection = new MoppyServiceConnection();
-        bindService(new Intent(this, MoppyMediaService.class), moppyServiceConnection, Context.BIND_AUTO_CREATE);
+        Intent bindIntent = new Intent(this, MoppyMediaService.class);
+        bindIntent.putExtra(MoppyMediaService.EXTRA_BIND_NORMAL, true);
+        bindService(bindIntent, moppyServiceConnection, Context.BIND_AUTO_CREATE);
     } // End onCreate method
 
     /**
@@ -90,10 +92,8 @@ public class MoppyMidiService extends MidiDeviceService {
          */
         @Override
         public void onServiceConnected(ComponentName name, IBinder service) {
-            // TODO: Override onBind method in MoppyMediaService to allow non-MediaBrowser binding.
-            //       Use an Intent extra to differentiate and refer to super.onBind if extra is false/missing?
-            //mediaService = ((MoppyMediaService.Binder) service).getService();
-            //midiToService.setReceiver(mediaService.getMidiReceiver);
+            mediaService = ((MoppyMediaService.Binder) service).getService();
+            //midiToService.setReceiver(mediaService); // TODO: Setup MIDI IO in MoppyMediaService
         } // End onServiceConnected method
 
         /**

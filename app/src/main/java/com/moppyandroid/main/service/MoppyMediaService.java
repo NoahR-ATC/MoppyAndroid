@@ -7,8 +7,11 @@ import android.app.NotificationManager;
 import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
+import android.content.ServiceConnection;
 import android.hardware.usb.UsbDevice;
+import android.os.Binder;
 import android.os.Bundle;
+import android.os.IBinder;
 import android.provider.MediaStore;
 import android.support.v4.media.MediaBrowserCompat;
 import android.support.v4.media.MediaMetadataCompat;
@@ -173,6 +176,11 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
     public static final String ACTION_LOAD_ITEM = "com.moppyandroid.main.service.MoppyMediaService.LOAD_FILE";
 
     /**
+     * {@code boolean} extra used to allow custom binding without using {@link MediaBrowserServiceCompat}.
+     */
+    public static final String EXTRA_BIND_NORMAL = "MOPPY_BIND_NORMAL";
+
+    /**
      * {@link String} extra field for the port name associated with a {@link #ACTION_ADD_DEVICE} or {@link #ACTION_REMOVE_DEVICE} event.
      */
     public static final String EXTRA_PORT_NAME = "MOPPY_EXTRA_DEVICE_PORT_NAME";
@@ -327,6 +335,19 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
         super.onStartCommand(intent, flags, startId);
         return START_REDELIVER_INTENT;
     } // End onStartCommand method
+
+    /**
+     * Triggered when this service is bound to with {@link Context#bindService(Intent, ServiceConnection, int)}.
+     *
+     * @param intent the {@link Intent} send with the {@code bindService} call
+     * @return a {@link Binder} if {@link #EXTRA_BIND_NORMAL} is specified and true, otherwise the result
+     * of {@link MediaBrowserServiceCompat#onBind(Intent)}
+     */
+    @Override
+    public IBinder onBind(Intent intent) {
+        if (intent.getBooleanExtra(EXTRA_BIND_NORMAL, false)) { return new Binder(); }
+        else { return super.onBind(intent); }
+    } // End onBind method
 
     /**
      * Triggered when the activity is killed (e.g. swipe up in recent apps, G.C.).
@@ -781,6 +802,13 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
             notificationManager.notify(NOTIFICATION_ID, notificationBuilder.build());
         }
     } // End updateNotificationText method
+
+    /**
+     * Used to allow binding to this {@link MoppyMediaService}.
+     */
+    public class Binder extends android.os.Binder {
+        MoppyMediaService getService() { return MoppyMediaService.this; }
+    } // End MoppyMediaService.Binder class
 
     // Callbacks for media button events. All callbacks are disabled if their associated action is not supported
     private class MediaCallback extends MediaSessionCompat.Callback {
