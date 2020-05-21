@@ -52,6 +52,8 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.hardware.usb.UsbDevice;
 import android.hardware.usb.UsbManager;
+import android.media.midi.MidiDeviceInfo;
+import android.media.midi.MidiManager;
 import android.os.Handler;
 import android.os.RemoteException;
 import android.os.SystemClock;
@@ -78,6 +80,7 @@ import com.moppyandroid.main.service.MoppyMediaService;
 import com.sothree.slidinguppanel.SlidingUpPanelLayout;
 import com.sothree.slidinguppanel.SlidingUpPanelLayout.PanelState;
 
+import java.io.IOException;
 import java.util.List;
 import java.util.Timer;
 import java.util.TimerTask;
@@ -164,6 +167,13 @@ public class MainActivity extends AppCompatActivity implements SeekBar.OnSeekBar
         setSupportActionBar(findViewById(R.id.main_toolbar));
         songSlider = findViewById(R.id.song_slider);
         setControlState(true);
+
+        // TODO Remove, used to test the MoppyMidiService
+        MidiManager m = (MidiManager) getSystemService(Context.MIDI_SERVICE);
+        MidiDeviceInfo[] infos = m.getDevices();
+        m.openDevice(infos[0], (device) -> {
+            try {device.close();}catch (IOException ignored) {}
+        }, null);
 
         // Start the media service
         // Note: This is in addition to binding/unbinding in onStart and onStop to allow the service
