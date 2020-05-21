@@ -57,6 +57,7 @@ public class MoppyMidiService extends MidiDeviceService {
      */
     @Override
     public void onDestroy() {
+        if (mediaService != null) { mediaService.removeReceiver(midiFromService); }
         midiToService.close();
         midiFromService.close();
         unbindService(moppyServiceConnection);
@@ -92,7 +93,7 @@ public class MoppyMidiService extends MidiDeviceService {
         public void onServiceConnected(ComponentName name, IBinder service) {
             mediaService = ((MoppyMediaService.Binder) service).getService();
             midiToService.setReceiver(mediaService.getInputReceiver());
-            mediaService.setReceiver(midiFromService);
+            mediaService.addReceiver(midiFromService);
         } // End onServiceConnected method
 
         /**
