@@ -57,7 +57,7 @@ public class MidiTransmitterAdapter extends MidiReceiver implements Transmitter 
             // Reminder: count is the length of the message
             MidiMessage outMessage;
             final byte[] messageBytes = Arrays.copyOfRange(msg, offset, offset + count);
-            final int status = (count > 1) ? messageBytes[offset] & 0xFF : 0;
+            final int status = (count > 1) ? messageBytes[0] & 0xFF : 0;
 
             // Convert the raw parameters to a MidiMessage implementation instance
             try {
