@@ -30,7 +30,7 @@ public class MidiReceiverAdapter implements Receiver {
     /**
      * Constructs a {@code MidiReceiverAdapter} that logs {@link IOException}s in {@link #send} as well as triggers
      * the {@link IOExceptionCallback#onIOException(IOException)} method of the provided {@link IOExceptionCallback}.
-     * 
+     *
      * @param receiver the {@link MidiReceiver} to send messages to
      * @param callback the {@link IOExceptionCallback} to callback {@link IOException}s to
      */

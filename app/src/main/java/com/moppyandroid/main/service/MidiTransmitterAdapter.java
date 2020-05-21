@@ -39,7 +39,7 @@ public class MidiTransmitterAdapter extends MidiReceiver implements Transmitter 
      * Releases held resources. <b>MUST</b> be called before this {@code MidiTransmitterAdapter}'s destruction.
      */
     @Override
-    public void close() { javaReceiver.close(); }
+    public void close() {if (javaReceiver != null) { javaReceiver.close(); } }
 
     /**
      * Triggered whenever the receiver is passed new MIDI data. May fail if count exceeds {@link #getMaxMessageSize()}.
