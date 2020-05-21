@@ -35,6 +35,7 @@ public class MoppyManager implements com.moppy.core.status.StatusConsumer {
     private Receiver midiThru;
     private MoppyMIDISequencer seq;
     private MoppyMIDIReceiverSender receiverSender;
+    private ReceiverDispatcher outputReceiverDispatcher;
     private MoppyUsbManager netManager;
     private List<Callback> callbackList;
     private MidiLibrary.MidiFile loadedFile;
@@ -42,6 +43,7 @@ public class MoppyManager implements com.moppy.core.status.StatusConsumer {
     public MoppyManager(Context context) throws MidiUnavailableException {
         paused = false;
         callbackList = new ArrayList<>();
+        outputReceiverDispatcher = new ReceiverDispatcher();
         loadedFile = null;
 
         BridgeSerial.init(context);
@@ -61,6 +63,8 @@ public class MoppyManager implements com.moppy.core.status.StatusConsumer {
             Log.wtf(TAG, "Unable to construct MoppyMIDISequencer", e);
             throw e;
         } // End try {new MoppyMIDISequencer} catch(MidiUnavailableException)
+
+        receiverSender.setMidiThru(outputReceiverDispatcher);
     } // End MoppyManager(Context) constructor
 
     /**
@@ -211,23 +215,33 @@ public class MoppyManager implements com.moppy.core.status.StatusConsumer {
     public Receiver getInputReceiver() { return receiverSender; }
 
     /**
-     * Gets the {@link Receiver} that messages are forwarded to.
+     * Gets the {@link ReceiverDispatcher} that messages are forwarded to.
      *
-     * @return the {@link Receiver} or null if not set
-     * @see #setReceiver(Receiver)
+     * @return the {@link ReceiverDispatcher} as a {@link Receiver}
+     * @see #addReceiver(Receiver)
+     * @see #removeReceiver(Receiver)
      */
-    public Receiver getReceiver() { return midiThru; }
+    public Receiver getReceiver() { return outputReceiverDispatcher; }
 
     /**
-     * Sets the {@link Receiver} to forward all MIDI messages to, regardless of if they originated on
-     * the MIDI wire input or the MIDI file input.
+     * Adds a {@link Receiver} to forward all MIDI messages to, regardless of if they originated on
+     * the MIDI wire input or the MIDI file input. See {@link ReceiverDispatcher#add(Receiver)} for
+     * more information.
      *
-     * @param receiver the {@link Receiver} to send messages to
+     * @param receiver the {@link Receiver} to add
+     * @return {@code true} if {@code receiver} was added, {@code false} if {@code receiver} was null or duplicate
+     * @see #removeReceiver(Receiver)
      */
-    public void setReceiver(Receiver receiver) {
-        receiverSender.setMidiThru(receiver);
-        this.midiThru = receiver;
-    } // End setReceiver method
+    public boolean addReceiver(Receiver receiver) { return outputReceiverDispatcher.add(receiver); }
+
+    /**
+     * Removes a {@link Receiver} from the list to forward messages to.
+     *
+     * @param receiver the {@link Receiver} to remove
+     * @return {@code true} if {@code receiver} was removed, {@code false} if it was {@code null} or not added
+     * @see #addReceiver(Receiver)
+     */
+    public boolean removeReceiver(Receiver receiver) { return outputReceiverDispatcher.remove(receiver); }
 
     /**
      * Registers a {@link Callback} with this {@code MoppyManager} to receive calls upon method completion.

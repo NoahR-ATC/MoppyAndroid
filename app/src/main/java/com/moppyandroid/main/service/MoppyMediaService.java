@@ -524,17 +524,30 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
      * Gets the {@link Receiver} that messages are forwarded to.
      *
      * @return the {@link Receiver} or null if not set
-     * @see #setReceiver(Receiver)
+     * @see #addReceiver(Receiver) 
+     * @see #removeReceiver(Receiver) 
      */
     public Receiver getReceiver() { return moppyManager.getReceiver(); }
 
     /**
-     * Sets the {@link Receiver} to forward all MIDI messages to, regardless of if they originated on
-     * the MIDI wire input or the MIDI file input.
+     * Adds a {@link Receiver} to forward all MIDI messages to, regardless of if they originated on
+     * the MIDI wire input or the MIDI file input. See {@link ReceiverDispatcher#add(Receiver)} for
+     * more information.
      *
-     * @param receiver the {@link Receiver} to send messages to
+     * @param receiver the {@link Receiver} to add
+     * @return {@code true} if {@code receiver} was added, {@code false} if {@code receiver} was null or duplicate
+     * @see #removeReceiver(Receiver)
      */
-    public void setReceiver(Receiver receiver) { moppyManager.setReceiver(receiver); }
+    public boolean addReceiver(Receiver receiver) { return moppyManager.addReceiver(receiver); }
+
+    /**
+     * Removes a {@link Receiver} from the list to forward messages to.
+     *
+     * @param receiver the {@link Receiver} to remove
+     * @return {@code true} if {@code receiver} was removed, {@code false} if it was {@code null} or not added
+     * @see #addReceiver(Receiver)
+     */
+    public boolean removeReceiver(Receiver receiver) { return moppyManager.removeReceiver(receiver); }
 
     // Triggered by ACTION_ADD_DEVICE
     private void onAddDevice(Bundle extras, Result<Bundle> result) {

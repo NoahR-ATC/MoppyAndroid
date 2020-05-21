@@ -20,8 +20,7 @@ public class ReceiverDispatcher implements Receiver {
     public ReceiverDispatcher() { receiverList = new ArrayList<>(); }
 
     /**
-     * Adds a {@link Receiver} to the list to forward messages to. Ignores
-     * {@code null} {@code Receiver}s and duplicates.
+     * Adds a {@link Receiver} to the list to forward messages to. Ignores {@code null} {@code Receiver}s and duplicates.
      *
      * @param receiver the {@link Receiver} to add
      * @return {@code true} if {@code receiver} was added, {@code false} if {@code receiver} was null or duplicate
