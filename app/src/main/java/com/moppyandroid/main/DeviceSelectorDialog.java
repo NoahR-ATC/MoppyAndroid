@@ -19,7 +19,9 @@ import android.support.v4.media.MediaBrowserCompat;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
+import android.widget.AdapterView;
 import android.widget.CheckBox;
+import android.widget.Spinner;
 import android.widget.TextView;
 
 import com.moppyandroid.main.service.MoppyMediaService;
@@ -31,15 +33,16 @@ import java.util.Map;
 /**
  * {@link DialogFragment} for selecting Moppy devices to connect/disconnect to.
  */
-public class DeviceSelectorDialog extends DialogFragment implements DialogInterface.OnShowListener {
+public class DeviceSelectorDialog extends DialogFragment implements DialogInterface.OnShowListener, Spinner.OnItemSelectedListener {
     private boolean refreshNext = false;
     private boolean emptyShowing = false;
-    private boolean isOpen = false;
     private int loadingBarRequests;
     private Map<UsbDevice, CheckBox> deviceCheckBoxMap;
     private MediaBrowserCompat mediaBrowser;
     private RecyclerView deviceRecycler;
     private TextView noDevicesText;
+    private Spinner midiInSpinner;
+    private Spinner midiOutSpinner;
     private AlertDialog loadingBar;
     private Context context;
     private UsbManager usbManager;
@@ -82,8 +85,6 @@ public class DeviceSelectorDialog extends DialogFragment implements DialogInterf
         alertBuilder.setCancelable(false);
         alertBuilder.setView(LayoutInflater.from(context).inflate(R.layout.loading_dialog_layout, null));
         loadingBar = alertBuilder.create();
-
-        isOpen = true;
     } // End onCreate method
 
     /**
@@ -95,6 +96,12 @@ public class DeviceSelectorDialog extends DialogFragment implements DialogInterf
     public Dialog onCreateDialog(Bundle savedInstanceState) {
         View v = LayoutInflater.from(context).inflate(R.layout.selector_dialog_layout, null);
         noDevicesText = v.findViewById(R.id.no_devices_text);
+
+        midiInSpinner = v.findViewById(R.id.midi_in_spinner);
+        midiInSpinner.setOnItemSelectedListener(this);
+        midiOutSpinner = v.findViewById(R.id.midi_out_spinner);
+        midiOutSpinner.setOnItemSelectedListener(this);
+
         deviceRecycler = v.findViewById(R.id.device_recycler);
         deviceRecycler.setLayoutManager(new LinearLayoutManager(context));
         deviceRecycler.setAdapter(new DeviceAdapter(null, null, null, null));
@@ -170,6 +177,26 @@ public class DeviceSelectorDialog extends DialogFragment implements DialogInterf
      */
     @Override
     public void onShow(DialogInterface dialog) { updateDevices(); }
+
+    /**
+     * Triggered when an item in either of the {@link Spinner}s has been selected.
+     */
+    @Override
+    public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+        if (parent == midiInSpinner) {
+            // TODO: Implement MIDI input connection
+        } // End if(parent == midiInSpinner)
+        else if (parent == midiOutSpinner) {
+            // TODO: Implement MIDI output connection
+        } // End if(parent == midiInSpinner) {} else if(parent == midiOutSpinner)
+    } // End onItemSelected method
+
+    /**
+     * Triggered when the selection disappears from this view. The selection can disappear for
+     * instance when touch is activated or when the adapter becomes empty.
+     */
+    @Override
+    public void onNothingSelected(AdapterView<?> parent) { /* Nothing to do */ }
 
     /**
      * Updates the list of available devices in this {@code DeviceSelectorDialog}.
