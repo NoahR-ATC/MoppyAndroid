@@ -32,7 +32,6 @@ public class MoppyManager implements com.moppy.core.status.StatusConsumer {
 
     private boolean paused;
     private long currentSequenceLength;
-    private Receiver midiThru;
     private MoppyMIDISequencer seq;
     private MoppyMIDIReceiverSender receiverSender;
     private ReceiverDispatcher outputReceiverDispatcher;

@@ -442,6 +442,42 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
      */
     @Override
     public void onDestroy() {
+        // Disconnect from the current MIDI in device
+        if (midiInDevicePort != null) {
+            try { midiInDevicePort.close(); }
+            catch (IOException e) { // Nothing we can do except log and move on
+                Log.e(TAG + "->onDestroy", "Unable to close midiInDevicePort", e);
+            }
+            midiInDevicePort = null;
+        }
+        if (midiInDevice != null) {
+            try { midiInDevice.close(); }
+            catch (IOException e) { // Nothing we can do except log and move on
+                Log.e(TAG + "->onDestroy", "Unable to close midiInDevice", e);
+            }
+            midiInDevice = null;
+        }
+        // Disconnect from the current MIDI out device
+        if (midiOutDeviceAdapter != null) {
+            removeReceiver(midiOutDeviceAdapter);
+            midiOutDeviceAdapter = null;
+        }
+        if (midiOutDevicePort != null) {
+            try { midiOutDevicePort.close(); }
+            catch (IOException e) { // Nothing we can do except log and move on
+                Log.e(TAG + "->onDestroy", "Unable to close midiOutDevicePort", e);
+            }
+            midiOutDevicePort = null;
+        }
+        if (midiOutDevice != null) {
+            try { midiOutDevice.close(); }
+            catch (IOException e) { // Nothing we can do except log and move on
+                Log.e(TAG + "->onDestroy", "Unable to close midiOutDevice", e);
+            }
+            midiOutDevice = null;
+        }
+
+        // Disconnect from all Moppy devices, stop running in the foreground, and shutdown the media session
         if (moppyManager != null) { moppyManager.getUsbManager().closeAllBridges(); }
         stopForeground(true);
         if (mediaSession != null) { mediaSession.release(); }
@@ -715,7 +751,7 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
 
     // Triggered by ACTION_SET_MIDI_IN
     private void onSetMidiIn(Bundle bundle, Result<Bundle> result) {
-        // Close the current MIDI in device
+        // Disconnect from the current MIDI in device
         if (midiInDevicePort != null) {
             try { midiInDevicePort.close(); }
             catch (IOException e) { // Nothing we can do except log and move on
