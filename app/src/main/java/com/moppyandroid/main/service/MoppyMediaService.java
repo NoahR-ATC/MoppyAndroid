@@ -9,6 +9,11 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.ServiceConnection;
 import android.hardware.usb.UsbDevice;
+import android.media.midi.MidiDevice;
+import android.media.midi.MidiDeviceInfo;
+import android.media.midi.MidiInputPort;
+import android.media.midi.MidiManager;
+import android.media.midi.MidiOutputPort;
 import android.os.Bundle;
 import android.os.IBinder;
 import android.provider.MediaStore;
@@ -94,6 +99,56 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
      * @see #onCustomAction(String, Bundle, androidx.media.MediaBrowserServiceCompat.Result) onCustomAction
      */
     public static final String ACTION_REMOVE_DEVICE = "com.moppyandroid.main.service.MoppyMediaService.REMOVE_DEVICE";
+    /**
+     * The custom action for setting the MIDI device to receive input from.
+     * <p>
+     * Non-standard {@link Bundle} fields required:
+     *     <table border="1">
+     *         <tr><th>KEY</th><th>TYPE</th><th>VALUE</th></tr>
+     *         <tr>
+     *             <td>{@link #EXTRA_MIDI_DEVICE}</td>
+     *             <td>{@link MidiDeviceInfo} ({@link android.os.Parcelable)}</td>
+     *             <td>The MIDI device to connect to</td>
+     *         </tr>
+     *         <tr>
+     *             <td>{@link #EXTRA_MIDI_INDEX}</td>
+     *             <td>{@code int}</td>
+     *             <td>
+     *                 The index of the requested output port in the MIDI device provided with
+     *                 {@link #EXTRA_MIDI_DEVICE}; 0 if omitted
+     *             </td>
+     *         </tr>
+     *     </table>
+     * </p>
+     *
+     * @see #onCustomAction(String, Bundle, androidx.media.MediaBrowserServiceCompat.Result) onCustomAction
+     */
+    public static final String ACTION_SET_MIDI_IN = "com.moppyandroid.main.service.MoppyMediaService.ACTION_SET_MIDI_IN_DEVICE";
+    /**
+     * The custom action for setting the MIDI device to send output to.
+     * <p>
+     * Non-standard {@link Bundle} fields required:
+     *     <table border="1">
+     *         <tr><th>KEY</th><th>TYPE</th><th>VALUE</th></tr>
+     *         <tr>
+     *             <td>{@link #EXTRA_MIDI_DEVICE}</td>
+     *             <td>{@link MidiDeviceInfo} ({@link android.os.Parcelable)}</td>
+     *             <td>The MIDI device to connect to</td>
+     *         </tr>
+     *         <tr>
+     *             <td>{@link #EXTRA_MIDI_INDEX}</td>
+     *             <td>{@code int}</td>
+     *             <td>
+     *                 The index of the requested input port in the MIDI device provided with
+     *                 {@link #EXTRA_MIDI_DEVICE}; 0 if omitted
+     *             </td>
+     *         </tr>
+     *     </table>
+     * </p>
+     *
+     * @see #onCustomAction(String, Bundle, androidx.media.MediaBrowserServiceCompat.Result) onCustomAction
+     */
+    public static final String ACTION_SET_MIDI_OUT = "com.moppyandroid.main.service.MoppyMediaService.ACTION_SET_MIDI_OUT_DEVICE";
     /**
      * The custom action for triggering media library creation if not done so already. Strongly recommended to send
      * this action after {@link Manifest.permission#READ_EXTERNAL_STORAGE} has been granted to the {@link android.app.Activity}.
@@ -183,7 +238,17 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
     /**
      * {@link String} extra field for the port name associated with a {@link #ACTION_ADD_DEVICE} or {@link #ACTION_REMOVE_DEVICE} event.
      */
-    public static final String EXTRA_PORT_NAME = "MOPPY_EXTRA_DEVICE_PORT_NAME";
+    public static final String EXTRA_PORT_NAME = "MOPPY_EXTRA_MOPPY_DEVICE_PORT_NAME";
+    /**
+     * {@link MidiDeviceInfo} extra field (stored as {@link android.os.Parcelable}) for the MIDI device
+     * associated with an {@link #ACTION_SET_MIDI_IN} or {@link #ACTION_SET_MIDI_OUT} event.
+     */
+    public static final String EXTRA_MIDI_DEVICE = "MOPPY_EXTRA_MIDI_DEVICE_INFO";
+    /**
+     * {@code int} extra field for the index of the port in {@link #EXTRA_MIDI_DEVICE} to connect to
+     * during the {@link #ACTION_SET_MIDI_IN} or {@link ACTION_SET_MIDI_OUT} event. Defaults to {@code 0}.
+     */
+    public static final String EXTRA_MIDI_INDEX = "MOPPY_EXTRA_MIDI_PORT_INDEX";
     /**
      * {@code boolean} extra field for if the {@link MidiLibrary} was created successfully.
      */
@@ -229,9 +294,11 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
      */
     public static final String EXTRA_ERROR_INFORMATIONAL = "MOPPY_ERROR_INFORMATIONAL";
 
+    private static final String TAG = MoppyMediaService.class.getName();
     private static final int NOTIFICATION_ID = 1;               // ID of the service notification
     private static final int NOTIFICATION_PLAY_PAUSE_INDEX = 2; // Index of play/pause button in notification actions
 
+    private MidiManager midiManager;
     private NotificationManager notificationManager;
     private MediaControllerCompat mediaController;
     private MediaSessionCompat mediaSession;
@@ -239,6 +306,13 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
     private NotificationCompat.Builder notificationBuilder;
     private MidiLibrary midiLibrary;
     private MoppyManager moppyManager;
+    private MidiDeviceInfo midiInDeviceInfo;
+    private MidiDevice midiInDevice;
+    private MidiOutputPort midiInDevicePort;
+    private MidiDeviceInfo midiOutDeviceInfo;
+    private MidiDevice midiOutDevice;
+    private MidiInputPort midiOutDevicePort;
+    private MidiReceiverAdapter midiOutDeviceAdapter;
 
     /**
      * Triggered when the service is first created, usually by the first {@link Context#startService(Intent)}
@@ -287,6 +361,8 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
             throw new RuntimeException("No notification manager found");
         } // End if(notificationManager == null)
         notificationManager.createNotificationChannel(notificationChannel);
+
+        midiManager = (MidiManager) getSystemService(Context.MIDI_SERVICE);
 
         // Create the initial notification and start this service in the foreground
         notificationBuilder = new NotificationCompat.Builder(this, CHANNEL_ID)
@@ -486,6 +562,14 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
                 onRemoveDevice(extras, result);
                 break;
             } // End ACTION_REMOVE_DEVICE case
+            case ACTION_SET_MIDI_IN: {
+                onSetMidiIn(extras, result);
+                break;
+            } // End ACTION_SET_MIDI_IN case
+            case ACTION_SET_MIDI_OUT: {
+                onSetMidiOut(extras, result);
+                break;
+            } // End ACTION_SET_MIDI_OUT case
             case ACTION_INIT_LIBRARY: {
                 onInitLibrary(result);
                 break;
@@ -524,8 +608,8 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
      * Gets the {@link Receiver} that messages are forwarded to.
      *
      * @return the {@link Receiver} or null if not set
-     * @see #addReceiver(Receiver) 
-     * @see #removeReceiver(Receiver) 
+     * @see #addReceiver(Receiver)
+     * @see #removeReceiver(Receiver)
      */
     public Receiver getReceiver() { return moppyManager.getReceiver(); }
 
@@ -604,7 +688,7 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
             return;
         } // End if(!connected(portName))
 
-        try {moppyManager.getUsbManager().closeBridge(portName);}
+        try { moppyManager.getUsbManager().closeBridge(portName); }
         catch (IOException e) {
             // In the words of MoppyLib's author when they deal with this exception, "There's not
             // much we can do if it fails to close (it's probably already closed). Just log it and move on"
@@ -628,6 +712,230 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
         resultBundle.putInt(EXTRA_NUM_CONNECTED, numConnected);
         result.sendResult(resultBundle);
     } // End onRemoveDevice method
+
+    // Triggered by ACTION_SET_MIDI_IN
+    private void onSetMidiIn(Bundle bundle, Result<Bundle> result) {
+        // Close the current MIDI in device
+        if (midiInDevicePort != null) {
+            try { midiInDevicePort.close(); }
+            catch (IOException e) { // Nothing we can do except log and move on
+                Log.e(TAG + "->onSetMidiIn", "Unable to close midiInDevicePort", e);
+            }
+            midiInDevicePort = null;
+        }
+        if (midiInDevice != null) {
+            try { midiInDevice.close(); }
+            catch (IOException e) { // Nothing we can do except log and move on
+                Log.e(TAG + "->onSetMidiIn", "Unable to close midiInDevice", e);
+            }
+            midiInDevice = null;
+        }
+        // midiInDeviceInfo not changed so that we can tell if the method was called again
+
+        // Retrieve arguments and validate them
+        MidiDeviceInfo deviceInfo = bundle.getParcelable(EXTRA_MIDI_DEVICE);
+        int portNumber = bundle.getInt(EXTRA_MIDI_INDEX, 0);
+        if (deviceInfo == null || deviceInfo.getOutputPortCount() < 1) {
+            Log.w(TAG + "->onSetMidiIn", "Missing EXTRA_MIDI_DEVICE or no output ports available");
+            Bundle errorBundle = new Bundle();
+            errorBundle.putString(EXTRA_ERROR_REASON, "EXTRA_MIDI_DEVICE missing or contains no output ports");
+            errorBundle.putBoolean(EXTRA_ERROR_INFORMATIONAL, false);
+            errorBundle.putParcelable(EXTRA_MIDI_DEVICE, deviceInfo);
+            errorBundle.putInt(EXTRA_MIDI_INDEX, portNumber);
+            result.sendError(errorBundle);
+            return;
+        } // End if(deviceInfo == null || !deviceInfo.hasOutputPorts)
+        if (deviceInfo.getOutputPortCount() < portNumber) {
+            Log.w(TAG + "->onSetMidiIn",
+                    "deviceInfo.getOutputPortCount() less than EXTRA_MIDI_INDEX; output port count: " +
+                    deviceInfo.getOutputPortCount() + ", index: " + portNumber
+            );
+            Bundle errorBundle = new Bundle();
+            errorBundle.putString(EXTRA_ERROR_REASON, "EXTRA_MIDI_INDEX is greater than the number of output ports available");
+            errorBundle.putBoolean(EXTRA_ERROR_INFORMATIONAL, false);
+            errorBundle.putParcelable(EXTRA_MIDI_DEVICE, deviceInfo);
+            errorBundle.putInt(EXTRA_MIDI_INDEX, portNumber);
+            result.sendError(errorBundle);
+            return;
+        } // End if(deviceInfo.getOutputPortCount < portNumber)
+
+        // Update the current device info and (asynchronously) open the device
+        midiInDeviceInfo = deviceInfo;
+        result.detach();
+        midiManager.openDevice(deviceInfo, (device) -> {
+            if (device == null) {
+                Log.e(TAG + "->onSetMidiIn->openDevice", "Unable to open the requested MidiDevice");
+                Bundle errorBundle = new Bundle();
+                errorBundle.putString(EXTRA_ERROR_REASON, "Unable to open the requested MidiDevice");
+                errorBundle.putBoolean(EXTRA_ERROR_INFORMATIONAL, false);
+                errorBundle.putParcelable(EXTRA_MIDI_DEVICE, deviceInfo);
+                errorBundle.putInt(EXTRA_MIDI_INDEX, portNumber);
+                result.sendError(errorBundle);
+                return;
+            } // End if(device == null)
+
+            // Check if this is still the requested device
+            if (device.getInfo() != midiInDeviceInfo) {
+                Log.i(TAG + "->onSetMidiIn->openDevice",
+                        "midiInDeviceInfo not the same as opened device info, ACTION_SET_MIDI " +
+                        "called again before connection completed"
+                );
+                try { device.close(); }
+                catch (IOException e) {
+                    Log.e(TAG + "->onSetMidiIn->openDevice", "Unable to close device", e);
+                }
+                Bundle errorBundle = new Bundle();
+                errorBundle.putString(EXTRA_ERROR_REASON, "ACTION_SET_MIDI_IN called again before connection completed");
+                errorBundle.putBoolean(EXTRA_ERROR_INFORMATIONAL, false);
+                errorBundle.putParcelable(EXTRA_MIDI_DEVICE, deviceInfo);
+                errorBundle.putInt(EXTRA_MIDI_INDEX, portNumber);
+                result.sendError(errorBundle);
+                return;
+            } // End if(device.info == midiInDeviceInfo)
+
+            // Attempt to open the output port
+            midiInDevice = device;
+            midiInDevicePort = device.openOutputPort(portNumber);
+            if (midiInDevicePort == null) {
+                Log.e(TAG + "->onSetMidiIn->openDevice",
+                        "Unable to access the requested MIDI output port; device name: '" +
+                        deviceInfo.getProperties().getString(MidiDeviceInfo.PROPERTY_NAME) + "', port: " + portNumber
+                );
+                Bundle errorBundle = new Bundle();
+                errorBundle.putString(EXTRA_ERROR_REASON, "Unable to open the requested MidiOutputPort");
+                errorBundle.putBoolean(EXTRA_ERROR_INFORMATIONAL, false);
+                errorBundle.putParcelable(EXTRA_MIDI_DEVICE, deviceInfo);
+                errorBundle.putInt(EXTRA_MIDI_INDEX, portNumber);
+                result.sendError(errorBundle);
+                return;
+            } // End if(midiInDevicePort == null)
+
+            // Construct the adapter and connect the port to the service
+            MidiTransmitterAdapter adapter = new MidiTransmitterAdapter();
+            midiInDevicePort.connect(adapter);
+            adapter.setReceiver(getInputReceiver());
+
+            // Return the result
+            Bundle resultBundle = new Bundle();
+            resultBundle.putParcelable(EXTRA_MIDI_DEVICE, deviceInfo);
+            resultBundle.putInt(EXTRA_MIDI_INDEX, portNumber);
+            result.sendResult(resultBundle);
+        }, null); // End midiManager.openDevice call
+    } // End onSetMidiIn method
+
+    // Triggered by ACTION_SET_MIDI_OUT
+    private void onSetMidiOut(Bundle bundle, Result<Bundle> result) {
+        // Disconnect from the current MIDI out device
+        if (midiOutDeviceAdapter != null) {
+            removeReceiver(midiOutDeviceAdapter);
+            midiOutDeviceAdapter = null;
+        }
+        if (midiOutDevicePort != null) {
+            try { midiOutDevicePort.close(); }
+            catch (IOException e) { // Nothing we can do except log and move on
+                Log.e(TAG + "->onSetMidiOut", "Unable to close midiOutDevicePort", e);
+            }
+            midiOutDevicePort = null;
+        }
+        if (midiOutDevice != null) {
+            try { midiOutDevice.close(); }
+            catch (IOException e) { // Nothing we can do except log and move on
+                Log.e(TAG + "->onSetMidiOut", "Unable to close midiOutDevice", e);
+            }
+            midiOutDevice = null;
+        }
+        // midiOutDeviceInfo not changed so that we can tell if the method was called again
+
+        // Retrieve arguments and validate them
+        MidiDeviceInfo deviceInfo = bundle.getParcelable(EXTRA_MIDI_DEVICE);
+        int portNumber = bundle.getInt(EXTRA_MIDI_INDEX, 0);
+        if (deviceInfo == null || deviceInfo.getInputPortCount() < 1) {
+            Log.w(TAG + "->onSetMidiOut", "Missing EXTRA_MIDI_DEVICE or no input ports available");
+            Bundle errorBundle = new Bundle();
+            errorBundle.putString(EXTRA_ERROR_REASON, "EXTRA_MIDI_DEVICE missing or contains no input ports");
+            errorBundle.putBoolean(EXTRA_ERROR_INFORMATIONAL, false);
+            errorBundle.putParcelable(EXTRA_MIDI_DEVICE, deviceInfo);
+            errorBundle.putInt(EXTRA_MIDI_INDEX, portNumber);
+            result.sendError(errorBundle);
+            return;
+        } // End if(deviceInfo == null || !deviceInfo.hasInputPorts)
+        if (deviceInfo.getInputPortCount() < portNumber) {
+            Log.w(TAG + "->onSetMidiOut",
+                    "deviceInfo.getInputPortCount() less than EXTRA_MIDI_INDEX; input port count: " +
+                    deviceInfo.getInputPortCount() + " , index: " + portNumber
+            );
+            Bundle errorBundle = new Bundle();
+            errorBundle.putString(EXTRA_ERROR_REASON, "EXTRA_MIDI_INDEX is greater than the number of input ports available");
+            errorBundle.putBoolean(EXTRA_ERROR_INFORMATIONAL, false);
+            errorBundle.putParcelable(EXTRA_MIDI_DEVICE, deviceInfo);
+            errorBundle.putInt(EXTRA_MIDI_INDEX, portNumber);
+            result.sendError(errorBundle);
+            return;
+        } // End if(deviceInfo.getInputPortCount < portNumber)
+
+        // Update the current device info and (asynchronously) open the device
+        midiOutDeviceInfo = deviceInfo;
+        result.detach();
+        midiManager.openDevice(deviceInfo, (device) -> {
+            if (device == null) {
+                Log.e(TAG + "->onSetMidiOut->openDevice", "Unable to open the requested MidiDevice");
+                Bundle errorBundle = new Bundle();
+                errorBundle.putString(EXTRA_ERROR_REASON, "Unable to open the requested MidiDevice");
+                errorBundle.putBoolean(EXTRA_ERROR_INFORMATIONAL, false);
+                errorBundle.putParcelable(EXTRA_MIDI_DEVICE, deviceInfo);
+                errorBundle.putInt(EXTRA_MIDI_INDEX, portNumber);
+                result.sendError(errorBundle);
+                return;
+            } // End if(device == null)
+
+            // Check if this is still the requested device
+            if (device.getInfo() != midiOutDeviceInfo) {
+                Log.i(TAG + "->onSetMidiOut->openDevice",
+                        "midiInDeviceInfo not the same as opened device info, ACTION_SET_MIDI " +
+                        "called again before connection completed"
+                );
+                try { device.close(); }
+                catch (IOException e) {
+                    Log.e(TAG + "->onSetMidiOut->openDevice", "Unable to close device", e);
+                }
+                Bundle errorBundle = new Bundle();
+                errorBundle.putString(EXTRA_ERROR_REASON, "ACTION_SET_MIDI_OUT called again before connection completed");
+                errorBundle.putBoolean(EXTRA_ERROR_INFORMATIONAL, false);
+                errorBundle.putParcelable(EXTRA_MIDI_DEVICE, deviceInfo);
+                errorBundle.putInt(EXTRA_MIDI_INDEX, portNumber);
+                result.sendError(errorBundle);
+                return;
+            } // End if(device.info != midiOutDeviceInfo)
+
+            // Attempt to open the input port
+            midiOutDevice = device;
+            midiOutDevicePort = device.openInputPort(portNumber);
+            if (midiOutDevicePort == null) {
+                Log.e(TAG + "->onSetMidiOut->openDevice",
+                        "Unable to access the requested MIDI input port, another application" +
+                        "probably has a lock on it; device name: '" +
+                        deviceInfo.getProperties().getString(MidiDeviceInfo.PROPERTY_NAME) + "', port: " + portNumber
+                );
+                Bundle errorBundle = new Bundle();
+                errorBundle.putString(EXTRA_ERROR_REASON, "Unable to open the requested MidiInputPort");
+                errorBundle.putBoolean(EXTRA_ERROR_INFORMATIONAL, false);
+                errorBundle.putParcelable(EXTRA_MIDI_DEVICE, deviceInfo);
+                errorBundle.putInt(EXTRA_MIDI_INDEX, portNumber);
+                result.sendError(errorBundle);
+                return;
+            } // End if(midiOutDevicePort == null)
+
+            // Construct the adapter and connect the port to the service
+            midiOutDeviceAdapter = new MidiReceiverAdapter(midiOutDevicePort);
+            addReceiver(midiOutDeviceAdapter);
+
+            // Return the result
+            Bundle resultBundle = new Bundle();
+            resultBundle.putParcelable(EXTRA_MIDI_DEVICE, deviceInfo);
+            resultBundle.putInt(EXTRA_MIDI_INDEX, portNumber);
+            result.sendResult(resultBundle);
+        }, null); // End midiManager.openDevice call
+    } // End onSetMidiOut method
 
     // Triggered by ACTION_INIT_LIBRARY
     private void onInitLibrary(Result<Bundle> result) {
