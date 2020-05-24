@@ -32,20 +32,6 @@ public class MoppyMidiService extends MidiDeviceService {
         super.onCreate();
 
         midiFromService = new MidiReceiverAdapter(getOutputPortReceivers()[0]); // Gets the first (only) output port
-
-        // TODO: Remove, tests that midiToService and midiFromService can receive input. midiToService messages
-        //  are being looped through midiFromService.
-        midiToService.setReceiver(new Receiver() {
-            @Override
-            public void send(@NonNull MidiMessage message, long timeStamp) {
-                Log.i("MIDI to service", message.toString());
-                midiFromService.send(message, timeStamp);
-            }
-
-            @Override
-            public void close() { }
-        });
-
         moppyServiceConnection = new MoppyServiceConnection();
         Intent bindIntent = new Intent(this, MoppyMediaService.class);
         bindIntent.putExtra(MoppyMediaService.EXTRA_BIND_NORMAL, true);

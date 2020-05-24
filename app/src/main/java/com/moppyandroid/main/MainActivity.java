@@ -168,13 +168,6 @@ public class MainActivity extends AppCompatActivity implements SeekBar.OnSeekBar
         songSlider = findViewById(R.id.song_slider);
         setControlState(true);
 
-        // TODO Remove, used to test the MoppyMidiService
-        MidiManager m = (MidiManager) getSystemService(Context.MIDI_SERVICE);
-        MidiDeviceInfo[] infos = m.getDevices();
-        m.openDevice(infos[0], (device) -> {
-            try {device.close();}catch (IOException ignored) {}
-        }, null);
-
         // Start the media service
         // Note: This is in addition to binding/unbinding in onStart and onStop to allow the service
         //      to run when the activity is minimized
