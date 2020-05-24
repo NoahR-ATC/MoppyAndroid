@@ -438,40 +438,9 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
      */
     @Override
     public void onDestroy() {
-        // Disconnect from the current MIDI in device
-        if (midiInDevicePort != null) {
-            try { midiInDevicePort.close(); }
-            catch (IOException e) { // Nothing we can do except log and move on
-                Log.e(TAG + "->onDestroy", "Unable to close midiInDevicePort", e);
-            }
-            midiInDevicePort = null;
-        }
-        if (midiInDevice != null) {
-            try { midiInDevice.close(); }
-            catch (IOException e) { // Nothing we can do except log and move on
-                Log.e(TAG + "->onDestroy", "Unable to close midiInDevice", e);
-            }
-            midiInDevice = null;
-        }
-        // Disconnect from the current MIDI out device
-        if (midiOutDeviceAdapter != null) {
-            removeReceiver(midiOutDeviceAdapter);
-            midiOutDeviceAdapter = null;
-        }
-        if (midiOutDevicePort != null) {
-            try { midiOutDevicePort.close(); }
-            catch (IOException e) { // Nothing we can do except log and move on
-                Log.e(TAG + "->onDestroy", "Unable to close midiOutDevicePort", e);
-            }
-            midiOutDevicePort = null;
-        }
-        if (midiOutDevice != null) {
-            try { midiOutDevice.close(); }
-            catch (IOException e) { // Nothing we can do except log and move on
-                Log.e(TAG + "->onDestroy", "Unable to close midiOutDevice", e);
-            }
-            midiOutDevice = null;
-        }
+        // Disconnect from the current MIDI devices
+        disconnectMidiIn();
+        disconnectMidiOut();
 
         // Disconnect from all Moppy devices, stop running in the foreground, and shutdown the media session
         if (moppyManager != null) { moppyManager.getUsbManager().closeAllBridges(); }
@@ -757,8 +726,24 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
             result.sendError(errorBundle);
             return;
         } // End if(extras == null)
+
         MidiPortInfoWrapper portInfo = extras.getParcelable(EXTRA_MIDI_IN_DEVICE);
-        if (portInfo == null || portInfo.getType() != MidiDeviceInfo.PortInfo.TYPE_OUTPUT) {
+
+        // Handle setting MIDI in device to null
+        if (portInfo == null) {
+            disconnectMidiIn();
+            requestedMidiInDeviceInfo = null;
+            currentMidiInInfo = null;
+
+            // Return the result
+            Bundle resultBundle = new Bundle();
+            resultBundle.putParcelable(EXTRA_MIDI_IN_DEVICE, null);
+            result.sendResult(resultBundle);
+            return;
+        } // End if(portInfo == null)
+
+        // Resume checking validity of arguments
+        if (portInfo.getType() != MidiDeviceInfo.PortInfo.TYPE_OUTPUT) {
             Log.w(TAG + "->onSetMidiIn", "Missing EXTRA_MIDI_DEVICE or isn't an output port");
             Bundle errorBundle = new Bundle();
             errorBundle.putString(EXTRA_ERROR_REASON, "EXTRA_MIDI_DEVICE missing or isn't an output port");
@@ -777,22 +762,7 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
             return;
         } // End if(parent == null)
 
-        // Disconnect from the current MIDI in device
-        if (midiInDevicePort != null) {
-            try { midiInDevicePort.close(); }
-            catch (IOException e) { // Nothing we can do except log and move on
-                Log.e(TAG + "->onSetMidiIn", "Unable to close midiInDevicePort", e);
-            }
-            midiInDevicePort = null;
-        }
-        if (midiInDevice != null) {
-            try { midiInDevice.close(); }
-            catch (IOException e) { // Nothing we can do except log and move on
-                Log.e(TAG + "->onSetMidiIn", "Unable to close midiInDevice", e);
-            }
-            midiInDevice = null;
-        }
-        // requestedMidiInDeviceInfo not changed so that we can tell if the method was called again
+        disconnectMidiIn();
 
         // Update the current device info and (asynchronously) open the device
         requestedMidiInDeviceInfo = portInfo.getParent();
@@ -867,8 +837,24 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
             result.sendError(errorBundle);
             return;
         } // End if(extras == null)
+
         MidiPortInfoWrapper portInfo = extras.getParcelable(EXTRA_MIDI_OUT_DEVICE);
-        if (portInfo == null || portInfo.getType() != MidiDeviceInfo.PortInfo.TYPE_INPUT) {
+
+        // Handle setting MIDI in device to null
+        if (portInfo == null) {
+            disconnectMidiOut();
+            requestedMidiOutDeviceInfo = null;
+            currentMidiOutInfo = null;
+
+            // Return the result
+            Bundle resultBundle = new Bundle();
+            resultBundle.putParcelable(EXTRA_MIDI_OUT_DEVICE, null);
+            result.sendResult(resultBundle);
+            return;
+        } // End if(portInfo == null)
+
+        // Resume checking validity of arguments
+        if (portInfo.getType() != MidiDeviceInfo.PortInfo.TYPE_INPUT) {
             Log.w(TAG + "->onSetMidiOut", "Missing EXTRA_MIDI_DEVICE or isn't an input port");
             Bundle errorBundle = new Bundle();
             errorBundle.putString(EXTRA_ERROR_REASON, "EXTRA_MIDI_DEVICE missing or isn't an input port");
@@ -887,26 +873,7 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
             return;
         } // End if(parent == null)
 
-        // Disconnect from the current MIDI out device
-        if (midiOutDeviceAdapter != null) {
-            removeReceiver(midiOutDeviceAdapter);
-            midiOutDeviceAdapter = null;
-        }
-        if (midiOutDevicePort != null) {
-            try { midiOutDevicePort.close(); }
-            catch (IOException e) { // Nothing we can do except log and move on
-                Log.e(TAG + "->onSetMidiOut", "Unable to close midiOutDevicePort", e);
-            }
-            midiOutDevicePort = null;
-        }
-        if (midiOutDevice != null) {
-            try { midiOutDevice.close(); }
-            catch (IOException e) { // Nothing we can do except log and move on
-                Log.e(TAG + "->onSetMidiOut", "Unable to close midiOutDevice", e);
-            }
-            midiOutDevice = null;
-        }
-        // requestedMidiOutDeviceInfo not changed so that we can tell if the method was called again
+        disconnectMidiOut();
 
         // Update the current requested device info and (asynchronously) open the device
         requestedMidiOutDeviceInfo = portInfo.getParent();
@@ -1110,6 +1077,48 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
         resultBundle.putString(EXTRA_MEDIA_ID, mediaId);
         result.sendResult(resultBundle);
     } // End onLoadAction method
+
+    // Disconnects the current MIDI in device
+    private void disconnectMidiIn() {
+        // Disconnect from the current MIDI in device
+        if (midiInDevicePort != null) {
+            try { midiInDevicePort.close(); }
+            catch (IOException e) { // Nothing we can do except log and move on
+                Log.e(TAG + "->onSetMidiIn", "Unable to close midiInDevicePort", e);
+            }
+            midiInDevicePort = null;
+        }
+        if (midiInDevice != null) {
+            try { midiInDevice.close(); }
+            catch (IOException e) { // Nothing we can do except log and move on
+                Log.e(TAG + "->onSetMidiIn", "Unable to close midiInDevice", e);
+            }
+            midiInDevice = null;
+        }
+    } // End disconnectMidiIn method
+
+    // Disconnects the current MIDI out device
+    private void disconnectMidiOut() {
+        // Disconnect from the current MIDI out device
+        if (midiOutDeviceAdapter != null) {
+            removeReceiver(midiOutDeviceAdapter);
+            midiOutDeviceAdapter = null;
+        }
+        if (midiOutDevicePort != null) {
+            try { midiOutDevicePort.close(); }
+            catch (IOException e) { // Nothing we can do except log and move on
+                Log.e(TAG + "->onSetMidiOut", "Unable to close midiOutDevicePort", e);
+            }
+            midiOutDevicePort = null;
+        }
+        if (midiOutDevice != null) {
+            try { midiOutDevice.close(); }
+            catch (IOException e) { // Nothing we can do except log and move on
+                Log.e(TAG + "->onSetMidiOut", "Unable to close midiOutDevice", e);
+            }
+            midiOutDevice = null;
+        }
+    } // End disconnectMidiOut method
 
     // Method to toggle the notification between playing (pause icon) and not-playing (play icon) modes.
     //
