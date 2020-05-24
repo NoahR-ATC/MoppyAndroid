@@ -123,6 +123,8 @@ public class DeviceSelectorDialog extends DialogFragment implements DialogInterf
         Dialog thisDialog = selectorBuilder.create();
         thisDialog.setOnShowListener(this);
         currentDialog = thisDialog;
+        emptyShowing = false;
+
         return currentDialog;
     } // End onCreateDialog method
 
