@@ -122,6 +122,21 @@ public class MidiPortInfoWrapper implements Parcelable {
     @Override
     public int describeContents() { return 0; }
 
+    /**
+     * Checks whether this {@code MidiPortInfoWrapper} is equal to another {@link Object}.
+     *
+     * @param o the object to check equality with
+     * @return {@code true} if the {@code o} is equal to this, {@code false} otherwise
+     */
+    @Override
+    public boolean equals(Object o) {
+        if (!(o instanceof MidiPortInfoWrapper)) { return false; }
+        return parent.equals(((MidiPortInfoWrapper) o).getParent()) &&
+               portType == ((MidiPortInfoWrapper) o).getType() &&
+               portNumber == ((MidiPortInfoWrapper) o).getPortNumber() &&
+               portName.equals(((MidiPortInfoWrapper) o).getName());
+    } // End equals method
+
     public static final Creator<MidiPortInfoWrapper> CREATOR = new Creator<MidiPortInfoWrapper>() {
         @Override
         public MidiPortInfoWrapper createFromParcel(Parcel in) { return new MidiPortInfoWrapper(in); }
