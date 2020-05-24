@@ -36,6 +36,9 @@ public class MidiSpinnerAdapter extends ArrayAdapter<MidiSpinnerAdapter.MidiPort
         List<MidiPortInfoWrapper> dataset = new ArrayList<>();
         if (infos == null) { return new MidiSpinnerAdapter(context, dataset); } // Create empty
 
+        // Add null entry to beginning to act as placeholder for "NONE"
+        dataset.add(0, null);
+
         // Add each port info in the list of devices based on the selection criteria, keeping track of its device
         for (MidiDeviceInfo info : infos) {
             MidiDeviceInfo.PortInfo[] ports = info.getPorts();
@@ -75,7 +78,10 @@ public class MidiSpinnerAdapter extends ArrayAdapter<MidiSpinnerAdapter.MidiPort
         // Set the text
         MidiPortInfoWrapper info = dataset.get(position);
         TextView textView = convertView.findViewById(android.R.id.text1);
-        textView.setText(context.getString(R.string.midi_spinner_text, info.getParentName(), info.getName()));
+        if (position == 0) { textView.setText(context.getString(R.string.none_entry)); }
+        else {
+            textView.setText(context.getString(R.string.midi_spinner_text, info.getParentName(), info.getName()));
+        }
 
         return convertView;
     } // End getView method
@@ -93,7 +99,10 @@ public class MidiSpinnerAdapter extends ArrayAdapter<MidiSpinnerAdapter.MidiPort
         // Set the text
         MidiPortInfoWrapper info = dataset.get(position);
         TextView textView = convertView.findViewById(android.R.id.text1);
-        textView.setText(context.getString(R.string.midi_spinner_text, info.getParentName(), info.getName()));
+        if (position == 0) { textView.setText(context.getString(R.string.none_entry)); }
+        else {
+            textView.setText(context.getString(R.string.midi_spinner_text, info.getParentName(), info.getName()));
+        }
 
         return convertView;
     } // End getDropDownView method
