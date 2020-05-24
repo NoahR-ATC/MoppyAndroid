@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <devices>
+    <!-- Keep device name the same as @string/midi_device_name -->
     <device
         name="MoppyAndroid MIDI"
         manufacturer="MoppyAndroid"

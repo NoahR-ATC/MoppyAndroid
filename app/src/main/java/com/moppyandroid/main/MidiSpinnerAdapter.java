@@ -33,8 +33,8 @@ public class MidiSpinnerAdapter extends ArrayAdapter<MidiSpinnerAdapter.MidiPort
      */
     public static MidiSpinnerAdapter newInstance(Context context, List<MidiDeviceInfo> infos, boolean selectInputs, boolean selectOutputs) {
         if (context == null) { return null; }
-        if (infos == null) { return new MidiSpinnerAdapter(context, null); }
         List<MidiPortInfoWrapper> dataset = new ArrayList<>();
+        if (infos == null) { return new MidiSpinnerAdapter(context, dataset); } // Create empty
 
         // Add each port info in the list of devices based on the selection criteria, keeping track of its device
         for (MidiDeviceInfo info : infos) {
@@ -69,15 +69,34 @@ public class MidiSpinnerAdapter extends ArrayAdapter<MidiSpinnerAdapter.MidiPort
     public View getView(int position, @Nullable View convertView, @NonNull ViewGroup parent) {
         // Construct view if necessary
         if (convertView == null) {
+            convertView = LayoutInflater.from(context).inflate(android.R.layout.simple_spinner_item, parent, false);
+        }
+
+        // Set the text
+        MidiPortInfoWrapper info = dataset.get(position);
+        TextView textView = convertView.findViewById(android.R.id.text1);
+        textView.setText(context.getString(R.string.midi_spinner_text, info.getParentName(), info.getName()));
+
+        return convertView;
+    } // End getView method
+
+    /**
+     * Triggered when a dropdown entry is created.
+     */
+    @Override
+    public View getDropDownView(int position, @Nullable View convertView, @NonNull ViewGroup parent) {
+        // Construct view if necessary
+        if (convertView == null) {
             convertView = LayoutInflater.from(context).inflate(android.R.layout.simple_spinner_dropdown_item, parent, false);
         }
 
         // Set the text
+        MidiPortInfoWrapper info = dataset.get(position);
         TextView textView = convertView.findViewById(android.R.id.text1);
-        textView.setText(dataset.get(position).getName());
+        textView.setText(context.getString(R.string.midi_spinner_text, info.getParentName(), info.getName()));
 
         return convertView;
-    } // End getView method
+    } // End getDropDownView method
 
     /**
      * {@link android.media.midi.MidiDeviceInfo.PortInfo} wrapper that provides the parent {@link MidiDeviceInfo}.
@@ -149,5 +168,12 @@ public class MidiSpinnerAdapter extends ArrayAdapter<MidiSpinnerAdapter.MidiPort
          * @return this port's parent
          */
         public MidiDeviceInfo getParent() { return parent; }
+
+        /**
+         * Gets the name of the parent {@link MidiDeviceInfo} of this port.
+         *
+         * @return the port's parent's name
+         */
+        public String getParentName() { return parent.getProperties().getString(MidiDeviceInfo.PROPERTY_NAME); }
     } // End MidiInfoPortWrapper class
 } // End MidiSpinnerAdapter class

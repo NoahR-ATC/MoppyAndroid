@@ -2,6 +2,7 @@
     <string name="app_name">MoppyAndroid</string>
 
     <string name="sequencer_fragment_txt">Sequencer fragment</string>
+    <string name="midi_device_name">MoppyAndroid MIDI</string>
     <string name="play_button">Play button</string>
     <string name="pause_button">Pause button</string>
     <string name="song_title">No song loaded</string>
@@ -9,6 +10,7 @@
     <string name="no_device_text">No Moppy devices available</string>
     <string name="midi_in_text">MIDI IN</string>
     <string name="midi_out_text">MIDI OUT</string>
+    <string name="midi_spinner_text">%1$s: %2$s</string>
     <string name="loading_text">Waiting for USB permission…</string>
     <string name="devices_button_description">Opens a menu for selecting devices</string>
     <string name="info_button_description">Device information button</string>
