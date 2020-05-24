@@ -22,6 +22,7 @@ import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.widget.AdapterView;
+import android.widget.ArrayAdapter;
 import android.widget.CheckBox;
 import android.widget.Spinner;
 import android.widget.TextView;
@@ -106,10 +107,10 @@ public class DeviceSelectorDialog extends DialogFragment implements DialogInterf
 
         midiInSpinner = v.findViewById(R.id.midi_in_spinner);
         midiInSpinner.setOnItemSelectedListener(this);
-        midiInSpinner.setAdapter(MidiSpinnerAdapter.newInstance(context, null, false, true));
+        midiInSpinner.setAdapter(new ArrayAdapter<>(context, android.R.layout.simple_spinner_item, new ArrayList<String>()));
         midiOutSpinner = v.findViewById(R.id.midi_out_spinner);
         midiOutSpinner.setOnItemSelectedListener(this);
-        midiOutSpinner.setAdapter(MidiSpinnerAdapter.newInstance(context, null, true, false));
+        midiOutSpinner.setAdapter(new ArrayAdapter<>(context, android.R.layout.simple_spinner_item, new ArrayList<String>()));
 
         deviceRecycler = v.findViewById(R.id.device_recycler);
         deviceRecycler.setLayoutManager(new LinearLayoutManager(context));
@@ -193,10 +194,30 @@ public class DeviceSelectorDialog extends DialogFragment implements DialogInterf
     @Override
     public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
         if (parent == midiInSpinner) {
-            // TODO: Implement MIDI input connection
+            Bundle setterBundle = new Bundle();
+            setterBundle.putParcelable(MoppyMediaService.EXTRA_MIDI_IN_DEVICE,
+                    (position == 0) ? null : (MidiPortInfoWrapper) parent.getItemAtPosition(position)
+            );
+            mediaBrowser.sendCustomAction(MoppyMediaService.ACTION_SET_MIDI_IN, setterBundle, new MediaBrowserCompat.CustomActionCallback() {
+                @Override
+                public void onError(String action, Bundle extras, Bundle data) {
+                    midiInSpinner.setSelection(0); // Set the MIDI input device to "NONE" and update the service
+                    super.onError(action, extras, data);
+                }
+            });
         } // End if(parent == midiInSpinner)
         else if (parent == midiOutSpinner) {
-            // TODO: Implement MIDI output connection
+            Bundle setterBundle = new Bundle();
+            setterBundle.putParcelable(MoppyMediaService.EXTRA_MIDI_OUT_DEVICE,
+                    (position == 0) ? null : (MidiPortInfoWrapper) parent.getItemAtPosition(position)
+            );
+            mediaBrowser.sendCustomAction(MoppyMediaService.ACTION_SET_MIDI_OUT, setterBundle, new MediaBrowserCompat.CustomActionCallback() {
+                @Override
+                public void onError(String action, Bundle extras, Bundle data) {
+                    midiOutSpinner.setSelection(0); // Set the MIDI output device to "NONE" and update the service
+                    super.onError(action, extras, data);
+                }
+            });
         } // End if(parent == midiInSpinner) {} else if(parent == midiOutSpinner)
     } // End onItemSelected method
 
@@ -315,6 +336,10 @@ public class DeviceSelectorDialog extends DialogFragment implements DialogInterf
     } // End showDeviceInfo method
 
     private void updateMidiSpinners(MidiPortInfoWrapper oldInputPort, MidiPortInfoWrapper oldOutputPort) {
+        // Disable onItemSelected events while we refresh
+        midiInSpinner.setOnItemSelectedListener(null);
+        midiOutSpinner.setOnItemSelectedListener(null);
+
         String deviceName = getString(R.string.midi_device_name);
         List<MidiDeviceInfo> newInfos = new ArrayList<>();
         MidiDeviceInfo[] deviceInfos = midiManager.getDevices();
@@ -332,8 +357,14 @@ public class DeviceSelectorDialog extends DialogFragment implements DialogInterf
         // Attempt to reselect the previously selected ports
         int midiInIndex = midiInAdapter.getIndexOf(oldInputPort);
         int midiOutIndex = midiOutAdapter.getIndexOf(oldOutputPort);
-        if (midiInIndex != -1 && midiInIndex != 0) { midiInSpinner.setSelection(midiInIndex); }
-        if (midiOutIndex != -1 && midiOutIndex != 0) { midiOutSpinner.setSelection(midiOutIndex); }
+        if (midiInIndex != -1) { midiInSpinner.setSelection(midiInIndex, false); }
+        if (midiOutIndex != -1) { midiOutSpinner.setSelection(midiOutIndex, false); }
+        // If either index is -1 then setSelection(index, false) won't be called so the respective
+        // onItemSelected will be called for the "NONE" entry and disconnect for us
+
+        // Re-enable onItemSelected events and send one if setSelection(index, false) wasn't called
+        midiInSpinner.setOnItemSelectedListener(this);
+        midiOutSpinner.setOnItemSelectedListener(this);
     } // End updateMidiSpinners method
 
     // Requests the service to connect to a device, showing an error and unchecking its box if unsuccessful
