@@ -14,6 +14,8 @@ import android.content.DialogInterface;
 import android.content.Intent;
 import android.hardware.usb.UsbDevice;
 import android.hardware.usb.UsbManager;
+import android.media.midi.MidiDeviceInfo;
+import android.media.midi.MidiManager;
 import android.os.Bundle;
 import android.support.v4.media.MediaBrowserCompat;
 import android.util.Log;
@@ -24,8 +26,10 @@ import android.widget.CheckBox;
 import android.widget.Spinner;
 import android.widget.TextView;
 
+import com.moppyandroid.main.service.MidiPortInfoWrapper;
 import com.moppyandroid.main.service.MoppyMediaService;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -46,6 +50,7 @@ public class DeviceSelectorDialog extends DialogFragment implements DialogInterf
     private AlertDialog loadingBar;
     private Context context;
     private UsbManager usbManager;
+    private MidiManager midiManager;
     private Dialog currentDialog;
 
     /**
@@ -79,6 +84,8 @@ public class DeviceSelectorDialog extends DialogFragment implements DialogInterf
         deviceCheckBoxMap = new HashMap<>();
         usbManager = (UsbManager) context.getSystemService(Service.USB_SERVICE);
         assert usbManager != null; // Shouldn't ever arise
+        midiManager = (MidiManager) context.getSystemService(Service.MIDI_SERVICE);
+        assert midiManager != null; // Shouldn't ever arise
 
         // Create the loading bar from an alert dialog containing loading_dialog_layout
         AlertDialog.Builder alertBuilder = new AlertDialog.Builder(context);
@@ -99,8 +106,10 @@ public class DeviceSelectorDialog extends DialogFragment implements DialogInterf
 
         midiInSpinner = v.findViewById(R.id.midi_in_spinner);
         midiInSpinner.setOnItemSelectedListener(this);
+        midiInSpinner.setAdapter(MidiSpinnerAdapter.newInstance(context, null, false, true));
         midiOutSpinner = v.findViewById(R.id.midi_out_spinner);
         midiOutSpinner.setOnItemSelectedListener(this);
+        midiOutSpinner.setAdapter(MidiSpinnerAdapter.newInstance(context, null, true, false));
 
         deviceRecycler = v.findViewById(R.id.device_recycler);
         deviceRecycler.setLayoutManager(new LinearLayoutManager(context));
@@ -234,6 +243,10 @@ public class DeviceSelectorDialog extends DialogFragment implements DialogInterf
                             emptyShowing = false;
                         } // End if(size < 1 && selectorDialog.showing) {} else if (size > 1 && emptyDialog.showing)
 
+                        MidiPortInfoWrapper currentMidiIn = resultData.getParcelable(MoppyMediaService.EXTRA_MIDI_IN_DEVICE);
+                        MidiPortInfoWrapper currentMidiOut = resultData.getParcelable(MoppyMediaService.EXTRA_MIDI_OUT_DEVICE);
+                        updateMidiSpinners(currentMidiIn, currentMidiOut);
+
                         super.onResult(action, extras, resultData);
                     } // End ACTION_GET_DEVICES.onResult method
                 }); // End ACTION_GET_DEVICES callback
@@ -300,6 +313,28 @@ public class DeviceSelectorDialog extends DialogFragment implements DialogInterf
         alertBuilder.setMessage(messageBuilder.toString());
         alertBuilder.show();
     } // End showDeviceInfo method
+
+    private void updateMidiSpinners(MidiPortInfoWrapper oldInputPort, MidiPortInfoWrapper oldOutputPort) {
+        String deviceName = getString(R.string.midi_device_name);
+        List<MidiDeviceInfo> newInfos = new ArrayList<>();
+        MidiDeviceInfo[] deviceInfos = midiManager.getDevices();
+
+        // Remove ourself from the list of available devices and update the spinners
+        for (MidiDeviceInfo info : deviceInfos) {
+            String name = info.getProperties().getString(MidiDeviceInfo.PROPERTY_NAME);
+            if (name == null || !name.equals(deviceName)) { newInfos.add(info); }
+        }
+        MidiSpinnerAdapter midiInAdapter = MidiSpinnerAdapter.newInstance(context, newInfos, false, true);
+        MidiSpinnerAdapter midiOutAdapter = MidiSpinnerAdapter.newInstance(context, newInfos, true, false);
+        midiInSpinner.setAdapter(midiInAdapter);
+        midiOutSpinner.setAdapter(midiOutAdapter);
+
+        // Attempt to reselect the previously selected ports
+        int midiInIndex = midiInAdapter.getIndexOf(oldInputPort);
+        int midiOutIndex = midiOutAdapter.getIndexOf(oldOutputPort);
+        if (midiInIndex != -1 && midiInIndex != 0) { midiInSpinner.setSelection(midiInIndex); }
+        if (midiOutIndex != -1 && midiOutIndex != 0) { midiOutSpinner.setSelection(midiOutIndex); }
+    } // End updateMidiSpinners method
 
     // Requests the service to connect to a device, showing an error and unchecking its box if unsuccessful
     private void connectDevice(UsbDevice device, CheckBox checkBox) {
