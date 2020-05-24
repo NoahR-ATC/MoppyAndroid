@@ -192,6 +192,16 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
      *             <td>{@link ArrayList}{@code <}{@link String}{@code >}</td>
      *             <td>The list of connected device identifiers</td>
      *         </tr>
+     *         <tr>
+     *             <td>(Result only) {@link #EXTRA_MIDI_IN_DEVICE}</td>
+     *             <td>{@link MidiPortInfoWrapper} ({@link android.os.Parcelable})</td>
+     *             <td>The currently connected MIDI in device, or null if none connected</td>
+     *         </tr>
+     *         <tr>
+     *             <td>(Result only) {@link #EXTRA_MIDI_OUT_DEVICE}</td>
+     *             <td>{@link MidiPortInfoWrapper} ({@link android.os.Parcelable})</td>
+     *             <td>The currently connected MIDI out device, or null if none connected</td>
+     *         </tr>
      *     </table>
      * </p>
      *
@@ -988,7 +998,7 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
         notificationBuilder.setContentText(numConnected + " device" + ((numConnected == 1) ? "" : "s") + " connected");
         notificationManager.notify(NOTIFICATION_ID, notificationBuilder.build());
         onGetDevices(result); // Add the new device list and send the result
-    }
+    } // End onRefreshDevice method
 
     // Triggered by ACTION_GET_DEVICES
     private void onGetDevices(Result<Bundle> result) {
@@ -1006,8 +1016,10 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
         resultBundle.putStringArrayList(EXTRA_DEVICES_CONNECTED,
                 new ArrayList<>(moppyManager.getUsbManager().getConnectedIdentifiers())
         );
+        resultBundle.putParcelable(EXTRA_MIDI_IN_DEVICE, currentMidiInInfo);
+        resultBundle.putParcelable(EXTRA_MIDI_OUT_DEVICE, currentMidiOutInfo);
         result.sendResult(resultBundle);
-    }
+    } // End onGetDevices method
 
     // Triggered by ACTION_LOAD_ITEM. Essentially MediaCallback.onPlayFromMediaId with callbacks to result.
     private void onLoadAction(Bundle extras, Result<Bundle> result) {
@@ -1018,7 +1030,7 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
             errorBundle.putBoolean(EXTRA_ERROR_INFORMATIONAL, false);
             result.sendError(errorBundle);
             return;
-        }
+        } // End if(extras == null || EXTRA_MEDIA_ID == null)
         String mediaId = extras.getString(EXTRA_MEDIA_ID);
         boolean setToPlaying = extras.getBoolean(EXTRA_PLAY, false);
 
