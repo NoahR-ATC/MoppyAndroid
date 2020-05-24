@@ -79,9 +79,9 @@ public class MidiPortInfoWrapper implements Parcelable {
     /**
      * Gets the name of the parent {@link MidiDeviceInfo} of this port.
      *
-     * @return the port's parent's name
+     * @return the port's parent's name, or {@code null if the parent is {@code null}}
      */
-    public String getParentName() { return parent.getProperties().getString(MidiDeviceInfo.PROPERTY_NAME); }
+    public String getParentName() { return (parent != null ? parent.getProperties().getString(MidiDeviceInfo.PROPERTY_NAME) : null); }
 
 
     // Parcelable implementation

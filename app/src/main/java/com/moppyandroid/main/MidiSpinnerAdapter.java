@@ -108,4 +108,12 @@ public class MidiSpinnerAdapter extends ArrayAdapter<MidiPortInfoWrapper> {
 
         return convertView;
     } // End getDropDownView method
+
+    /**
+     * Gets the index of the first entry for the specified {@link MidiPortInfoWrapper}.
+     *
+     * @param portInfo the port to look for
+     * @return {@code -1} if not found, otherwise the index
+     */
+    public int getIndexOf(MidiPortInfoWrapper portInfo) { return dataset.indexOf(portInfo); }
 } // End MidiSpinnerAdapter class
