@@ -11,6 +11,8 @@ import android.widget.TextView;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
+import com.moppyandroid.main.service.MidiPortInfoWrapper;
+
 import java.util.ArrayList;
 import java.util.List;
 
@@ -18,7 +20,7 @@ import java.util.List;
  * {@link List}{@code <}{@link MidiPortInfoWrapper}{@code >} adapter for a {@link android.widget.Spinner}
  * that displays the name of each port as a list entry.
  */
-public class MidiSpinnerAdapter extends ArrayAdapter<MidiSpinnerAdapter.MidiPortInfoWrapper> {
+public class MidiSpinnerAdapter extends ArrayAdapter<MidiPortInfoWrapper> {
     private Context context;
     private List<MidiPortInfoWrapper> dataset;
 
@@ -106,83 +108,4 @@ public class MidiSpinnerAdapter extends ArrayAdapter<MidiSpinnerAdapter.MidiPort
 
         return convertView;
     } // End getDropDownView method
-
-    /**
-     * {@link android.media.midi.MidiDeviceInfo.PortInfo} wrapper that provides the parent {@link MidiDeviceInfo}.
-     */
-    public static class MidiPortInfoWrapper {
-        private MidiDeviceInfo parent;
-        private MidiDeviceInfo.PortInfo portInfo;
-
-        /**
-         * Constructs a {@code MidiPortInfoWrapper} to represent a MIDI port.
-         *
-         * @param portInfo the {@link android.media.midi.MidiDeviceInfo.PortInfo} to provide
-         * @param parent   the {@link MidiDeviceInfo} that contains {@code portInfo}
-         */
-        public MidiPortInfoWrapper(MidiDeviceInfo.PortInfo portInfo, MidiDeviceInfo parent) {
-            this.portInfo = portInfo;
-            this.parent = parent;
-        } // End MidiPortInfoWrapper constructor
-
-        /**
-         * Gets the {@link android.media.midi.MidiDeviceInfo.PortInfo} associated with this port.
-         *
-         * @return this port's {@link android.media.midi.MidiDeviceInfo.PortInfo}
-         */
-        public MidiDeviceInfo.PortInfo getPortInfo() { return portInfo; }
-
-        /**
-         * Gets the type of this port, either {@link android.media.midi.MidiDeviceInfo.PortInfo#TYPE_INPUT}
-         * or {@link android.media.midi.MidiDeviceInfo.PortInfo#TYPE_OUTPUT} depending on if this MIDI port
-         * receives or sends MIDI messages.
-         *
-         * @return {@link android.media.midi.MidiDeviceInfo.PortInfo#TYPE_INPUT} or {@link android.media.midi.MidiDeviceInfo.PortInfo#TYPE_OUTPUT}
-         */
-        public int getType() { return portInfo.getType(); }
-
-        /**
-         * Gets the number of this port within either the input or output port lists of the parent
-         * {@link MidiDeviceInfo} (i.e. an input port and output port could both have a port number of 0).
-         * Not suitable to be used as an index in {@code getParent().{@link MidiDeviceInfo#getPorts() getPorts()}},
-         * see {@link #getPortIndex()} for that.
-         *
-         * @return this port's number
-         */
-        public int getPortNumber() { return portInfo.getPortNumber(); }
-
-        /**
-         * Gets the index of this port in the array returned with the parent {@link MidiDeviceInfo}'s
-         * {@link MidiDeviceInfo#getPorts() getPorts()} method.
-         *
-         * @return this port's index
-         */
-        public int getPortIndex() {
-            if (portInfo.getType() == MidiDeviceInfo.PortInfo.TYPE_INPUT) {
-                return getPortNumber();
-            }
-            else { return parent.getInputPortCount() + getPortNumber(); }
-        } // End getPortIndex method
-
-        /**
-         * Gets the name of this port.
-         *
-         * @return this port's name
-         */
-        public String getName() { return portInfo.getName(); }
-
-        /**
-         * Gets the parent {@link MidiDeviceInfo} of this port.
-         *
-         * @return this port's parent
-         */
-        public MidiDeviceInfo getParent() { return parent; }
-
-        /**
-         * Gets the name of the parent {@link MidiDeviceInfo} of this port.
-         *
-         * @return the port's parent's name
-         */
-        public String getParentName() { return parent.getProperties().getString(MidiDeviceInfo.PROPERTY_NAME); }
-    } // End MidiInfoPortWrapper class
 } // End MidiSpinnerAdapter class
