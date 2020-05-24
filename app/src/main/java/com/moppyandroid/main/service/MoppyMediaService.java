@@ -106,17 +106,9 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
      *     <table border="1">
      *         <tr><th>KEY</th><th>TYPE</th><th>VALUE</th></tr>
      *         <tr>
-     *             <td>{@link #EXTRA_MIDI_DEVICE}</td>
-     *             <td>{@link MidiDeviceInfo} ({@link android.os.Parcelable)}</td>
-     *             <td>The MIDI device to connect to</td>
-     *         </tr>
-     *         <tr>
-     *             <td>{@link #EXTRA_MIDI_INDEX}</td>
-     *             <td>{@code int}</td>
-     *             <td>
-     *                 The index of the requested output port in the MIDI device provided with
-     *                 {@link #EXTRA_MIDI_DEVICE}; 0 if omitted
-     *             </td>
+     *             <td>{@link #EXTRA_MIDI_IN_DEVICE}</td>
+     *             <td>{@link MidiPortInfoWrapper} ({@link android.os.Parcelable)}</td>
+     *             <td>The MIDI port to connect to</td>
      *         </tr>
      *     </table>
      * </p>
@@ -131,17 +123,9 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
      *     <table border="1">
      *         <tr><th>KEY</th><th>TYPE</th><th>VALUE</th></tr>
      *         <tr>
-     *             <td>{@link #EXTRA_MIDI_DEVICE}</td>
-     *             <td>{@link MidiDeviceInfo} ({@link android.os.Parcelable)}</td>
-     *             <td>The MIDI device to connect to</td>
-     *         </tr>
-     *         <tr>
-     *             <td>{@link #EXTRA_MIDI_INDEX}</td>
-     *             <td>{@code int}</td>
-     *             <td>
-     *                 The index of the requested input port in the MIDI device provided with
-     *                 {@link #EXTRA_MIDI_DEVICE}; 0 if omitted
-     *             </td>
+     *             <td>{@link #EXTRA_MIDI_OUT_DEVICE}</td>
+     *             <td>{@link MidiPortInfoWrapper} ({@link android.os.Parcelable)}</td>
+     *             <td>The MIDI port to connect to</td>
      *         </tr>
      *     </table>
      * </p>
@@ -240,15 +224,15 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
      */
     public static final String EXTRA_PORT_NAME = "MOPPY_EXTRA_MOPPY_DEVICE_PORT_NAME";
     /**
-     * {@link MidiDeviceInfo} extra field (stored as {@link android.os.Parcelable}) for the MIDI device
-     * associated with an {@link #ACTION_SET_MIDI_IN} or {@link #ACTION_SET_MIDI_OUT} event.
+     * {@link MidiPortInfoWrapper} extra field (stored as {@link android.os.Parcelable}) for the MIDI
+     * device associated with an {@link #ACTION_SET_MIDI_IN} event.
      */
-    public static final String EXTRA_MIDI_DEVICE = "MOPPY_EXTRA_MIDI_DEVICE_INFO";
+    public static final String EXTRA_MIDI_IN_DEVICE = "MOPPY_EXTRA_MIDI_IN_DEVICE";
     /**
-     * {@code int} extra field for the index of the port in {@link #EXTRA_MIDI_DEVICE} to connect to
-     * during the {@link #ACTION_SET_MIDI_IN} or {@link ACTION_SET_MIDI_OUT} event. Defaults to {@code 0}.
+     * {@link MidiPortInfoWrapper} extra field (stored as {@link android.os.Parcelable}) for the MIDI
+     * device associated with an {@link #ACTION_SET_MIDI_OUT} event.
      */
-    public static final String EXTRA_MIDI_INDEX = "MOPPY_EXTRA_MIDI_PORT_INDEX";
+    public static final String EXTRA_MIDI_OUT_DEVICE = "MOPPY_EXTRA_MIDI_OUT_DEVICE";
     /**
      * {@code boolean} extra field for if the {@link MidiLibrary} was created successfully.
      */
@@ -306,10 +290,12 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
     private NotificationCompat.Builder notificationBuilder;
     private MidiLibrary midiLibrary;
     private MoppyManager moppyManager;
-    private MidiDeviceInfo midiInDeviceInfo;
+    private MidiPortInfoWrapper currentMidiInInfo;
+    private MidiDeviceInfo requestedMidiInDeviceInfo;
     private MidiDevice midiInDevice;
     private MidiOutputPort midiInDevicePort;
-    private MidiDeviceInfo midiOutDeviceInfo;
+    private MidiPortInfoWrapper currentMidiOutInfo;
+    private MidiDeviceInfo requestedMidiOutDeviceInfo;
     private MidiDevice midiOutDevice;
     private MidiInputPort midiOutDevicePort;
     private MidiReceiverAdapter midiOutDeviceAdapter;
@@ -750,7 +736,37 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
     } // End onRemoveDevice method
 
     // Triggered by ACTION_SET_MIDI_IN
-    private void onSetMidiIn(Bundle bundle, Result<Bundle> result) {
+    private void onSetMidiIn(Bundle extras, Result<Bundle> result) {
+        // Retrieve arguments and validate them
+        if (extras == null) {
+            Log.w(TAG + "->onSetMidiIn", "No extras supplied");
+            Bundle errorBundle = new Bundle();
+            errorBundle.putString(EXTRA_ERROR_REASON, "No extras supplied");
+            errorBundle.putBoolean(EXTRA_ERROR_INFORMATIONAL, false);
+            // Can't put EXTRA_MIDI_IN_DEVICE
+            result.sendError(errorBundle);
+            return;
+        } // End if(extras == null)
+        MidiPortInfoWrapper portInfo = extras.getParcelable(EXTRA_MIDI_IN_DEVICE);
+        if (portInfo == null || portInfo.getType() != MidiDeviceInfo.PortInfo.TYPE_OUTPUT) {
+            Log.w(TAG + "->onSetMidiIn", "Missing EXTRA_MIDI_DEVICE or isn't an output port");
+            Bundle errorBundle = new Bundle();
+            errorBundle.putString(EXTRA_ERROR_REASON, "EXTRA_MIDI_DEVICE missing or isn't an output port");
+            errorBundle.putBoolean(EXTRA_ERROR_INFORMATIONAL, false);
+            errorBundle.putParcelable(EXTRA_MIDI_IN_DEVICE, portInfo);
+            result.sendError(errorBundle);
+            return;
+        } // End if(deviceInfo == null || !deviceInfo.hasOutputPorts)
+        if (portInfo.getParent() == null) {
+            Log.w(TAG + "->onSetMidiIn", "Parent of provided MidiPortInfoWrapper is null");
+            Bundle errorBundle = new Bundle();
+            errorBundle.putString(EXTRA_ERROR_REASON, "Parent of provided MidiPortInfoWrapper is null");
+            errorBundle.putBoolean(EXTRA_ERROR_INFORMATIONAL, false);
+            errorBundle.putParcelable(EXTRA_MIDI_OUT_DEVICE, portInfo);
+            result.sendError(errorBundle);
+            return;
+        } // End if(parent == null)
+
         // Disconnect from the current MIDI in device
         if (midiInDevicePort != null) {
             try { midiInDevicePort.close(); }
@@ -766,52 +782,24 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
             }
             midiInDevice = null;
         }
-        // midiInDeviceInfo not changed so that we can tell if the method was called again
-
-        // Retrieve arguments and validate them
-        MidiDeviceInfo deviceInfo = bundle.getParcelable(EXTRA_MIDI_DEVICE);
-        int portNumber = bundle.getInt(EXTRA_MIDI_INDEX, 0);
-        if (deviceInfo == null || deviceInfo.getOutputPortCount() < 1) {
-            Log.w(TAG + "->onSetMidiIn", "Missing EXTRA_MIDI_DEVICE or no output ports available");
-            Bundle errorBundle = new Bundle();
-            errorBundle.putString(EXTRA_ERROR_REASON, "EXTRA_MIDI_DEVICE missing or contains no output ports");
-            errorBundle.putBoolean(EXTRA_ERROR_INFORMATIONAL, false);
-            errorBundle.putParcelable(EXTRA_MIDI_DEVICE, deviceInfo);
-            errorBundle.putInt(EXTRA_MIDI_INDEX, portNumber);
-            result.sendError(errorBundle);
-            return;
-        } // End if(deviceInfo == null || !deviceInfo.hasOutputPorts)
-        if (deviceInfo.getOutputPortCount() < portNumber) {
-            Log.w(TAG + "->onSetMidiIn",
-                    "deviceInfo.getOutputPortCount() less than EXTRA_MIDI_INDEX; output port count: " +
-                    deviceInfo.getOutputPortCount() + ", index: " + portNumber
-            );
-            Bundle errorBundle = new Bundle();
-            errorBundle.putString(EXTRA_ERROR_REASON, "EXTRA_MIDI_INDEX is greater than the number of output ports available");
-            errorBundle.putBoolean(EXTRA_ERROR_INFORMATIONAL, false);
-            errorBundle.putParcelable(EXTRA_MIDI_DEVICE, deviceInfo);
-            errorBundle.putInt(EXTRA_MIDI_INDEX, portNumber);
-            result.sendError(errorBundle);
-            return;
-        } // End if(deviceInfo.getOutputPortCount < portNumber)
+        // requestedMidiInDeviceInfo not changed so that we can tell if the method was called again
 
         // Update the current device info and (asynchronously) open the device
-        midiInDeviceInfo = deviceInfo;
+        requestedMidiInDeviceInfo = portInfo.getParent();
         result.detach();
-        midiManager.openDevice(deviceInfo, (device) -> {
+        midiManager.openDevice(requestedMidiInDeviceInfo, (device) -> {
             if (device == null) {
                 Log.e(TAG + "->onSetMidiIn->openDevice", "Unable to open the requested MidiDevice");
                 Bundle errorBundle = new Bundle();
                 errorBundle.putString(EXTRA_ERROR_REASON, "Unable to open the requested MidiDevice");
                 errorBundle.putBoolean(EXTRA_ERROR_INFORMATIONAL, false);
-                errorBundle.putParcelable(EXTRA_MIDI_DEVICE, deviceInfo);
-                errorBundle.putInt(EXTRA_MIDI_INDEX, portNumber);
+                errorBundle.putParcelable(EXTRA_MIDI_IN_DEVICE, portInfo);
                 result.sendError(errorBundle);
                 return;
             } // End if(device == null)
 
             // Check if this is still the requested device
-            if (device.getInfo() != midiInDeviceInfo) {
+            if (device.getInfo() != requestedMidiInDeviceInfo) {
                 Log.i(TAG + "->onSetMidiIn->openDevice",
                         "midiInDeviceInfo not the same as opened device info, ACTION_SET_MIDI " +
                         "called again before connection completed"
@@ -823,25 +811,23 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
                 Bundle errorBundle = new Bundle();
                 errorBundle.putString(EXTRA_ERROR_REASON, "ACTION_SET_MIDI_IN called again before connection completed");
                 errorBundle.putBoolean(EXTRA_ERROR_INFORMATIONAL, false);
-                errorBundle.putParcelable(EXTRA_MIDI_DEVICE, deviceInfo);
-                errorBundle.putInt(EXTRA_MIDI_INDEX, portNumber);
+                errorBundle.putParcelable(EXTRA_MIDI_IN_DEVICE, portInfo);
                 result.sendError(errorBundle);
                 return;
-            } // End if(device.info == midiInDeviceInfo)
+            } // End if(device.info == requestedMidiInDeviceInfo)
 
             // Attempt to open the output port
             midiInDevice = device;
-            midiInDevicePort = device.openOutputPort(portNumber);
+            midiInDevicePort = device.openOutputPort(portInfo.getPortNumber());
             if (midiInDevicePort == null) {
                 Log.e(TAG + "->onSetMidiIn->openDevice",
                         "Unable to access the requested MIDI output port; device name: '" +
-                        deviceInfo.getProperties().getString(MidiDeviceInfo.PROPERTY_NAME) + "', port: " + portNumber
+                        portInfo.getParentName() + "', port: " + portInfo.getPortNumber()
                 );
                 Bundle errorBundle = new Bundle();
                 errorBundle.putString(EXTRA_ERROR_REASON, "Unable to open the requested MidiOutputPort");
                 errorBundle.putBoolean(EXTRA_ERROR_INFORMATIONAL, false);
-                errorBundle.putParcelable(EXTRA_MIDI_DEVICE, deviceInfo);
-                errorBundle.putInt(EXTRA_MIDI_INDEX, portNumber);
+                errorBundle.putParcelable(EXTRA_MIDI_IN_DEVICE, portInfo);
                 result.sendError(errorBundle);
                 return;
             } // End if(midiInDevicePort == null)
@@ -850,17 +836,47 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
             MidiTransmitterAdapter adapter = new MidiTransmitterAdapter();
             midiInDevicePort.connect(adapter);
             adapter.setReceiver(getInputReceiver());
+            currentMidiInInfo = portInfo;
 
             // Return the result
             Bundle resultBundle = new Bundle();
-            resultBundle.putParcelable(EXTRA_MIDI_DEVICE, deviceInfo);
-            resultBundle.putInt(EXTRA_MIDI_INDEX, portNumber);
+            resultBundle.putParcelable(EXTRA_MIDI_IN_DEVICE, portInfo);
             result.sendResult(resultBundle);
         }, null); // End midiManager.openDevice call
     } // End onSetMidiIn method
 
     // Triggered by ACTION_SET_MIDI_OUT
-    private void onSetMidiOut(Bundle bundle, Result<Bundle> result) {
+    private void onSetMidiOut(Bundle extras, Result<Bundle> result) {
+        // Retrieve arguments and validate them
+        if (extras == null) {
+            Log.w(TAG + "->onSetMidiOut", "No extras supplied");
+            Bundle errorBundle = new Bundle();
+            errorBundle.putString(EXTRA_ERROR_REASON, "No extras supplied");
+            errorBundle.putBoolean(EXTRA_ERROR_INFORMATIONAL, false);
+            // Can't put EXTRA_MIDI_OUT_DEVICE
+            result.sendError(errorBundle);
+            return;
+        } // End if(extras == null)
+        MidiPortInfoWrapper portInfo = extras.getParcelable(EXTRA_MIDI_OUT_DEVICE);
+        if (portInfo == null || portInfo.getType() != MidiDeviceInfo.PortInfo.TYPE_INPUT) {
+            Log.w(TAG + "->onSetMidiOut", "Missing EXTRA_MIDI_DEVICE or isn't an input port");
+            Bundle errorBundle = new Bundle();
+            errorBundle.putString(EXTRA_ERROR_REASON, "EXTRA_MIDI_DEVICE missing or isn't an input port");
+            errorBundle.putBoolean(EXTRA_ERROR_INFORMATIONAL, false);
+            errorBundle.putParcelable(EXTRA_MIDI_OUT_DEVICE, portInfo);
+            result.sendError(errorBundle);
+            return;
+        } // End if(portInfo == null || portInfo != TYPE_INPUT)
+        if (portInfo.getParent() == null) {
+            Log.w(TAG + "->onSetMidiOut", "Parent of provided MidiPortInfoWrapper is null");
+            Bundle errorBundle = new Bundle();
+            errorBundle.putString(EXTRA_ERROR_REASON, "Parent of provided MidiPortInfoWrapper is null");
+            errorBundle.putBoolean(EXTRA_ERROR_INFORMATIONAL, false);
+            errorBundle.putParcelable(EXTRA_MIDI_OUT_DEVICE, portInfo);
+            result.sendError(errorBundle);
+            return;
+        } // End if(parent == null)
+
         // Disconnect from the current MIDI out device
         if (midiOutDeviceAdapter != null) {
             removeReceiver(midiOutDeviceAdapter);
@@ -880,52 +896,24 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
             }
             midiOutDevice = null;
         }
-        // midiOutDeviceInfo not changed so that we can tell if the method was called again
+        // requestedMidiOutDeviceInfo not changed so that we can tell if the method was called again
 
-        // Retrieve arguments and validate them
-        MidiDeviceInfo deviceInfo = bundle.getParcelable(EXTRA_MIDI_DEVICE);
-        int portNumber = bundle.getInt(EXTRA_MIDI_INDEX, 0);
-        if (deviceInfo == null || deviceInfo.getInputPortCount() < 1) {
-            Log.w(TAG + "->onSetMidiOut", "Missing EXTRA_MIDI_DEVICE or no input ports available");
-            Bundle errorBundle = new Bundle();
-            errorBundle.putString(EXTRA_ERROR_REASON, "EXTRA_MIDI_DEVICE missing or contains no input ports");
-            errorBundle.putBoolean(EXTRA_ERROR_INFORMATIONAL, false);
-            errorBundle.putParcelable(EXTRA_MIDI_DEVICE, deviceInfo);
-            errorBundle.putInt(EXTRA_MIDI_INDEX, portNumber);
-            result.sendError(errorBundle);
-            return;
-        } // End if(deviceInfo == null || !deviceInfo.hasInputPorts)
-        if (deviceInfo.getInputPortCount() < portNumber) {
-            Log.w(TAG + "->onSetMidiOut",
-                    "deviceInfo.getInputPortCount() less than EXTRA_MIDI_INDEX; input port count: " +
-                    deviceInfo.getInputPortCount() + " , index: " + portNumber
-            );
-            Bundle errorBundle = new Bundle();
-            errorBundle.putString(EXTRA_ERROR_REASON, "EXTRA_MIDI_INDEX is greater than the number of input ports available");
-            errorBundle.putBoolean(EXTRA_ERROR_INFORMATIONAL, false);
-            errorBundle.putParcelable(EXTRA_MIDI_DEVICE, deviceInfo);
-            errorBundle.putInt(EXTRA_MIDI_INDEX, portNumber);
-            result.sendError(errorBundle);
-            return;
-        } // End if(deviceInfo.getInputPortCount < portNumber)
-
-        // Update the current device info and (asynchronously) open the device
-        midiOutDeviceInfo = deviceInfo;
+        // Update the current requested device info and (asynchronously) open the device
+        requestedMidiOutDeviceInfo = portInfo.getParent();
         result.detach();
-        midiManager.openDevice(deviceInfo, (device) -> {
+        midiManager.openDevice(requestedMidiOutDeviceInfo, (device) -> {
             if (device == null) {
                 Log.e(TAG + "->onSetMidiOut->openDevice", "Unable to open the requested MidiDevice");
                 Bundle errorBundle = new Bundle();
                 errorBundle.putString(EXTRA_ERROR_REASON, "Unable to open the requested MidiDevice");
                 errorBundle.putBoolean(EXTRA_ERROR_INFORMATIONAL, false);
-                errorBundle.putParcelable(EXTRA_MIDI_DEVICE, deviceInfo);
-                errorBundle.putInt(EXTRA_MIDI_INDEX, portNumber);
+                errorBundle.putParcelable(EXTRA_MIDI_OUT_DEVICE, portInfo);
                 result.sendError(errorBundle);
                 return;
             } // End if(device == null)
 
             // Check if this is still the requested device
-            if (device.getInfo() != midiOutDeviceInfo) {
+            if (device.getInfo() != requestedMidiOutDeviceInfo) {
                 Log.i(TAG + "->onSetMidiOut->openDevice",
                         "midiInDeviceInfo not the same as opened device info, ACTION_SET_MIDI " +
                         "called again before connection completed"
@@ -937,26 +925,24 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
                 Bundle errorBundle = new Bundle();
                 errorBundle.putString(EXTRA_ERROR_REASON, "ACTION_SET_MIDI_OUT called again before connection completed");
                 errorBundle.putBoolean(EXTRA_ERROR_INFORMATIONAL, false);
-                errorBundle.putParcelable(EXTRA_MIDI_DEVICE, deviceInfo);
-                errorBundle.putInt(EXTRA_MIDI_INDEX, portNumber);
+                errorBundle.putParcelable(EXTRA_MIDI_OUT_DEVICE, portInfo);
                 result.sendError(errorBundle);
                 return;
-            } // End if(device.info != midiOutDeviceInfo)
+            } // End if(device.info != requestedMidiOutDeviceInfo)
 
             // Attempt to open the input port
             midiOutDevice = device;
-            midiOutDevicePort = device.openInputPort(portNumber);
+            midiOutDevicePort = device.openInputPort(portInfo.getPortNumber());
             if (midiOutDevicePort == null) {
                 Log.e(TAG + "->onSetMidiOut->openDevice",
                         "Unable to access the requested MIDI input port, another application" +
                         "probably has a lock on it; device name: '" +
-                        deviceInfo.getProperties().getString(MidiDeviceInfo.PROPERTY_NAME) + "', port: " + portNumber
+                        portInfo.getParentName() + "', port: " + portInfo.getPortNumber()
                 );
                 Bundle errorBundle = new Bundle();
                 errorBundle.putString(EXTRA_ERROR_REASON, "Unable to open the requested MidiInputPort");
                 errorBundle.putBoolean(EXTRA_ERROR_INFORMATIONAL, false);
-                errorBundle.putParcelable(EXTRA_MIDI_DEVICE, deviceInfo);
-                errorBundle.putInt(EXTRA_MIDI_INDEX, portNumber);
+                errorBundle.putParcelable(EXTRA_MIDI_OUT_DEVICE, portInfo);
                 result.sendError(errorBundle);
                 return;
             } // End if(midiOutDevicePort == null)
@@ -964,11 +950,11 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
             // Construct the adapter and connect the port to the service
             midiOutDeviceAdapter = new MidiReceiverAdapter(midiOutDevicePort);
             addReceiver(midiOutDeviceAdapter);
+            currentMidiOutInfo = portInfo;
 
             // Return the result
             Bundle resultBundle = new Bundle();
-            resultBundle.putParcelable(EXTRA_MIDI_DEVICE, deviceInfo);
-            resultBundle.putInt(EXTRA_MIDI_INDEX, portNumber);
+            resultBundle.putParcelable(EXTRA_MIDI_OUT_DEVICE, portInfo);
             result.sendResult(resultBundle);
         }, null); // End midiManager.openDevice call
     } // End onSetMidiOut method
