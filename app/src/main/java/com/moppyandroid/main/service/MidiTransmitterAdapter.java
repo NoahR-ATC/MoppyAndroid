@@ -61,7 +61,8 @@ public class MidiTransmitterAdapter extends MidiReceiver implements Transmitter 
 
             // Convert the raw parameters to a MidiMessage implementation instance
             try {
-                if (count <= 3 && status != 0xF0 && status != 0xF7) { // MetaMessage or ShortMessage
+                // Check if the message is a normal ShortMessage or MetaMessage
+                if (count <= 3 && status != 0xF0 && status != 0xF7) {
                     if (count > 1 && status == 0xFF) { // MetaMessage, sys-reset (also 0xFF) has length of 1
                         outMessage = new MetaMessage(messageBytes[1], messageBytes, count);
                     }
@@ -72,9 +73,24 @@ public class MidiTransmitterAdapter extends MidiReceiver implements Transmitter 
                         );
                     } // End if(outMessage ∈ MetaMessage) {} else
                 } // End if(outMessage ∈ {MetaMessage, ShortMessage})
-                else { // SysexMessage
+
+                // Check if the message is a malformed NOTE-ON or NOTE-OFF.
+                // Due to what appears to be an OS bug, sometimes when multiple NOTE-ON/NOTE-OFF messages
+                // are sent at the same time instead of appearing as two messages with length 3 they
+                // get sent as one message with a length of 6. Therefore we have a catch here for
+                // NOTE-ON/NOTE-OFF messages with a length greater than 3 and split them up
+                else if (status >= 0x80 && status <= 0x9F) { // NOTE-ON channel 1 to NOTE-OFF channel 16
+                    outMessage = new ShortMessage(status, messageBytes[1], messageBytes[2]);
+                    javaReceiver.send(outMessage, timestamp);
+                    onSend(messageBytes, 3, count - 3, timestamp);
+                    return;
+                } // End if(outMessage ∈ {MetaMessage, ShortMessage}) {} else if(mashedNote)
+
+                // If neither of the above clauses caught this message then it must be a system exclusive message
+                else {  // SysexMessage
                     outMessage = new SysexMessage(messageBytes, count);
-                } // End if(outMessage ∈ {MetaMessage, ShortMessage}) {} else
+                } // End if(outMessage ∈ {MetaMessage, ShortMessage}) {} else if(mashedNote) {} else
+
             } // End try {new MidiMessage}
             catch (InvalidMidiDataException e) {
                 Log.e(MidiTransmitterAdapter.class.getName() + "->onSend", "Invalid MIDI message encountered", e);
