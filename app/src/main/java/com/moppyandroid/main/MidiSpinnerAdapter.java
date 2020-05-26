@@ -23,6 +23,8 @@ import java.util.List;
 public class MidiSpinnerAdapter extends ArrayAdapter<MidiPortInfoWrapper> {
     private Context context;
     private List<MidiPortInfoWrapper> dataset;
+    private boolean selectInputs;
+    private boolean selectOutputs;
 
     /**
      * Constructs a new {@code MidiSpinnerAdapter}.
@@ -36,7 +38,9 @@ public class MidiSpinnerAdapter extends ArrayAdapter<MidiPortInfoWrapper> {
     public static MidiSpinnerAdapter newInstance(Context context, List<MidiDeviceInfo> infos, boolean selectInputs, boolean selectOutputs) {
         if (context == null) { return null; }
         List<MidiPortInfoWrapper> dataset = new ArrayList<>();
-        if (infos == null) { return new MidiSpinnerAdapter(context, dataset); } // Create empty
+        if (infos == null) { // Create empty adapter
+            return new MidiSpinnerAdapter(context, dataset, selectInputs, selectOutputs);
+        }
 
         // Add null entry to beginning to act as placeholder for "NONE"
         dataset.add(0, null);
@@ -55,15 +59,17 @@ public class MidiSpinnerAdapter extends ArrayAdapter<MidiPortInfoWrapper> {
         } // End for(info : infos)
 
         // Since we can't call super here we need to return a new instance
-        return new MidiSpinnerAdapter(context, dataset);
+        return new MidiSpinnerAdapter(context, dataset, selectInputs, selectOutputs);
     } // End MidiSpinnerAdapter.newInstance factory method
 
     // Private constructor since we need to call super(...) but that needs to be the first call and we
     // need to do some processing of the provided list first
-    private MidiSpinnerAdapter(Context context, List<MidiPortInfoWrapper> dataset) {
+    private MidiSpinnerAdapter(Context context, List<MidiPortInfoWrapper> dataset, boolean selectInputs, boolean selectOutputs) {
         super(context, android.R.layout.simple_spinner_dropdown_item, dataset);
         this.context = context;
         this.dataset = dataset;
+        this.selectInputs = selectInputs;
+        this.selectOutputs = selectOutputs;
     } // End MidiSpinnerAdapter constructor
 
     /**
@@ -116,4 +122,52 @@ public class MidiSpinnerAdapter extends ArrayAdapter<MidiPortInfoWrapper> {
      * @return {@code -1} if not found, otherwise the index
      */
     public int getIndexOf(MidiPortInfoWrapper portInfo) { return dataset.indexOf(portInfo); }
+
+    /**
+     * Adds the relevant ports ports of a {@link MidiDeviceInfo} to the dataset if they are not already there.
+     *
+     * @param deviceInfo the parent of the ports to add
+     */
+    public void addDevice(MidiDeviceInfo deviceInfo) {
+        if (deviceInfo == null) { return; }
+        MidiDeviceInfo.PortInfo[] ports = deviceInfo.getPorts();
+        for (MidiDeviceInfo.PortInfo port : ports) {
+            if (
+                    (selectInputs && port.getType() == MidiDeviceInfo.PortInfo.TYPE_INPUT) ||
+                    (selectOutputs && port.getType() == MidiDeviceInfo.PortInfo.TYPE_OUTPUT)
+            ) {
+                MidiPortInfoWrapper portInfo = new MidiPortInfoWrapper(port, deviceInfo);
+                if (!dataset.contains(portInfo)) { add(portInfo); }
+            } // End if((selectInput && port.isInput) || (selectOutput && port.isOutput))
+        } // End for(port : ports)
+    } // End addDevice method
+
+    /**
+     * Removes all ports with a specific parent {@link MidiDeviceInfo} from the dataset.
+     *
+     * @param deviceInfo the parent whose children ports should be removed
+     */
+    public void removeDevice(MidiDeviceInfo deviceInfo) {
+        List<MidiPortInfoWrapper> duplicateDataset = new ArrayList<>(dataset);
+        for (MidiPortInfoWrapper portInfo : duplicateDataset) {
+            if (portInfo != null && portInfo.getParent() != null && portInfo.getParent().equals(deviceInfo)) {
+                remove(portInfo);
+            } // End if(port.getParent().equals(deviceInfo))
+        } // End for(portInfo : dataset)
+    } // End removeAllFromDevice method
+
+    /**
+     * Checks whether any ports with a specific parent {@link MidiDeviceInfo} are present.
+     *
+     * @param deviceInfo the parent to look for
+     * @return {@code true} if child ports of {@code parent} are found, otherwise {@code false}
+     */
+    public boolean containsDevice(MidiDeviceInfo deviceInfo) {
+        for (MidiPortInfoWrapper portInfo : dataset) {
+            if (portInfo != null && portInfo.getParent() != null && portInfo.getParent().equals(deviceInfo)) {
+                return true;
+            } // End if(portInfo.getParent.equals(deviceInfo))
+        } // End for(portInfo : dataset)
+        return false;
+    } // End containsDevice method
 } // End MidiSpinnerAdapter class
