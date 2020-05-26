@@ -15,8 +15,10 @@ import android.content.Intent;
 import android.hardware.usb.UsbDevice;
 import android.hardware.usb.UsbManager;
 import android.media.midi.MidiDeviceInfo;
+import android.media.midi.MidiDeviceStatus;
 import android.media.midi.MidiManager;
 import android.os.Bundle;
+import android.os.Handler;
 import android.support.v4.media.MediaBrowserCompat;
 import android.util.Log;
 import android.view.LayoutInflater;
@@ -41,6 +43,7 @@ import java.util.Map;
 public class DeviceSelectorDialog extends DialogFragment implements DialogInterface.OnShowListener, Spinner.OnItemSelectedListener {
     private boolean refreshNext = false;
     private boolean emptyShowing = false;
+    private boolean midiCallbackRegistered = false;
     private int loadingBarRequests;
     private Map<UsbDevice, CheckBox> deviceCheckBoxMap;
     private MediaBrowserCompat mediaBrowser;
@@ -48,11 +51,14 @@ public class DeviceSelectorDialog extends DialogFragment implements DialogInterf
     private TextView noDevicesText;
     private Spinner midiInSpinner;
     private Spinner midiOutSpinner;
+    private MidiSpinnerAdapter midiInAdapter;
+    private MidiSpinnerAdapter midiOutAdapter;
     private AlertDialog loadingBar;
     private Context context;
     private UsbManager usbManager;
     private MidiManager midiManager;
     private Dialog currentDialog;
+    private Handler uiHandler;
 
     /**
      * Creates a new {@code DeviceSelectorDialog}. <b>This is the only way a {@code DeviceSelectorDialog}
@@ -93,6 +99,8 @@ public class DeviceSelectorDialog extends DialogFragment implements DialogInterf
         alertBuilder.setCancelable(false);
         alertBuilder.setView(LayoutInflater.from(context).inflate(R.layout.loading_dialog_layout, null));
         loadingBar = alertBuilder.create();
+
+        uiHandler = new Handler();
     } // End onCreate method
 
     /**
@@ -135,6 +143,11 @@ public class DeviceSelectorDialog extends DialogFragment implements DialogInterf
      */
     @Override
     public void onDestroyView() { // Seriously? Issue from 2011 still not fixed...
+        if (midiCallbackRegistered) {
+            midiManager.unregisterDeviceCallback(midiStatusCallback);
+            midiCallbackRegistered = false;
+        }
+
         Dialog dialog = getDialog();
         // handles https://code.google.com/p/android/issues/detail?id=17423
         if (dialog != null && getRetainInstance()) {
@@ -346,13 +359,13 @@ public class DeviceSelectorDialog extends DialogFragment implements DialogInterf
         List<MidiDeviceInfo> newInfos = new ArrayList<>();
         MidiDeviceInfo[] deviceInfos = midiManager.getDevices();
 
-        // Remove ourself from the list of available devices and update the spinners
+        // Remove MoppyMidiService from the list of available devices and update the spinners
         for (MidiDeviceInfo info : deviceInfos) {
             String name = info.getProperties().getString(MidiDeviceInfo.PROPERTY_NAME);
             if (name == null || !name.equals(deviceName)) { newInfos.add(info); }
         }
-        MidiSpinnerAdapter midiInAdapter = MidiSpinnerAdapter.newInstance(context, newInfos, false, true);
-        MidiSpinnerAdapter midiOutAdapter = MidiSpinnerAdapter.newInstance(context, newInfos, true, false);
+        midiInAdapter = MidiSpinnerAdapter.newInstance(context, newInfos, false, true);
+        midiOutAdapter = MidiSpinnerAdapter.newInstance(context, newInfos, true, false);
         midiInSpinner.setAdapter(midiInAdapter);
         midiOutSpinner.setAdapter(midiOutAdapter);
 
@@ -367,6 +380,14 @@ public class DeviceSelectorDialog extends DialogFragment implements DialogInterf
         // Re-enable onItemSelected events and send one if setSelection(index, false) wasn't called
         midiInSpinner.setOnItemSelectedListener(this);
         midiOutSpinner.setOnItemSelectedListener(this);
+
+        // Unregister and re-register for MIDI device status callbacks so that unavailable devices are removed
+        if (midiCallbackRegistered) {
+            midiManager.unregisterDeviceCallback(midiStatusCallback);
+            midiCallbackRegistered = false;
+        }
+        midiManager.registerDeviceCallback(midiStatusCallback, uiHandler);
+        midiCallbackRegistered = true;
     } // End updateMidiSpinners method
 
     // Requests the service to connect to a device, showing an error and unchecking its box if unsuccessful
@@ -412,5 +433,47 @@ public class DeviceSelectorDialog extends DialogFragment implements DialogInterf
         if (--loadingBarRequests == 0) { loadingBar.dismiss(); }
     } // End closeLoadingBar method
 
+    private MidiManager.DeviceCallback midiStatusCallback = new MidiManager.DeviceCallback() {
+        @Override
+        public void onDeviceAdded(MidiDeviceInfo device) {
+            midiInAdapter.addDevice(device);
+            midiOutAdapter.addDevice(device);
+            super.onDeviceAdded(device);
+        } // End midiStatusCallback.onDeviceAdded method
 
+        @Override
+        public void onDeviceRemoved(MidiDeviceInfo device) {
+            midiInAdapter.removeDevice(device);
+            midiOutAdapter.removeDevice(device);
+            super.onDeviceRemoved(device);
+        } // End midiStatusCallback.onDeviceRemoved method
+
+        @Override
+        public void onDeviceStatusChanged(MidiDeviceStatus status) {
+            // Exit processing if the affected device is provided by MoppyMidiService
+            MidiDeviceInfo deviceInfo = status.getDeviceInfo();
+            String moppyDeviceName = getString(R.string.midi_device_name);
+            String name = deviceInfo.getProperties().getString(MidiDeviceInfo.PROPERTY_NAME);
+            if (name != null && name.equals(moppyDeviceName)) { return; }
+
+            // Remove all ports from the device and re-add them only if they are available
+            Object selectedOutDevice = midiOutSpinner.getSelectedItem();
+            midiInAdapter.removeDevice(deviceInfo);
+            midiOutAdapter.removeDevice(deviceInfo);
+            MidiDeviceInfo.PortInfo[] ports = deviceInfo.getPorts();
+            for (MidiDeviceInfo.PortInfo port : ports) {
+                if (port.getType() == MidiDeviceInfo.PortInfo.TYPE_INPUT) {
+                    MidiPortInfoWrapper portInfo = new MidiPortInfoWrapper(port, deviceInfo);
+                    if (!status.isInputPortOpen(port.getPortNumber()) || portInfo.equals(selectedOutDevice)) {
+                        midiOutAdapter.add(portInfo);
+                    } // End if(status.isAvailable(port) || portInfo.isSelected)
+                } // End if(port.isInput)
+                else {
+                    midiInAdapter.add(new MidiPortInfoWrapper(port, deviceInfo));
+                } // End if(port.isInput) {} else
+            } // End for(port : ports)
+
+            super.onDeviceStatusChanged(status);
+        } // End midiStatusCallback.onDeviceStatusChanged method
+    }; // End anonymous MidiManager.DeviceCallback
 } // End DeviceSelectorDialog class
