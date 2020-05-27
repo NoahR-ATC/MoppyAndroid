@@ -1,0 +1,7 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="com.github.noahr_atc.midisplitter" >
+
+    <uses-feature
+        android:name="android.software.midi"
+        android:required="true" />
+</manifest>

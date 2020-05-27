@@ -13,6 +13,7 @@
             <option value="$PROJECT_DIR$" />
             <option value="$PROJECT_DIR$/app" />
             <option value="$PROJECT_DIR$/javax.sound.midi" />
+            <option value="$PROJECT_DIR$/midisplitterlib" />
             <option value="$PROJECT_DIR$/moppylib" />
             <option value="$PROJECT_DIR$/realtimesequencer" />
             <option value="$PROJECT_DIR$/sherlockmidi" />
