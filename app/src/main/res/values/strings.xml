@@ -9,6 +9,7 @@
     <string name="no_device_text">No Moppy devices available</string>
     <string name="midi_in_text">MIDI IN</string>
     <string name="midi_out_text">MIDI OUT</string>
+    <string name="midi_split_text">Split Input</string>
     <string name="loading_text">Waiting for USB permission…</string>
     <string name="devices_button_description">Opens a menu for selecting devices</string>
     <string name="info_button_description">Device information button</string>
