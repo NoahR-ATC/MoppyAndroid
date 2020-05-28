@@ -305,9 +305,15 @@ public class DeviceSelectorDialog extends DialogFragment implements DialogInterf
                             emptyShowing = false;
                         } // End if(size < 1 && selectorDialog.showing) {} else if (size > 1 && emptyDialog.showing)
 
+                        // Update the MIDI device spinners
                         MidiPortInfoWrapper currentMidiIn = resultData.getParcelable(MoppyMediaService.EXTRA_MIDI_IN_DEVICE);
                         MidiPortInfoWrapper currentMidiOut = resultData.getParcelable(MoppyMediaService.EXTRA_MIDI_OUT_DEVICE);
                         updateMidiSpinners(currentMidiIn, currentMidiOut);
+
+                        // Update the split MIDI checkbox
+                        splitMidiCheckbox.setOnCheckedChangeListener(null);
+                        splitMidiCheckbox.setChecked(resultData.getBoolean(MoppyMediaService.EXTRA_MIDI_SPLIT_ENABLE));
+                        splitMidiCheckbox.setOnCheckedChangeListener(DeviceSelectorDialog.this);
 
                         super.onResult(action, extras, resultData);
                     } // End ACTION_GET_DEVICES.onResult method
