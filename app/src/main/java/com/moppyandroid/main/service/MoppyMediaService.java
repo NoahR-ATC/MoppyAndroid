@@ -423,7 +423,7 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
         midiLibrary = MidiLibrary.getMidiLibrary(this);
 
         midiInForwarder = new MidiForwarder();
-        midiSplitter = new MidiProcessor(getInputReceiver());
+        midiSplitter = new MidiProcessor(moppyManager.getInputReceiver());
     } // End onCreate method
 
     /**
@@ -644,7 +644,7 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
      *
      * @return the {@link Receiver} to send messages to
      */
-    public Receiver getInputReceiver() { return moppyManager.getInputReceiver(); }
+    public Receiver getInputReceiver() { return midiInForwarder; }
 
     /**
      * Gets the {@link Receiver} that messages are forwarded to.
@@ -856,7 +856,7 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
             // Construct the adapter and connect the port to the service
             MidiTransmitterAdapter adapter = new MidiTransmitterAdapter();
             midiInDevicePort.connect(adapter);
-            adapter.setReceiver(getInputReceiver());
+            adapter.setReceiver(midiInForwarder);
             currentMidiInInfo = portInfo;
 
             // Return the result
@@ -995,7 +995,7 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
         if (enable) {
             midiInForwarder.setReceiver(midiSplitter);
         }
-        else { midiInForwarder.setReceiver(getInputReceiver()); }
+        else { midiInForwarder.setReceiver(moppyManager.getInputReceiver()); }
 
         // Send the result
         Bundle resultBundle = new Bundle();
