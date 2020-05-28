@@ -18,7 +18,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
  */
 
-import javax.sound.midi.*;
+import jp.kshoji.javax.sound.midi.*;
 import java.io.Serializable;
 import java.util.List;
 import java.util.Objects;
@@ -28,8 +28,8 @@ import java.util.logging.Logger;
 import com.google.common.collect.ArrayListMultimap;
 
 /**
- * A {@link javax.sound.midi.Receiver} that splits MIDI chords into notes distributed across all MIDI channels before
- * forwarding the new {@link javax.sound.midi.MidiMessage}s to another Receiver.
+ * A {@link Receiver} that splits MIDI chords into notes distributed across all MIDI channels before
+ * forwarding the new {@link MidiMessage}s to another Receiver.
  *
  * @author Noah Reeder
  * @version 1.0

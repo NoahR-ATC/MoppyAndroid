@@ -1,0 +1,7 @@
+Originally written and changes made by Noah Reeder
+
+I pulled this from the lib module of https://github.com/NoahR-ATC/MidiSplitterJava version v1.1.0.
+Changes:
+    - Gradle conversion from Maven
+    - javax.sound.midi usages converted to kshoji.javax.sound.midi in order to support Android
+    - Android version of Google Guava used instead of JRE
