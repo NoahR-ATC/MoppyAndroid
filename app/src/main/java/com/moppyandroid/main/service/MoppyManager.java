@@ -4,11 +4,11 @@ import android.content.Context;
 import android.util.Log;
 
 import com.moppy.core.comms.bridge.BridgeSerial;
-import com.moppy.core.midi.MoppyMIDISequencer;
 import com.moppy.core.events.mapper.MIDIEventMapper;
 import com.moppy.core.events.mapper.MapperCollection;
 import com.moppy.core.events.postprocessor.MessagePostProcessor;
 import com.moppy.core.midi.MoppyMIDIReceiverSender;
+import com.moppy.core.midi.MoppyMIDISequencer;
 import com.moppy.core.status.StatusBus;
 import com.moppy.core.status.StatusType;
 import com.moppy.core.status.StatusUpdate;
@@ -27,6 +27,9 @@ import jp.kshoji.javax.sound.midi.Sequencer;
 import jp.kshoji.javax.sound.midi.io.StandardMidiFileReader;
 import jp.kshoji.javax.sound.midi.spi.MidiFileReader;
 
+/**
+ * Manages all objects necessary to operate Moppy and provides methods to control them.
+ */
 public class MoppyManager implements com.moppy.core.status.StatusConsumer {
     private static final String TAG = MoppyManager.class.getName();
 
@@ -39,6 +42,12 @@ public class MoppyManager implements com.moppy.core.status.StatusConsumer {
     private List<Callback> callbackList;
     private MidiLibrary.MidiFile loadedFile;
 
+    /**
+     * Constructs a new {@code MoppyManager}.
+     *
+     * @param context the context to create the {@code MoppyManager} in
+     * @throws MidiUnavailableException if a {@link MoppyMIDISequencer} cannot be created
+     */
     public MoppyManager(Context context) throws MidiUnavailableException {
         paused = false;
         callbackList = new ArrayList<>();

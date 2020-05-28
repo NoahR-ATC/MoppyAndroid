@@ -1,7 +1,5 @@
 package com.moppyandroid.main.service;
 
-import android.media.midi.MidiDeviceInfo;
-import android.media.midi.MidiManager;
 import android.media.midi.MidiReceiver;
 import android.util.Log;
 

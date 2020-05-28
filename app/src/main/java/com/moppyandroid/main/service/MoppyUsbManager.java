@@ -8,17 +8,20 @@ import android.hardware.usb.UsbDevice;
 import android.hardware.usb.UsbManager;
 import android.util.Log;
 
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-
 import com.moppy.core.comms.bridge.BridgeSerial;
 import com.moppy.core.comms.bridge.MultiBridge;
 import com.moppy.core.comms.bridge.NetworkBridge;
 import com.moppy.core.status.StatusBus;
 import com.moppy.core.status.StatusUpdate;
 
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+
+/**
+ * Manages the USB serial connections to Moppy devices and provides information about them.
+ */
 public class MoppyUsbManager {
     private final StatusBus statusBus;
     private final MultiBridge multiBridge;

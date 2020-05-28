@@ -7,13 +7,10 @@ import android.content.ServiceConnection;
 import android.media.midi.MidiDeviceService;
 import android.media.midi.MidiReceiver;
 import android.os.IBinder;
-import android.util.Log;
 
-import androidx.annotation.NonNull;
-
-import jp.kshoji.javax.sound.midi.MidiMessage;
-import jp.kshoji.javax.sound.midi.Receiver;
-
+/**
+ * {@link MidiDeviceService} for providing virtual MIDI devices for {@link MoppyMediaService}.
+ */
 public class MoppyMidiService extends MidiDeviceService {
     private MidiTransmitterAdapter midiToService;
     private MidiReceiverAdapter midiFromService;

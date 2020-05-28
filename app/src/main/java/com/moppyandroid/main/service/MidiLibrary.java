@@ -476,7 +476,7 @@ public class MidiLibrary implements Map<String, MidiLibrary.MapNode> {
     } // End createFileInFolder method
 
     /**
-     * Callback interface used for running code upon completion of asynchronous {@link MidiLibrary} creation
+     * Callback interface used for running code upon completion of asynchronous {@link MidiLibrary} creation.
      *
      * @see #getMidiLibraryAsync(Context, MidiLibrary.Callback)
      */

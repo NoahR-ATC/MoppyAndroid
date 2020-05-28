@@ -1,6 +1,5 @@
 package com.moppyandroid.main.service;
 
-import android.Manifest;
 import android.annotation.SuppressLint;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
@@ -51,7 +50,7 @@ import jp.kshoji.javax.sound.midi.Receiver;
  * while playback control is offered through {@link android.media.session.MediaController}. As with any
  * {@link androidx.media.MediaBrowserServiceCompat}, content is available through
  * {@link #onLoadChildren(String, androidx.media.MediaBrowserServiceCompat.Result) onLoadChildren},
- * and loading can be done either through {@link #ACTION_LOAD_ITEM} or the {@code MediaController}, with the
+ * and loading can be done either through {@link #ACTION_LOAD_ITEM} or the {@link android.support.v4.media.session.MediaControllerCompat}, with the
  * main advantage of {@code ACTION_LOAD_ITEM} being that the user can supply callbacks for success and failure,
  * while loading a file through the {@code MediaController} is fire-and-forget.
  * </p>
@@ -108,7 +107,7 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
      *         <tr><th>KEY</th><th>TYPE</th><th>VALUE</th></tr>
      *         <tr>
      *             <td>{@link #EXTRA_MIDI_IN_DEVICE}</td>
-     *             <td>{@link MidiPortInfoWrapper} ({@link android.os.Parcelable)}</td>
+     *             <td>{@link MidiPortInfoWrapper} ({@link android.os.Parcelable})</td>
      *             <td>The MIDI port to connect to</td>
      *         </tr>
      *     </table>
@@ -125,7 +124,7 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
      *         <tr><th>KEY</th><th>TYPE</th><th>VALUE</th></tr>
      *         <tr>
      *             <td>{@link #EXTRA_MIDI_OUT_DEVICE}</td>
-     *             <td>{@link MidiPortInfoWrapper} ({@link android.os.Parcelable)}</td>
+     *             <td>{@link MidiPortInfoWrapper} ({@link android.os.Parcelable})</td>
      *             <td>The MIDI port to connect to</td>
      *         </tr>
      *     </table>
@@ -154,7 +153,7 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
     public static final String ACTION_SET_MIDI_SPLIT = "com.moppyandroid.main.service.MoppyMediaService.ACTION_SET_MIDI_SPLIT";
     /**
      * The custom action for triggering media library creation if not done so already. Strongly recommended to send
-     * this action after {@link Manifest.permission#READ_EXTERNAL_STORAGE} has been granted to the {@link android.app.Activity}.
+     * this action after {@link android.Manifest.permission#READ_EXTERNAL_STORAGE} has been granted to the {@link android.app.Activity}.
      * <p>
      * Non-standard {@link Bundle} fields required:
      *     <table border="1">
@@ -267,11 +266,11 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
      */
     public static final String EXTRA_LIBRARY_CREATED = "MOPPY_LIBRARY_CREATED";
     /**
-     * {@link ArrayList}{@code <}{@link String>}{@code >} extra field for the available device names.
+     * {@link ArrayList}{@code <}{@link String}{@code >} extra field for the available device names.
      */
     public static final String EXTRA_DEVICE_NAMES = "MOPPY_DEVICE_NAMES";
     /**
-     * {@link ArrayList}{@code <}{@link UsbDevice>}{@code >} (stored as
+     * {@link ArrayList}{@code <}{@link UsbDevice}{@code >} (stored as
      * {@code ArrayList<}{@link android.os.Parcelable}){@code >}) extra field containing all available devices.
      *
      * @see MoppyUsbManager#getDeviceInfoForAll()

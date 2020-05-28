@@ -37,10 +37,6 @@ Regexes:
  */
 
 
-import androidx.annotation.NonNull;
-import androidx.appcompat.app.AppCompatActivity;
-import androidx.recyclerview.widget.RecyclerView;
-
 import android.annotation.SuppressLint;
 import android.app.AlertDialog;
 import android.app.PendingIntent;
@@ -52,8 +48,7 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.hardware.usb.UsbDevice;
 import android.hardware.usb.UsbManager;
-import android.media.midi.MidiDeviceInfo;
-import android.media.midi.MidiManager;
+import android.os.Bundle;
 import android.os.Handler;
 import android.os.RemoteException;
 import android.os.SystemClock;
@@ -68,23 +63,27 @@ import android.widget.ImageButton;
 import android.widget.RelativeLayout;
 import android.widget.SeekBar;
 import android.widget.TextView;
-import android.os.Bundle;
+
+import androidx.annotation.NonNull;
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.recyclerview.widget.RecyclerView;
 
 import com.google.android.flexbox.FlexDirection;
 import com.google.android.flexbox.FlexboxLayoutManager;
 import com.google.android.flexbox.JustifyContent;
 import com.moppy.core.comms.bridge.BridgeSerial;
-
 import com.moppyandroid.main.service.MidiLibrary;
 import com.moppyandroid.main.service.MoppyMediaService;
 import com.sothree.slidinguppanel.SlidingUpPanelLayout;
 import com.sothree.slidinguppanel.SlidingUpPanelLayout.PanelState;
 
-import java.io.IOException;
 import java.util.List;
 import java.util.Timer;
 import java.util.TimerTask;
 
+/**
+ * Main activity for MoppyAndroid.
+ */
 public class MainActivity extends AppCompatActivity implements SeekBar.OnSeekBarChangeListener {
     /**
      * Tag for the {@link DeviceSelectorDialog} fragment used.
@@ -151,7 +150,9 @@ public class MainActivity extends AppCompatActivity implements SeekBar.OnSeekBar
         } // End onReceive method
     }; // End new BroadcastReceiver
 
-    // Method triggered upon activity creation
+    /**
+     * Triggered when the activity is created.
+     */
     @SuppressLint("InflateParams") // Not applicable to inflation for AlertDialog
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -215,7 +216,7 @@ public class MainActivity extends AppCompatActivity implements SeekBar.OnSeekBar
     } // End onCreate method
 
     /**
-     * Method triggered when the app is destroyed (e.g. force killed, finalize called, killed to reclaim memory).
+     * Triggered when the app is destroyed (e.g. force killed, finalize called, killed to reclaim memory).
      */
     @Override
     protected void onDestroy() {
@@ -233,7 +234,7 @@ public class MainActivity extends AppCompatActivity implements SeekBar.OnSeekBar
 
 
     /**
-     * Method triggered when the back event is raised (e.g. back button pressed). Taken from AndroidSlidingUpPanel
+     * Triggered when the back event is raised (e.g. back button pressed). Taken from AndroidSlidingUpPanel
      * demo application located at https://github.com/umano/AndroidSlidingUpPanel/tree/master/demo.
      */
     @Override
@@ -248,7 +249,9 @@ public class MainActivity extends AppCompatActivity implements SeekBar.OnSeekBar
         } // End if(panelLayout.state == EXPANDED || panelLayout.state == ANCHORED) {} else
     } // End onBackPressed method
 
-    // Method triggered when a spawned activity exits
+    /**
+     * Triggered when a spawned activity exits.
+     */
     @Override
     public void onActivityResult(int requestCode, int resultCode, Intent resultData) {
         super.onActivityResult(requestCode, resultCode, resultData);
@@ -259,6 +262,9 @@ public class MainActivity extends AppCompatActivity implements SeekBar.OnSeekBar
         }
     } // End onActivityResult method
 
+    /**
+     * Triggered when a permission request is responded to.
+     */
     @Override
     public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
         if (requestCode == REQUEST_READ_STORAGE) {
@@ -269,7 +275,9 @@ public class MainActivity extends AppCompatActivity implements SeekBar.OnSeekBar
         } // End if(READ_STORAGE)
     } // End onRequestPermissionsResult method
 
-    // Method triggered when the song slider has been used
+    /**
+     * Triggered when the song slider has been used.
+     */
     @Override
     public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
         if (seekBar == songSlider) {
@@ -280,7 +288,9 @@ public class MainActivity extends AppCompatActivity implements SeekBar.OnSeekBar
         } // End if(seekBar == songSlider)
     } // End onProgressChanged method
 
-    // Method triggered when the song slider begins to be moved
+    /**
+     * Triggered when the song slider begins to be moved.
+     */
     @Override
     public void onStartTrackingTouch(SeekBar seekBar) {
         if (seekBar == songSlider) {
@@ -289,7 +299,9 @@ public class MainActivity extends AppCompatActivity implements SeekBar.OnSeekBar
         } // End if(seekBar == songSlider)
     } // End onStartTrackingTouch method
 
-    // Method triggered when the song time slider finishes being moved
+    /**
+     * Triggered when the song slider finishes being moved.
+     */
     @Override
     public void onStopTrackingTouch(SeekBar seekBar) {
         if (seekBar == songSlider) {

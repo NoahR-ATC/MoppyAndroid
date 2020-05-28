@@ -1,11 +1,5 @@
 package com.moppyandroid.main;
 
-import androidx.annotation.Nullable;
-import androidx.appcompat.app.AlertDialog;
-import androidx.fragment.app.DialogFragment;
-import androidx.recyclerview.widget.LinearLayoutManager;
-import androidx.recyclerview.widget.RecyclerView;
-
 import android.app.Dialog;
 import android.app.PendingIntent;
 import android.app.Service;
@@ -29,6 +23,12 @@ import android.widget.CheckBox;
 import android.widget.CompoundButton;
 import android.widget.Spinner;
 import android.widget.TextView;
+
+import androidx.annotation.Nullable;
+import androidx.appcompat.app.AlertDialog;
+import androidx.fragment.app.DialogFragment;
+import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
 
 import com.moppyandroid.main.service.MidiPortInfoWrapper;
 import com.moppyandroid.main.service.MoppyMediaService;

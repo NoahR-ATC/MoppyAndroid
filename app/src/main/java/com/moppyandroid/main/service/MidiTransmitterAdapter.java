@@ -15,8 +15,16 @@ import jp.kshoji.javax.sound.midi.ShortMessage;
 import jp.kshoji.javax.sound.midi.SysexMessage;
 import jp.kshoji.javax.sound.midi.Transmitter;
 
+/**
+ * A {@link MidiReceiver} that also acts as a {@link Transmitter} in order to bridge Android and Java MIDI APIs.
+ */
 public class MidiTransmitterAdapter extends MidiReceiver implements Transmitter {
     private Receiver javaReceiver;
+
+    /**
+     * Constructs a new {@code MidiTransmitterAdapter}.
+     */
+    public MidiTransmitterAdapter() { }
 
     /**
      * Set the {@link Receiver} for this {@link Transmitter}
