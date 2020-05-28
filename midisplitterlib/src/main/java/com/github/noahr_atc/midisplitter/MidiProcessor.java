@@ -280,7 +280,7 @@ public class MidiProcessor implements Receiver {
                 //      the exception-producing method call before the translation is created
                 try {
                     key = new NoteMapping(message.getChannel(), message.getData1());
-                    message.setMessage(message.getCommand(), message.getChannel(), message.getData1(), message.getData2());
+                    message.setMessage(message.getCommand(), newChannel, message.getData1(), message.getData2());
                     noteTranslations.put(
                             key,
                             new NoteMapping(newChannel, message.getData1())
