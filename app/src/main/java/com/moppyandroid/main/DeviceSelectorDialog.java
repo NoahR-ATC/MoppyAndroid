@@ -26,6 +26,7 @@ import android.view.View;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.CheckBox;
+import android.widget.CompoundButton;
 import android.widget.Spinner;
 import android.widget.TextView;
 
@@ -40,7 +41,7 @@ import java.util.Map;
 /**
  * {@link DialogFragment} for selecting Moppy devices to connect/disconnect to.
  */
-public class DeviceSelectorDialog extends DialogFragment implements DialogInterface.OnShowListener, Spinner.OnItemSelectedListener {
+public class DeviceSelectorDialog extends DialogFragment implements DialogInterface.OnShowListener, Spinner.OnItemSelectedListener, CompoundButton.OnCheckedChangeListener {
     private boolean refreshNext = false;
     private boolean emptyShowing = false;
     private boolean midiCallbackRegistered = false;
@@ -53,6 +54,7 @@ public class DeviceSelectorDialog extends DialogFragment implements DialogInterf
     private Spinner midiOutSpinner;
     private MidiSpinnerAdapter midiInAdapter;
     private MidiSpinnerAdapter midiOutAdapter;
+    private CheckBox splitMidiCheckbox;
     private AlertDialog loadingBar;
     private Context context;
     private UsbManager usbManager;
@@ -123,6 +125,9 @@ public class DeviceSelectorDialog extends DialogFragment implements DialogInterf
         deviceRecycler = v.findViewById(R.id.device_recycler);
         deviceRecycler.setLayoutManager(new LinearLayoutManager(context));
         deviceRecycler.setAdapter(new DeviceAdapter(null, null, null, null));
+
+        splitMidiCheckbox = v.findViewById(R.id.midi_split_checkbox);
+        splitMidiCheckbox.setOnCheckedChangeListener(this);
 
         AlertDialog.Builder selectorBuilder = new AlertDialog.Builder(context);
         selectorBuilder.setTitle("Connect to a device");
@@ -242,6 +247,27 @@ public class DeviceSelectorDialog extends DialogFragment implements DialogInterf
      */
     @Override
     public void onNothingSelected(AdapterView<?> parent) { /* Nothing to do */ }
+
+    /**
+     * Triggered when the checked state of a {@link CheckBox} changes.
+     */
+    @Override
+    public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
+        if (buttonView != splitMidiCheckbox) { return; }
+
+        // Send ACTION_SET_MIDI_SPLIT request with the checkbox state
+        Bundle requestBundle = new Bundle();
+        requestBundle.putBoolean(MoppyMediaService.EXTRA_MIDI_SPLIT_ENABLE, isChecked);
+        mediaBrowser.sendCustomAction(MoppyMediaService.ACTION_SET_MIDI_SPLIT, requestBundle, new MediaBrowserCompat.CustomActionCallback() {
+            @Override
+            public void onError(String action, Bundle extras, Bundle data) {
+                splitMidiCheckbox.setOnCheckedChangeListener(null);
+                splitMidiCheckbox.setChecked(!isChecked);
+                splitMidiCheckbox.setOnCheckedChangeListener(DeviceSelectorDialog.this);
+                super.onError(action, extras, data);
+            } // End ACTION_SET_MIDI_SPLIT.onError method
+        }); // End ACTION_SET_MIDI_SPLIT callback
+    } // End onCheckedChanged method
 
     /**
      * Updates the list of available devices in this {@code DeviceSelectorDialog}.
