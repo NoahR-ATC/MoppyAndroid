@@ -26,7 +26,7 @@ import jp.kshoji.javax.sound.midi.Sequencer;
 import jp.kshoji.javax.sound.midi.io.StandardMidiFileReader;
 import jp.kshoji.javax.sound.midi.spi.MidiFileReader;
 
-public class MoppyManager implements com.moppy.core.status.StatusConsumer {
+public class MoppyManager implements com.moppy.core.status.StatusConsumer, AutoCloseable {
     private static final String TAG = MoppyManager.class.getName();
 
     private boolean paused;
@@ -74,6 +74,16 @@ public class MoppyManager implements com.moppy.core.status.StatusConsumer {
             ); // End callbackList.forEach lambda
         } // End if(update == SEQUENCE_END)
     } // End receiveUpdate method
+
+    /**
+     * Releases held resources. <b>MUST</b> be called before this {@code MoppyManager}'s destruction.
+     */
+    @Override
+    public void close() {
+        netManager.closeAllBridges();
+        try { seq.close(); } catch (IOException ignored) { } // Outdated method signature
+        receiverSender.close();
+    } // End close method
 
     /**
      * Gets the {@link MoppyUsbManager} managed by this {@code MoppyManager}.

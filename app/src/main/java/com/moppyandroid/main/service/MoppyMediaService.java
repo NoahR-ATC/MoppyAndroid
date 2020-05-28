@@ -344,7 +344,7 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
      */
     @Override
     public void onDestroy() {
-        if (moppyManager != null) { moppyManager.getUsbManager().closeAllBridges(); }
+        if (moppyManager != null) { moppyManager.close(); }
         stopForeground(true);
         if (mediaSession != null) { mediaSession.release(); }
 
