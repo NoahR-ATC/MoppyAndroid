@@ -174,16 +174,7 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
      * The custom action for refreshing the available USB devices. Replicates {@link #ACTION_GET_DEVICES} upon completion.
      * Guaranteed to not send an error.
      * <p>
-     * Non-standard {@link Bundle} fields required:
-     *     <table border="1">
-     *         <tr><th>KEY</th><th>TYPE</th><th>VALUE</th></tr>
-     *         <tr>
-     *             <td>(Result only) {@link #EXTRA_DEVICE_NAMES}</td>
-     *             <td>{@link ArrayList}{@literal <}{@link String}{@literal >}</td>
-     *             <td>The list of available port/device names</td>
-     *         </tr>
-     *         <tr><td>(Result only) {@link #EXTRA_NUM_CONNECTED}</td><td>{@code int}</td><td>The number of currently connected devices</td></tr>
-     *     </table>
+     * Non-standard {@link Bundle} fields: see {@link #ACTION_GET_DEVICES}
      * </p>
      *
      * @see #onCustomAction(String, Bundle, androidx.media.MediaBrowserServiceCompat.Result) onCustomAction
@@ -320,6 +311,7 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
     private static final int NOTIFICATION_ID = 1;               // ID of the service notification
     private static final int NOTIFICATION_PLAY_PAUSE_INDEX = 2; // Index of play/pause button in notification actions
 
+    private boolean splittingMidi = false;
     private MidiManager midiManager;
     private NotificationManager notificationManager;
     private MediaControllerCompat mediaController;
@@ -991,15 +983,15 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
         } // End if(extras == null)
 
         // Set the forwarder to the splitter or direct depending on EXTRA_MIDI_SPLIT_ENABLE
-        boolean enable = extras.getBoolean(EXTRA_MIDI_SPLIT_ENABLE, false);
-        if (enable) {
+        splittingMidi = extras.getBoolean(EXTRA_MIDI_SPLIT_ENABLE, false);
+        if (splittingMidi) {
             midiInForwarder.setReceiver(midiSplitter);
         }
         else { midiInForwarder.setReceiver(moppyManager.getInputReceiver()); }
 
         // Send the result
         Bundle resultBundle = new Bundle();
-        resultBundle.putBoolean(EXTRA_MIDI_SPLIT_ENABLE, enable);
+        resultBundle.putBoolean(EXTRA_MIDI_SPLIT_ENABLE, splittingMidi);
         result.sendResult(resultBundle);
     } // End onSetMidiSplit method
 
@@ -1052,6 +1044,7 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
         );
         resultBundle.putParcelable(EXTRA_MIDI_IN_DEVICE, currentMidiInInfo);
         resultBundle.putParcelable(EXTRA_MIDI_OUT_DEVICE, currentMidiOutInfo);
+        resultBundle.putBoolean(EXTRA_MIDI_SPLIT_ENABLE, splittingMidi);
         result.sendResult(resultBundle);
     } // End onGetDevices method
 
