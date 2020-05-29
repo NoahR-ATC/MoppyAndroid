@@ -415,6 +415,7 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
 
         midiInForwarder = new MidiForwarder();
         midiSplitter = new MidiProcessor(moppyManager.getInputReceiver());
+        midiInForwarder.setReceiver(moppyManager.getInputReceiver()); // splitingMidi false by default
     } // End onCreate method
 
     /**
