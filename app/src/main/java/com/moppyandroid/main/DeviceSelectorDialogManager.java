@@ -25,9 +25,9 @@ public class DeviceSelectorDialogManager implements AutoCloseable {
     /**
      * Constructs a new {@code DeviceSelectorDialogManager} and connects to a {@link DeviceSelectorDialog}.
      *
-     * @param context the {@link Context} to use
+     * @param context         the {@link Context} to use
      * @param fragmentManager the {@link FragmentManager} to use
-     * @param tag the tag to use when registering the {@link DeviceSelectorDialog} with {@code fragmentManager}
+     * @param tag             the tag to use when registering the {@link DeviceSelectorDialog} with {@code fragmentManager}
      */
     public DeviceSelectorDialogManager(Context context, FragmentManager fragmentManager, String tag) {
         this.fragmentManager = fragmentManager;
@@ -89,7 +89,7 @@ public class DeviceSelectorDialogManager implements AutoCloseable {
     /**
      * Shows the {@link DeviceSelectorDialog}.
      */
-    public void show() { deviceDialog.show(fragmentManager, tag); }
+    public void show() { if (!deviceDialog.isAdded()) { deviceDialog.show(fragmentManager, tag); } }
 
     // Receives callbacks about mediaBrowser.connect
     private class BrowserConnectionCallback extends MediaBrowserCompat.ConnectionCallback {

@@ -1,10 +1,15 @@
 package com.moppyandroid.main;
 
+import androidx.annotation.Nullable;
+import androidx.appcompat.app.AlertDialog;
+import androidx.fragment.app.DialogFragment;
+import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
+
 import android.app.Dialog;
 import android.app.PendingIntent;
 import android.app.Service;
 import android.content.Context;
-import android.content.DialogInterface;
 import android.content.Intent;
 import android.hardware.usb.UsbDevice;
 import android.hardware.usb.UsbManager;
@@ -24,14 +29,8 @@ import android.widget.CompoundButton;
 import android.widget.Spinner;
 import android.widget.TextView;
 
-import androidx.annotation.Nullable;
-import androidx.appcompat.app.AlertDialog;
-import androidx.fragment.app.DialogFragment;
-import androidx.recyclerview.widget.LinearLayoutManager;
-import androidx.recyclerview.widget.RecyclerView;
-
-import com.moppyandroid.main.service.MidiPortInfoWrapper;
 import com.moppyandroid.main.service.MoppyMediaService;
+import com.moppyandroid.main.service.MidiPortInfoWrapper;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -41,7 +40,7 @@ import java.util.Map;
 /**
  * {@link DialogFragment} for selecting Moppy devices to connect/disconnect to.
  */
-public class DeviceSelectorDialog extends DialogFragment implements DialogInterface.OnShowListener, Spinner.OnItemSelectedListener, CompoundButton.OnCheckedChangeListener {
+public class DeviceSelectorDialog extends DialogFragment implements Spinner.OnItemSelectedListener, CompoundButton.OnCheckedChangeListener {
     private boolean refreshNext = false;
     private boolean emptyShowing = false;
     private boolean midiCallbackRegistered = false;
@@ -133,13 +132,23 @@ public class DeviceSelectorDialog extends DialogFragment implements DialogInterf
         selectorBuilder.setTitle("Connect to a device");
         selectorBuilder.setCancelable(true);
         selectorBuilder.setView(v);
-        Dialog thisDialog = selectorBuilder.create();
-        thisDialog.setOnShowListener(this);
-        currentDialog = thisDialog;
+        currentDialog = selectorBuilder.create();
         emptyShowing = false;
 
         return currentDialog;
     } // End onCreateDialog method
+
+    /**
+     * Triggered whenever this {@code DeviceSelectorDialog} comes into the foreground from a hidden state
+     * (e.g. app minimized, device locked), including when this {@code DeviceSelectorDialog} first gets created.
+     */
+    @Override
+    public void onStart() {
+        // Device connections/disconnections before this is triggered may not have been sent to MoppyAndroid
+        // and therefore onDeviceConnectionStateChanged may not have been called.
+        updateDevices();
+        super.onStart();
+    } // End onStart method
 
     /**
      * Triggered when the contained dialog is destroyed. If the dialog was destroyed due to a configuration
@@ -201,12 +210,6 @@ public class DeviceSelectorDialog extends DialogFragment implements DialogInterf
         refreshNext = true;
         if (currentDialog != null && currentDialog.isShowing()) { updateDevices(); }
     } // End onDeviceConnectionStateChange method
-
-    /**
-     * Triggered when the contained dialog is shown.
-     */
-    @Override
-    public void onShow(DialogInterface dialog) { updateDevices(); }
 
     /**
      * Triggered when an item in either of the {@link Spinner}s has been selected.

@@ -6,7 +6,6 @@ import android.app.NotificationManager;
 import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
-import android.content.ServiceConnection;
 import android.hardware.usb.UsbDevice;
 import android.media.midi.MidiDevice;
 import android.media.midi.MidiDeviceInfo;
@@ -242,7 +241,6 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
      * {@code boolean} extra used to allow custom binding without using {@link MediaBrowserServiceCompat}.
      */
     public static final String EXTRA_BIND_NORMAL = "MOPPY_BIND_NORMAL";
-
     /**
      * {@link String} extra field for the port name associated with a {@link #ACTION_ADD_DEVICE} or {@link #ACTION_REMOVE_DEVICE} event.
      */
@@ -354,7 +352,6 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
                         PlaybackStateCompat.ACTION_PLAY |
                         PlaybackStateCompat.ACTION_STOP
                 ) // End setActions call
-                .addCustomAction("initLibrary", "initLibrary", R.drawable.ic_folder)
                 .setState(
                         PlaybackStateCompat.STATE_NONE,
                         PlaybackStateCompat.PLAYBACK_POSITION_UNKNOWN,
@@ -468,7 +465,7 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
         disconnectMidiOut();
 
         // Disconnect from all Moppy devices, stop running in the foreground, and shutdown the media session
-        if (moppyManager != null) { moppyManager.getUsbManager().closeAllBridges(); }
+        if (moppyManager != null) { moppyManager.close(); }
         if (midiSplitter != null) { midiSplitter.close(); }
         stopForeground(true);
         if (mediaSession != null) { mediaSession.release(); }

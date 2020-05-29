@@ -30,7 +30,7 @@ import jp.kshoji.javax.sound.midi.spi.MidiFileReader;
 /**
  * Manages all objects necessary to operate Moppy and provides methods to control them.
  */
-public class MoppyManager implements com.moppy.core.status.StatusConsumer {
+public class MoppyManager implements com.moppy.core.status.StatusConsumer, AutoCloseable {
     private static final String TAG = MoppyManager.class.getName();
 
     private boolean paused;
@@ -88,6 +88,16 @@ public class MoppyManager implements com.moppy.core.status.StatusConsumer {
             ); // End callbackList.forEach lambda
         } // End if(update == SEQUENCE_END)
     } // End receiveUpdate method
+
+    /**
+     * Releases held resources. <b>MUST</b> be called before this {@code MoppyManager}'s destruction.
+     */
+    @Override
+    public void close() {
+        netManager.closeAllBridges();
+        try { seq.close(); } catch (IOException ignored) { } // Outdated method signature
+        receiverSender.close();
+    } // End close method
 
     /**
      * Gets the {@link MoppyUsbManager} managed by this {@code MoppyManager}.
@@ -313,5 +323,5 @@ public class MoppyManager implements com.moppy.core.status.StatusConsumer {
          * @param reset {@code true} if the song progress is to be reset, otherwise {@code false}
          */
         void onSongEnd(boolean reset) {}
-    }
-}
+    } // End MidiManager.Callback class
+} // End MidiManager class
