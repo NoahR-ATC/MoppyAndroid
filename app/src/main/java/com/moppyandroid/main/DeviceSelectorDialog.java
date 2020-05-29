@@ -31,10 +31,9 @@ import java.util.Map;
 /**
  * {@link DialogFragment} for selecting Moppy devices to connect/disconnect to.
  */
-public class DeviceSelectorDialog extends DialogFragment implements DialogInterface.OnShowListener {
+public class DeviceSelectorDialog extends DialogFragment {
     private boolean refreshNext = false;
     private boolean emptyShowing = false;
-    private boolean isOpen = false;
     private int loadingBarRequests;
     private Map<UsbDevice, CheckBox> deviceCheckBoxMap;
     private MediaBrowserCompat mediaBrowser;
@@ -82,8 +81,6 @@ public class DeviceSelectorDialog extends DialogFragment implements DialogInterf
         alertBuilder.setCancelable(false);
         alertBuilder.setView(LayoutInflater.from(context).inflate(R.layout.loading_dialog_layout, null));
         loadingBar = alertBuilder.create();
-
-        isOpen = true;
     } // End onCreate method
 
     /**
@@ -103,11 +100,21 @@ public class DeviceSelectorDialog extends DialogFragment implements DialogInterf
         selectorBuilder.setTitle("Connect to a device");
         selectorBuilder.setCancelable(true);
         selectorBuilder.setView(v);
-        Dialog thisDialog = selectorBuilder.create();
-        thisDialog.setOnShowListener(this);
-        currentDialog = thisDialog;
+        currentDialog = selectorBuilder.create();
         return currentDialog;
     } // End onCreateDialog method
+
+    /**
+     * Triggered whenever this {@code DeviceSelectorDialog} comes into the foreground from a hidden state
+     * (e.g. app minimized, device locked), including when this {@code DeviceSelectorDialog} first gets created.
+     */
+    @Override
+    public void onStart() {
+        // Device connections/disconnections before this is triggered may not have been sent to MoppyAndroid
+        // and therefore onDeviceConnectionStateChanged may not have been called.
+        updateDevices();
+        super.onStart();
+    } // End onStart
 
     /**
      * Triggered when the contained dialog is destroyed. If the dialog was destroyed due to a configuration
@@ -164,12 +171,6 @@ public class DeviceSelectorDialog extends DialogFragment implements DialogInterf
         refreshNext = true;
         if (currentDialog != null && currentDialog.isShowing()) { updateDevices(); }
     } // End onDeviceConnectionStateChange method
-
-    /**
-     * Triggered when the contained dialog is shown.
-     */
-    @Override
-    public void onShow(DialogInterface dialog) { updateDevices(); }
 
     /**
      * Updates the list of available devices in this {@code DeviceSelectorDialog}.
