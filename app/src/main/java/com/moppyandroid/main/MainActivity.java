@@ -38,6 +38,7 @@ Regexes:
 import android.annotation.SuppressLint;
 import android.app.AlertDialog;
 import android.app.PendingIntent;
+import android.app.SearchManager;
 import android.content.BroadcastReceiver;
 import android.content.ComponentName;
 import android.content.Context;
@@ -50,6 +51,7 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.RemoteException;
 import android.os.SystemClock;
+import android.provider.MediaStore;
 import android.support.v4.media.MediaBrowserCompat;
 import android.support.v4.media.MediaMetadataCompat;
 import android.support.v4.media.session.MediaControllerCompat;
@@ -128,6 +130,12 @@ public class MainActivity extends AppCompatActivity implements SeekBar.OnSeekBar
 
             // Determine action and process accordingly
             switch (intent.getAction()) {
+                case MediaStore.INTENT_ACTION_MEDIA_PLAY_FROM_SEARCH: {
+                    if (transportControls != null) {
+                        transportControls.playFromSearch(intent.getStringExtra(SearchManager.QUERY), intent.getExtras());
+                    }
+                    break;
+                } // End case ACTION_MEDIA_PLAY_FROM_SEARCH
                 case ACTION_USB_PERMISSION: {
                     requestDevicesRefresh();
                     if (deviceDialogManager != null) {
@@ -330,6 +338,7 @@ public class MainActivity extends AppCompatActivity implements SeekBar.OnSeekBar
 
         // Create the filter describing which Android system intents to process and register it
         IntentFilter globalIntentFilter = new IntentFilter();
+        globalIntentFilter.addAction(MediaStore.INTENT_ACTION_MEDIA_PLAY_FROM_SEARCH);
         globalIntentFilter.addAction(ACTION_USB_PERMISSION);
         globalIntentFilter.addAction(UsbManager.ACTION_USB_DEVICE_ATTACHED);
         globalIntentFilter.addAction(UsbManager.ACTION_USB_DEVICE_DETACHED);
@@ -557,6 +566,7 @@ public class MainActivity extends AppCompatActivity implements SeekBar.OnSeekBar
         @Override
         public void onConnectionSuspended() { // Server crashed, awaiting restart
             setControlState(true);
+            transportControls = null;
             super.onConnectionSuspended();
         } // End onConnectionSuspended method
 
