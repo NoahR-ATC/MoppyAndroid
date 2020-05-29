@@ -12,8 +12,6 @@ Known problems:
 
 
 Features to implement:
-    - MIDI I/O
-        > Import MidiSplitter
     - Playlist/file queue
 
 
