@@ -152,6 +152,7 @@ public class MoppyManager implements com.moppy.core.status.StatusConsumer, AutoC
     public void load(MidiLibrary.MidiFile file, Context context) throws IOException, InvalidMidiDataException {
         if (file == null || file.getUri() == null || file.getName() == null) {
             Log.e(TAG + "->load:", "Provided MidiFile was null or malformed");
+            return;
         }
 
         // Get an input stream for the file and read it, raising an exception if the stream is invalid

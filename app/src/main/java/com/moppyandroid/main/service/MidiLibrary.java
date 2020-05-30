@@ -9,6 +9,8 @@ import android.content.Context;
 import android.content.pm.PackageManager;
 import android.database.Cursor;
 import android.net.Uri;
+import android.os.Parcel;
+import android.os.Parcelable;
 import android.provider.MediaStore;
 import android.support.v4.media.MediaMetadataCompat;
 import android.util.Log;
@@ -487,7 +489,7 @@ public class MidiLibrary implements Map<String, MidiLibrary.MapNode> {
     /**
      * A structure representing a MIDI file that can be contained in a {@link Folder}.
      */
-    public static class MidiFile implements MapNode { // https://developer.android.com/training/data-storage/shared/media
+    public static class MidiFile implements MapNode, Parcelable { // https://developer.android.com/training/data-storage/shared/media
         private final Uri uri;
         private final String name;
         private final int duration;
@@ -580,7 +582,7 @@ public class MidiLibrary implements Map<String, MidiLibrary.MapNode> {
         public String getPath() { return path; }
 
 
-        // Implement interface methods
+        // Implement MapNode interface methods
 
         /**
          * Always returns {@code false}.
@@ -679,6 +681,82 @@ public class MidiLibrary implements Map<String, MidiLibrary.MapNode> {
          */
         @Override
         public int compareTo(MapNode node) { return this.name.compareToIgnoreCase(node.getName()); }
+
+        // Parcelable implementation
+
+        /**
+         * Creates a new {@code MidiFile} from a {@link Parcel}.
+         *
+         * @param in the parcel to read
+         */
+        protected MidiFile(Parcel in) {
+            uri = in.readParcelable(Uri.class.getClassLoader());
+            name = in.readString();
+            duration = in.readInt();
+            artist = in.readString();
+            album = in.readString();
+            parentName = in.readString();
+            globalName = in.readString();
+            metadata = in.readParcelable(MediaMetadataCompat.class.getClassLoader());
+            path = in.readString();
+        } // End MidiFile(Parcel) constructor
+
+        /**
+         * Writes this {@code MidiFile} to a {@link Parcel}.
+         *
+         * @param dest  the parcel to write to
+         * @param flags the flags used for writing
+         * @see Parcelable#writeToParcel(Parcel, int)
+         */
+        @Override
+        public void writeToParcel(Parcel dest, int flags) {
+            dest.writeParcelable(uri, flags);
+            dest.writeString(name);
+            dest.writeInt(duration);
+            dest.writeString(artist);
+            dest.writeString(album);
+            dest.writeString(parentName);
+            dest.writeString(globalName);
+            dest.writeParcelable(metadata, flags);
+            dest.writeString(path);
+        } // End writeToParcel method
+
+        /**
+         * Returns {@code 0}.
+         *
+         * @return {@code 0}
+         * @see Parcelable#describeContents()
+         */
+        @Override
+        public int describeContents() { return 0; }
+
+        /**
+         * Checks whether this {@code MidiFile} is equal to another {@link Object}.
+         *
+         * @param o the object to check equality with
+         * @return {@code true} if the {@code o} is equal to this, {@code false} otherwise
+         */
+        @Override
+        public boolean equals(Object o) {
+            if (!(o instanceof MidiFile)) { return false; }
+            return uri.equals(((MidiFile) o).getUri()) &&
+                   name.equals(((MidiFile) o).getName()) &&
+                   duration == ((MidiFile) o).getDuration() &&
+                   artist.equals( ((MidiFile) o).getArtist()) &&
+                   album.equals(((MidiFile) o).getAlbum()) &&
+                   parentName.equals(((MidiFile) o).getParentName()) &&
+                   globalName.equals(((MidiFile) o).getNameGlobal()) &&
+                   metadata.equals(((MidiFile) o).getMetadata()) &&
+                   path.equals(((MidiFile) o).getPath());
+        } // End equals method
+
+        public static final Creator<MidiFile> CREATOR = new Creator<MidiFile>() {
+            @Override
+            public MidiFile createFromParcel(Parcel in) { return new MidiFile(in); }
+
+            @Override
+            public MidiFile[] newArray(int size) { return new MidiFile[size]; }
+        };
     } // End MidiFile class
 
     /**
