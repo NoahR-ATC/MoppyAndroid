@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="err_file_not_found">Not found: Item doesn\'t exist!</string>
+    <string name="back">Back</string>
+    <string name="replay">Replay</string>
+    <string name="play">Play</string>
+    <string name="rewind">Rewind</string>
+    <string name="forward">Forward</string>
+    <string name="show_hide_piano">Show/Hide Piano</string>
+    <string name="settings">Settings</string>
+
+</resources>

@@ -1,0 +1,42 @@
+apply plugin: 'com.android.library'
+apply plugin: 'kotlin-android'
+apply plugin: 'kotlin-android-extensions'
+
+repositories {
+    mavenCentral()
+}
+android {
+    compileSdkVersion 29
+    buildToolsVersion '28.0.3'
+
+    defaultConfig {
+        minSdkVersion 21
+        targetSdkVersion 29
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.txt'
+        }
+    }
+    compileOptions {
+        sourceCompatibility = '1.8'
+        targetCompatibility = '1.8'
+    }
+
+    packagingOptions {
+        exclude 'META-INF/library-core_release.kotlin_module'
+    }
+}
+
+dependencies {
+    implementation 'androidx.legacy:legacy-support-v4:1.0.0'
+    implementation project(path: ':javax.sound.midi')
+    implementation 'androidx.preference:preference:1.1.1'
+    //implementation 'jp.kshoji:midi-driver:0.1.5:@aar'
+
+    // For the navigation drawer
+    implementation "com.mikepenz:materialdrawer:7.0.0-rc01"
+    implementation 'androidx.constraintlayout:constraintlayout:2.0.0-beta6'
+}

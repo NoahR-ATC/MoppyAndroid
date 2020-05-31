@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <style name="ToolbarButtonStyle" parent="@android:style/Widget.Material.Button.Borderless">
+        <item name="android:layout_width">40dp</item>
+        <item name="android:layout_height">40dp</item>
+    </style>
+
+    <style name="DisabledToolbarButton" parent="ToolbarButtonStyle">
+        <item name="android:textColor">@android:color/holo_red_dark</item>
+    </style>
+    <color name="IconColor">@android:color/darker_gray</color>
+</resources>
