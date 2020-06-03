@@ -229,6 +229,11 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
      *         <tr><th>KEY</th><th>TYPE</th><th>VALUE</th></tr>
      *         <tr><td>{@link #EXTRA_MEDIA_ID}</td><td>{@link String}</td><td>The media ID to load</td></tr>
      *         <tr><td>(Optional) {@link #EXTRA_PLAY}</td><td>{@code boolean}</td><td>Start playing after loading finished</td></tr>
+     *         <tr>
+     *             <td>(Result only) {@link #EXTRA_MEDIA_MIDI_FILE}</td>
+     *             <td>{@link com.moppyandroid.main.service.MidiLibrary.MidiFile} ({@link android.os.Parcelable})</td>
+     *             <td>Information about the MIDI file that was loaded</td>
+     *         </tr>
      *     </table>
      * </p>
      *
@@ -286,6 +291,11 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
      * {@link String} extra field for the media ID of the file to load.
      */
     public static final String EXTRA_MEDIA_ID = "MOPPY_MEDIA_ITEM";
+    /**
+     * {@link com.moppyandroid.main.service.MidiLibrary.MidiFile} extra field (stored as {@link android.os.Parcelable})
+     * for the MIDI file loaded in an {@link #ACTION_LOAD_ITEM} event.
+     */
+    public static final String EXTRA_MEDIA_MIDI_FILE = "MOPPY_EXTRA_MIDI_OUT_DEVICE";
     /**
      * {@code boolean} extra field for if the sequencer should be started if file loaded successfully.
      * If an action reads this extra, {@code null} represents {@code false}.
@@ -1132,6 +1142,7 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
 
         Bundle resultBundle = new Bundle();
         resultBundle.putString(EXTRA_MEDIA_ID, mediaId);
+        resultBundle.putParcelable(EXTRA_MEDIA_MIDI_FILE, (MidiLibrary.MidiFile) node);
         result.sendResult(resultBundle);
     } // End onLoadAction method
 
