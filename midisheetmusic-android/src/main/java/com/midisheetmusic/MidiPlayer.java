@@ -465,7 +465,7 @@ public class MidiPlayer extends LinearLayout {
     /** The callback for the play button.
      *  If we're stopped or pause, then play the midi file.
      */
-    private void Play() {
+    public void Play() {
         if (midifile == null || sheet == null || numberTracks() == 0) {
             return;
         }
@@ -479,7 +479,7 @@ public class MidiPlayer extends LinearLayout {
         this.setVisibility(View.GONE);
         RemoveShading();
         timer.removeCallbacks(TimerCallback);
-        timer.postDelayed(DoPlay, 1000);
+        timer.post(DoPlay);
     }
 
     Runnable DoPlay = new Runnable() {
@@ -556,7 +556,7 @@ public class MidiPlayer extends LinearLayout {
      *  If playing, initiate a stop and wait for the timer to finish.
      *  Then do the actual stop.
      */
-    void Reset() {
+    public void Reset() {
         if (midifile == null || sheet == null) {
             return;
         }

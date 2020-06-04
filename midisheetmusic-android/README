@@ -9,3 +9,4 @@ Changes:
     - Updated build.gradle and switched from using jp.kshoji.midi-driver to jp.kshoji.javax.sound.midi-for-Android
     - Switched zoom calculation in SheetMusic.onSizeChanged to use viewHeight instead of screenHeight
     - Removed unused resources from 'src/main/res' folder
+    - Changed visibility of Play and Reset methods of MidiPlayer from package-private to public
