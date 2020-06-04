@@ -5,6 +5,8 @@ Author: Noah Reeder, noahreederatc@gmail.com
 
 Known bugs:
 TODO: "W/ActivityThread: handleWindowVisibilty: no activity for token" in log when starting BrowserActivity, unable to find reason
+TODO: Sheet music not synchronized with playback
+TODO: Sheet music scrolling is wacky
 
 Known problems:
     - Hard to use track slider in slide menu (adjust slide menu sensitivity?)
@@ -60,6 +62,7 @@ import android.util.Log;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ImageButton;
+import android.widget.LinearLayout;
 import android.widget.RelativeLayout;
 import android.widget.SeekBar;
 import android.widget.TextView;
@@ -71,8 +74,16 @@ import androidx.recyclerview.widget.RecyclerView;
 import com.google.android.flexbox.FlexDirection;
 import com.google.android.flexbox.FlexboxLayoutManager;
 import com.google.android.flexbox.JustifyContent;
+import com.midisheetmusic.FileUri;
+import com.midisheetmusic.MidiOptions;
+import com.midisheetmusic.MidiPlayer;
+import com.midisheetmusic.Piano;
+import com.midisheetmusic.SheetMusic;
+import com.midisheetmusic.TimeSigSymbol;
+import com.midisheetmusic.sheets.ClefSymbol;
 import com.moppy.core.comms.bridge.BridgeSerial;
 import com.moppyandroid.main.service.MidiLibrary;
+import com.moppyandroid.main.service.MidiLibrary.MidiFile;
 import com.moppyandroid.main.service.MoppyMediaService;
 import com.sothree.slidinguppanel.SlidingUpPanelLayout;
 import com.sothree.slidinguppanel.SlidingUpPanelLayout.PanelState;
@@ -119,7 +130,11 @@ public class MainActivity extends AppCompatActivity implements SeekBar.OnSeekBar
     private MediaControllerCompat.TransportControls transportControls;
     private PlaybackStateCompat playbackState;
     private MediaMetadataCompat metadata;
+    private MidiFile midiFile;
     private DeviceSelectorDialogManager deviceDialogManager;
+    private SheetMusic sheetMusic;
+    private Piano sheetPiano;
+    private MidiPlayer sheetPlayer;
 
     // Define the receiver to process relevant intent messages
     private BroadcastReceiver broadcastReceiver = new BroadcastReceiver() {
@@ -215,6 +230,17 @@ public class MainActivity extends AppCompatActivity implements SeekBar.OnSeekBar
         findViewById(R.id.song_time_text).setSelected(true);
         findViewById(R.id.song_title).setSelected(true);
 
+        // Create the sheet music objects
+        sheetPiano = new Piano(this);
+        sheetPlayer = new MidiPlayer(this);
+        sheetPlayer.SetPiano(sheetPiano);
+        sheetPlayer.setSheetUpdateRequestListener(this::createSheetMusic);
+        sheetPiano.setVisibility(View.GONE);
+        sheetPlayer.setVisibility(View.GONE);
+        LinearLayout hiddenLayout = findViewById(R.id.sheet_hidden_layout);
+        hiddenLayout.addView(sheetPiano);
+        hiddenLayout.addView(sheetPlayer);
+
         mediaBrowser.connect();
 
         deviceDialogManager = new DeviceSelectorDialogManager(this, getSupportFragmentManager(), TAG_DEVICE_DIALOG);
@@ -278,6 +304,8 @@ public class MainActivity extends AppCompatActivity implements SeekBar.OnSeekBar
                 mediaBrowser.sendCustomAction(MoppyMediaService.ACTION_INIT_LIBRARY, null, null);
             }
             else { sendInitLibraryOnConnect = true; }
+            TimeSigSymbol.LoadImages(this);
+            ClefSymbol.LoadImages(this);
         } // End if(READ_STORAGE)
     } // End onRequestPermissionsResult method
 
@@ -397,7 +425,13 @@ public class MainActivity extends AppCompatActivity implements SeekBar.OnSeekBar
         Bundle loadExtras = new Bundle();
         loadExtras.putString(MoppyMediaService.EXTRA_MEDIA_ID, item.getMediaId());
         mediaBrowser.sendCustomAction(MoppyMediaService.ACTION_LOAD_ITEM, loadExtras, new MediaBrowserCompat.CustomActionCallback() {
-            // After-load processing handled through the media controller metadata change listener
+            @Override
+            public void onResult(String action, Bundle extras, Bundle resultData) {
+                // Most after-load processing handled through the media controller metadata change listener
+                midiFile = resultData.getParcelable(MoppyMediaService.EXTRA_MEDIA_MIDI_FILE);
+                createSheetMusic();
+                super.onResult(action, extras, resultData);
+            }
 
             @Override
             public void onError(String action, Bundle extras, Bundle data) {
@@ -406,6 +440,28 @@ public class MainActivity extends AppCompatActivity implements SeekBar.OnSeekBar
             } // End ACTION_LOAD_ITEM.onError method
         }); // End ACTION_LOAD_ITEM callback
     } // End onLoadFile method
+
+    // Creates sheet music in the slider based on the current MidiFile
+    private void createSheetMusic() {
+        if (midiFile == null) { return; }
+
+        FileUri sheetFileUri = new FileUri(midiFile.getUri(), midiFile.getPath());
+        byte[] bytes = sheetFileUri.getData(MainActivity.this);
+        com.midisheetmusic.MidiFile sheetFile = new com.midisheetmusic.MidiFile(bytes, midiFile.getName());
+        MidiOptions options = new MidiOptions(sheetFile);
+        options.showPiano = false;
+        options.twoStaffs = false;
+
+        LinearLayout sheetLayout = findViewById(R.id.sheet_layout);
+        if (sheetMusic != null) {
+            sheetLayout.removeView(sheetMusic);
+        }
+        sheetMusic = new SheetMusic(MainActivity.this);
+        sheetMusic.init(sheetFile, options);
+        sheetPiano.SetMidiFile(sheetFile, options, sheetPlayer);
+        sheetPlayer.SetMidiFile(sheetFile, options, sheetMusic);
+        sheetLayout.addView(sheetMusic);
+    } // End createSheetMusic method
 
     // Enables/disables the play button
     private void enablePlayButton(boolean enabled) {
@@ -589,12 +645,15 @@ public class MainActivity extends AppCompatActivity implements SeekBar.OnSeekBar
                     songTimerTask.unpause();
                     setControlState(false);
                     ((ImageButton) findViewById(R.id.pause_button)).setImageResource(R.drawable.ic_pause);
+                    if (sheetPlayer != null) { sheetPlayer.Play(); }
+                    // TODO: Update seekbar position
                     break;
                 } // End STATE_PLAYING case
                 case PlaybackStateCompat.STATE_PAUSED: {
                     songTimerTask.pause();
                     setControlState(false);
                     ((ImageButton) findViewById(R.id.pause_button)).setImageResource(R.drawable.ic_stop);
+                    if (sheetPlayer != null) { sheetPlayer.Pause(); }
                     break;
                 } // End STATE_PAUSED case
                 case PlaybackStateCompat.STATE_STOPPED: {
@@ -603,6 +662,10 @@ public class MainActivity extends AppCompatActivity implements SeekBar.OnSeekBar
                     ((ImageButton) findViewById(R.id.pause_button)).setImageResource(R.drawable.ic_stop);
                     // Move slider to where sequencer stopped (0 if reset, otherwise song end)
                     updateSongProgress();
+                    if (sheetPlayer != null) {
+                        if (playbackState.getPosition() == 0) { sheetPlayer.Reset(); }
+                        else { sheetPlayer.Pause(); }
+                    }
                     break;
                 } // End STATE_STOPPED case
                 case PlaybackStateCompat.STATE_BUFFERING:
