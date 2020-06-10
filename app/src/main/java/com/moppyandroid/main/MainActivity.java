@@ -5,12 +5,11 @@ Author: Noah Reeder, noahreederatc@gmail.com
 
 Known bugs:
 TODO: "W/ActivityThread: handleWindowVisibilty: no activity for token" in log when starting BrowserActivity, unable to find reason
-TODO: Sheet music not synchronized with playback
-TODO: Sheet music scrolling is wacky
 
 Known problems:
     - Hard to use track slider in slide menu (adjust slide menu sensitivity?)
     - Must connect to device, disconnect, and connect again for connection to work... sometimes
+    - Sheet music shading is a little weird sometimes, particularly during seeks or while scrolling music
 
 
 Features to implement:
@@ -47,12 +46,10 @@ import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.IntentFilter;
-import android.content.ServiceConnection;
 import android.hardware.usb.UsbDevice;
 import android.hardware.usb.UsbManager;
 import android.os.Bundle;
 import android.os.Handler;
-import android.os.IBinder;
 import android.os.RemoteException;
 import android.os.SystemClock;
 import android.provider.MediaStore;
@@ -78,8 +75,6 @@ import com.google.android.flexbox.FlexboxLayoutManager;
 import com.google.android.flexbox.JustifyContent;
 import com.midisheetmusic.FileUri;
 import com.midisheetmusic.MidiOptions;
-import com.midisheetmusic.MidiPlayer;
-import com.midisheetmusic.Piano;
 import com.midisheetmusic.SheetMusic;
 import com.midisheetmusic.TimeSigSymbol;
 import com.midisheetmusic.sheets.ClefSymbol;
@@ -127,6 +122,9 @@ public class MainActivity extends AppCompatActivity implements SeekBar.OnSeekBar
     private boolean movingSlider;
     private boolean initialized;
     private boolean sendInitLibraryOnConnect;
+    private boolean shadeSheetMusic;
+    private double pulsesPerMs;
+    private double currentPulseTime;
     private MediaBrowserCompat mediaBrowser;
     private MediaControllerCallback mediaControllerCallback;
     private MediaControllerCompat.TransportControls transportControls;
@@ -135,11 +133,6 @@ public class MainActivity extends AppCompatActivity implements SeekBar.OnSeekBar
     private MidiFile midiFile;
     private DeviceSelectorDialogManager deviceDialogManager;
     private SheetMusic sheetMusic;
-    private Piano sheetPiano;
-    private MidiPlayer sheetPlayer;
-    private ServiceConnection serviceConnection;
-    private SheetMusicShader shader;
-    private MoppyMediaService service;
 
     // Define the receiver to process relevant intent messages
     private BroadcastReceiver broadcastReceiver = new BroadcastReceiver() {
@@ -188,6 +181,7 @@ public class MainActivity extends AppCompatActivity implements SeekBar.OnSeekBar
         movingSlider = false;
         initialized = false;
         sendInitLibraryOnConnect = false;
+        shadeSheetMusic = false;
 
         // Set the initial view and disable the pause and play buttons
         setContentView(R.layout.activity_main);
@@ -235,40 +229,10 @@ public class MainActivity extends AppCompatActivity implements SeekBar.OnSeekBar
         findViewById(R.id.song_time_text).setSelected(true);
         findViewById(R.id.song_title).setSelected(true);
 
-        // Create the sheet music objects
-        sheetPiano = new Piano(this);
-        sheetPlayer = new MidiPlayer(this);
-        sheetPlayer.SetPiano(sheetPiano);
-        sheetPlayer.setSheetUpdateRequestListener(this::createSheetMusic);
-        sheetPiano.setVisibility(View.GONE);
-        sheetPlayer.setVisibility(View.GONE);
-        LinearLayout hiddenLayout = findViewById(R.id.sheet_hidden_layout);
-        hiddenLayout.addView(sheetPiano);
-        hiddenLayout.addView(sheetPlayer);
-
         mediaBrowser.connect();
 
         deviceDialogManager = new DeviceSelectorDialogManager(this, getSupportFragmentManager(), TAG_DEVICE_DIALOG);
         findViewById(R.id.devices_button).setOnClickListener((view) -> deviceDialogManager.show());
-
-        // TODO: make better
-        shader = new SheetMusicShader();
-        serviceConnection = new ServiceConnection() {
-            @Override
-            public void onServiceConnected(ComponentName name, IBinder service) {
-                MainActivity.this.service = ((MoppyMediaService.Binder) service).getService();
-                MainActivity.this.service.addReceiver(shader);
-                // TODO: Only accept SMF messages
-            }
-
-            @Override
-            public void onServiceDisconnected(ComponentName name) {
-
-            }
-        };
-        Intent bindIntent = new Intent(this, MoppyMediaService.class);
-        bindIntent.putExtra(MoppyMediaService.EXTRA_BIND_NORMAL, true);
-        bindService(bindIntent, serviceConnection, Context.BIND_AUTO_CREATE);
     } // End onCreate method
 
     /**
@@ -285,8 +249,6 @@ public class MainActivity extends AppCompatActivity implements SeekBar.OnSeekBar
         mediaBrowser.disconnect();
         if (initialized) { unregisterReceiver(broadcastReceiver); }
         if (deviceDialogManager != null) { deviceDialogManager.close(); }
-        if (service != null) { service.removeReceiver(shader); }
-        unbindService(serviceConnection);
         super.onDestroy();
     } // End onDestroy method
 
@@ -470,6 +432,7 @@ public class MainActivity extends AppCompatActivity implements SeekBar.OnSeekBar
     // Creates sheet music in the slider based on the current MidiFile
     private void createSheetMusic() {
         if (midiFile == null) { return; }
+        shadeSheetMusic = false;
 
         FileUri sheetFileUri = new FileUri(midiFile.getUri(), midiFile.getPath());
         byte[] bytes = sheetFileUri.getData(MainActivity.this);
@@ -477,6 +440,7 @@ public class MainActivity extends AppCompatActivity implements SeekBar.OnSeekBar
         MidiOptions options = new MidiOptions(sheetFile);
         options.showPiano = false;
         options.twoStaffs = false;
+        pulsesPerMs = sheetFile.getTime().getQuarter() * (1000.0 / options.tempo);
 
         LinearLayout sheetLayout = findViewById(R.id.sheet_layout);
         if (sheetMusic != null) {
@@ -484,11 +448,8 @@ public class MainActivity extends AppCompatActivity implements SeekBar.OnSeekBar
         }
         sheetMusic = new SheetMusic(MainActivity.this);
         sheetMusic.init(sheetFile, options);
-        sheetPiano.SetMidiFile(sheetFile, options, sheetPlayer);
-        sheetPlayer.SetMidiFile(sheetFile, options, sheetMusic);
         sheetLayout.addView(sheetMusic);
-        shader.start(sheetFile, options, sheetMusic);
-        shader.pause(); // TODO: Is it paused?
+        shadeSheetMusic = true;
     } // End createSheetMusic method
 
     // Enables/disables the play button
@@ -555,11 +516,25 @@ public class MainActivity extends AppCompatActivity implements SeekBar.OnSeekBar
     } // End setSongName method
 
     // Updates the song position slider and textual counter
-    private void updateSongProgress() {
+    private void updateSongProgress(boolean overrideDelta) {
+        long delta = (SystemClock.elapsedRealtime() - playbackState.getLastPositionUpdateTime());
         long time = playbackState.getPosition();
-        time += playbackState.getPlaybackSpeed() * (SystemClock.elapsedRealtime() - playbackState.getLastPositionUpdateTime());
+        if (!overrideDelta) { time += playbackState.getPlaybackSpeed() * delta; }
+
         songSlider.setProgress((int) Math.min(time, Integer.MAX_VALUE));
         updateSongPositionText(time);
+
+        double prevPulseTime = currentPulseTime;
+        currentPulseTime = time * pulsesPerMs;
+        if (sheetMusic != null && shadeSheetMusic) {
+            if (time == 0) {
+                sheetMusic.ShadeNotes(-10, (int)prevPulseTime, SheetMusic.DontScroll);
+                sheetMusic.ShadeNotes(-10, (int)currentPulseTime, SheetMusic.DontScroll);
+            }
+            else {
+                sheetMusic.ShadeNotes((int) currentPulseTime, (int) prevPulseTime, SheetMusic.GradualScroll);
+            }
+        }
     } // End updateSongProgress method
 
     // Updates the text label representing the song position (e.g. 0:02:24/0:03:00)
@@ -605,9 +580,7 @@ public class MainActivity extends AppCompatActivity implements SeekBar.OnSeekBar
         public SongTimerTask(boolean startPaused) { notPaused = !startPaused; }
 
         @Override
-        public void run() {
-            if (notPaused) { updateSongProgress(); }
-        } // End run method
+        public void run() { if (notPaused) { updateSongProgress(false); } }
 
         public void pause() { notPaused = false; }
 
@@ -673,27 +646,19 @@ public class MainActivity extends AppCompatActivity implements SeekBar.OnSeekBar
                     songTimerTask.unpause();
                     setControlState(false);
                     ((ImageButton) findViewById(R.id.pause_button)).setImageResource(R.drawable.ic_pause);
-                    if (sheetPlayer != null) {  shader.unpause(); }
                     // TODO: Update seekbar position
                     break;
                 } // End STATE_PLAYING case
-                case PlaybackStateCompat.STATE_PAUSED: {
-                    songTimerTask.pause();
-                    setControlState(false);
-                    ((ImageButton) findViewById(R.id.pause_button)).setImageResource(R.drawable.ic_stop);
-                    if (sheetPlayer != null) { shader.pause(); }
-                    break;
-                } // End STATE_PAUSED case
+                case PlaybackStateCompat.STATE_PAUSED: // Fall through to STATE_STOPPED case
                 case PlaybackStateCompat.STATE_STOPPED: {
                     songTimerTask.pause();
-                    setControlState(false);
+                    setControlState(false); // Accounts for whether STATE_PAUSED or STATE_STOPPED
                     ((ImageButton) findViewById(R.id.pause_button)).setImageResource(R.drawable.ic_stop);
-                    // Move slider to where sequencer stopped (0 if reset, otherwise song end)
-                    updateSongProgress();
-                    if (sheetPlayer != null) {
-                        if (playbackState.getPosition() == 0) { sheetPlayer.Reset(); }
-                        else { sheetPlayer.Pause(); }
-                    }
+                    // Move slider to where sequencer stopped, overriding calculations
+                    // Note: Calculations overridden because updateSongProgress uses clock calculations
+                    //      to compute the time delta for how far into the song it is, which makes it slightly
+                    //      inaccurate and means that the position wouldn't be correct if playback stopped
+                    updateSongProgress(true);
                     break;
                 } // End STATE_STOPPED case
                 case PlaybackStateCompat.STATE_BUFFERING:
