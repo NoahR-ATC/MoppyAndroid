@@ -1262,7 +1262,7 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
      * Used to allow binding to this {@link MoppyMediaService}.
      */
     public class Binder extends android.os.Binder {
-        MoppyMediaService getService() { return MoppyMediaService.this; }
+        public MoppyMediaService getService() { return MoppyMediaService.this; }
     } // End MoppyMediaService.Binder class
 
     // Callbacks for media button events. All callbacks are disabled if their associated action is not supported
