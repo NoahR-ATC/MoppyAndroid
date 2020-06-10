@@ -16,4 +16,5 @@
     <string name="loading_text">Waiting for USB permission…</string>
     <string name="devices_button_description">Opens a menu for selecting devices</string>
     <string name="info_button_description">Device information button</string>
+    <string name="sheet_music_credit">Sheet music provided through a slightly modified version of https://github.com/ditek/MidiSheetMusic-Android</string>
 </resources>

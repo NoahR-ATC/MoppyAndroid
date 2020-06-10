@@ -38,12 +38,17 @@
         android:layout_marginTop="?attr/actionBarSize"
         android:orientation="vertical" />
 
-    <LinearLayout
-        android:id="@+id/sheet_hidden_layout"
+    <TextView
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:orientation="vertical"
-        android:visibility="gone"/>
+        android:layout_height="wrap_content"
+        android:layout_above="@id/song_slider"
+        android:layout_alignParentStart="true"
+        android:layout_marginStart="8dp"
+        android:layout_marginEnd="8dp"
+        android:text="@string/sheet_music_credit"
+        android:textAlignment="center"
+        android:textColor="@android:color/secondary_text_dark"
+        android:textSize="12sp" />
 
     <SeekBar
         android:id="@+id/song_slider"
