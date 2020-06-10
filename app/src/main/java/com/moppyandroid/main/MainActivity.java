@@ -47,10 +47,12 @@ import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.ServiceConnection;
 import android.hardware.usb.UsbDevice;
 import android.hardware.usb.UsbManager;
 import android.os.Bundle;
 import android.os.Handler;
+import android.os.IBinder;
 import android.os.RemoteException;
 import android.os.SystemClock;
 import android.provider.MediaStore;
@@ -135,6 +137,9 @@ public class MainActivity extends AppCompatActivity implements SeekBar.OnSeekBar
     private SheetMusic sheetMusic;
     private Piano sheetPiano;
     private MidiPlayer sheetPlayer;
+    private ServiceConnection serviceConnection;
+    private SheetMusicShader shader;
+    private MoppyMediaService service;
 
     // Define the receiver to process relevant intent messages
     private BroadcastReceiver broadcastReceiver = new BroadcastReceiver() {
@@ -245,6 +250,25 @@ public class MainActivity extends AppCompatActivity implements SeekBar.OnSeekBar
 
         deviceDialogManager = new DeviceSelectorDialogManager(this, getSupportFragmentManager(), TAG_DEVICE_DIALOG);
         findViewById(R.id.devices_button).setOnClickListener((view) -> deviceDialogManager.show());
+
+        // TODO: make better
+        shader = new SheetMusicShader();
+        serviceConnection = new ServiceConnection() {
+            @Override
+            public void onServiceConnected(ComponentName name, IBinder service) {
+                MainActivity.this.service = ((MoppyMediaService.Binder) service).getService();
+                MainActivity.this.service.addReceiver(shader);
+                // TODO: Only accept SMF messages
+            }
+
+            @Override
+            public void onServiceDisconnected(ComponentName name) {
+
+            }
+        };
+        Intent bindIntent = new Intent(this, MoppyMediaService.class);
+        bindIntent.putExtra(MoppyMediaService.EXTRA_BIND_NORMAL, true);
+        bindService(bindIntent, serviceConnection, Context.BIND_AUTO_CREATE);
     } // End onCreate method
 
     /**
@@ -261,6 +285,8 @@ public class MainActivity extends AppCompatActivity implements SeekBar.OnSeekBar
         mediaBrowser.disconnect();
         if (initialized) { unregisterReceiver(broadcastReceiver); }
         if (deviceDialogManager != null) { deviceDialogManager.close(); }
+        if (service != null) { service.removeReceiver(shader); }
+        unbindService(serviceConnection);
         super.onDestroy();
     } // End onDestroy method
 
@@ -461,6 +487,8 @@ public class MainActivity extends AppCompatActivity implements SeekBar.OnSeekBar
         sheetPiano.SetMidiFile(sheetFile, options, sheetPlayer);
         sheetPlayer.SetMidiFile(sheetFile, options, sheetMusic);
         sheetLayout.addView(sheetMusic);
+        shader.start(sheetFile, options, sheetMusic);
+        shader.pause(); // TODO: Is it paused?
     } // End createSheetMusic method
 
     // Enables/disables the play button
@@ -645,7 +673,7 @@ public class MainActivity extends AppCompatActivity implements SeekBar.OnSeekBar
                     songTimerTask.unpause();
                     setControlState(false);
                     ((ImageButton) findViewById(R.id.pause_button)).setImageResource(R.drawable.ic_pause);
-                    if (sheetPlayer != null) { sheetPlayer.Play(); }
+                    if (sheetPlayer != null) {  shader.unpause(); }
                     // TODO: Update seekbar position
                     break;
                 } // End STATE_PLAYING case
@@ -653,7 +681,7 @@ public class MainActivity extends AppCompatActivity implements SeekBar.OnSeekBar
                     songTimerTask.pause();
                     setControlState(false);
                     ((ImageButton) findViewById(R.id.pause_button)).setImageResource(R.drawable.ic_stop);
-                    if (sheetPlayer != null) { sheetPlayer.Pause(); }
+                    if (sheetPlayer != null) { shader.pause(); }
                     break;
                 } // End STATE_PAUSED case
                 case PlaybackStateCompat.STATE_STOPPED: {
