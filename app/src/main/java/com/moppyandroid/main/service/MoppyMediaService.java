@@ -6,6 +6,7 @@ import android.app.NotificationManager;
 import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
+import android.content.ServiceConnection;
 import android.hardware.usb.UsbDevice;
 import android.media.midi.MidiDevice;
 import android.media.midi.MidiDeviceInfo;
@@ -16,9 +17,11 @@ import android.os.Bundle;
 import android.os.IBinder;
 import android.provider.MediaStore;
 import android.support.v4.media.MediaBrowserCompat;
+import android.support.v4.media.MediaDescriptionCompat;
 import android.support.v4.media.MediaMetadataCompat;
 import android.support.v4.media.session.MediaControllerCompat;
 import android.support.v4.media.session.MediaSessionCompat;
+import android.support.v4.media.session.MediaSessionCompat.QueueItem;
 import android.support.v4.media.session.PlaybackStateCompat;
 import android.util.Log;
 
@@ -34,7 +37,9 @@ import com.moppyandroid.main.R;
 import java.io.IOException;
 import java.io.Serializable;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import jp.kshoji.javax.sound.midi.InvalidMidiDataException;
@@ -317,7 +322,11 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
     private static final String TAG = MoppyMediaService.class.getName();
     private static final int NOTIFICATION_ID = 1;               // ID of the service notification
     private static final int NOTIFICATION_PLAY_PAUSE_INDEX = 2; // Index of play/pause button in notification actions
+    private static final long ID_INCREMENT = 10000;  // The increment between queue item IDs when appended to the queue
 
+    private final HashMap<Long, QueueItem> musicQueueFull = new HashMap<>();
+    private final List<Long> queueIndexToId = new ArrayList<>();
+    private final List<QueueItem> musicQueueSmall = new ArrayList<>();
     private boolean splittingMidi = false;
     private MidiManager midiManager;
     private NotificationManager notificationManager;
@@ -1437,6 +1446,78 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
 
             super.onSeekTo(position);
         } // End onSeekTo method
+
+        @Override
+        public void onAddQueueItem(MediaDescriptionCompat description) {
+            if (description == null) { return; }
+
+            long id;
+            if (queueIndexToId.size() > 0) {
+                // Calculate the next multiple of ID_INCREMENT
+                long lastId = queueIndexToId.get(queueIndexToId.size() - 1);
+                long r = lastId % ID_INCREMENT;
+                id = lastId + (ID_INCREMENT - r);
+            }
+            else { id = ID_INCREMENT; }
+
+            synchronized (musicQueueFull) {
+                musicQueueFull.put(id, new MediaSessionCompat.QueueItem(description, id));
+                queueIndexToId.add(id);
+            }
+
+            // TODO: If necessary update small list and load
+
+            super.onAddQueueItem(description);
+        } // End onAddQueueItem(MediaDescriptionCompat) method
+
+        @Override
+        public void onAddQueueItem(MediaDescriptionCompat description, int index) {
+            if (description == null || index < 0) { return; }
+
+            long id;
+            if (queueIndexToId.size() > index) {
+                long currentIndexId = queueIndexToId.get(index);
+                long previousIndexId = (index > 0) ? queueIndexToId.get(index - 1) : 0;
+
+                // Calculate an ID halfway between the current ID at the requested index and the ID at
+                // the previous index, truncating decimal if odd
+                id = (currentIndexId - previousIndexId) / 2;
+
+                // Short circuits so id isn't incremented if first clause false, second clause triggered
+                // if the situation cannot be resolved by adding 1 to id
+                if (id == previousIndexId && ++id == currentIndexId) {
+                    // Too many items have been inserted and IDs are colliding, relabeling needed
+                    synchronized (musicQueueFull) {
+                        Map<Long, QueueItem> musicQueueClone = new HashMap<>(musicQueueFull);
+                        musicQueueFull.clear();
+                        for (int i = 0; i < queueIndexToId.size(); ++i) {
+                            musicQueueFull.put((i + 1) * ID_INCREMENT, musicQueueClone.get(queueIndexToId.get(i)));
+                            queueIndexToId.set(i, (i + 1) * ID_INCREMENT);
+                        } // End for(i < queueIndexToId.size)
+                        // TODO: Update small list
+                    } // End sync(musicQueueFull)
+                } // End if(id == previousIndexId && ++id == currentIndexId)
+            } // End if(queueIndexToId.size > index)
+            else {
+                index = queueIndexToId.size();
+                if (queueIndexToId.size() > 0) {
+                    // Calculate the next multiple of ID_INCREMENT
+                    long lastId = queueIndexToId.get(queueIndexToId.size() - 1);
+                    long r = lastId % ID_INCREMENT;
+                    id = lastId + (ID_INCREMENT - r);
+                } // End if(queueIndexToId.size > 0)
+                else { id = ID_INCREMENT; }
+            } // End if(queueIndexToId.size > index) {} else
+
+            synchronized (musicQueueFull) {
+                musicQueueFull.put(id, new MediaSessionCompat.QueueItem(description, id));
+                queueIndexToId.add(index, id);
+            }
+
+            // TODO: If necessary update small list and load
+
+            super.onAddQueueItem(description, index);
+        } // End onAddQueueItem(MediaDescriptionCompat, int) method
 
         /**
          * Called when a {@link MediaControllerCompat} wants a
