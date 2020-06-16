@@ -1519,6 +1519,22 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
             super.onAddQueueItem(description, index);
         } // End onAddQueueItem(MediaDescriptionCompat, int) method
 
+        @Override
+        public void onRemoveQueueItem(MediaDescriptionCompat description) {
+            // Find the first item with the specified description
+            QueueItem item = musicQueueFull.values().stream().filter((q) -> q.getDescription().equals(description)).findFirst().orElse(null);
+            if (item == null) { return; } // Not found
+
+            synchronized (musicQueueFull) {
+                musicQueueFull.remove(item.getQueueId());
+                queueIndexToId.remove((Long)item.getQueueId());
+            }
+
+            // TODO: If necessary update small list and load
+
+            super.onRemoveQueueItem(description);
+        } // End onRemoveQueueItem method
+
         /**
          * Called when a {@link MediaControllerCompat} wants a
          * {@link PlaybackStateCompat.CustomAction} to be performed.
