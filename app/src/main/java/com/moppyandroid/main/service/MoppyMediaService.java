@@ -322,11 +322,13 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
     private static final String TAG = MoppyMediaService.class.getName();
     private static final int NOTIFICATION_ID = 1;               // ID of the service notification
     private static final int NOTIFICATION_PLAY_PAUSE_INDEX = 2; // Index of play/pause button in notification actions
-    private static final long ID_INCREMENT = 10000;  // The increment between queue item IDs when appended to the queue
+    private static final long ID_INCREMENT = 10000;             // The increment between queue item IDs when appended to the queue
+    private static final int QUEUE_SIZE = 50;                   // The size of the queue handed to the media session
 
     private final HashMap<Long, QueueItem> musicQueueFull = new HashMap<>();
-    private final List<Long> queueIndexToId = new ArrayList<>();
+    private final List<Long> queueIndexToId = new ArrayList<>(); // Used to track index of items in musicQueueFull
     private final List<QueueItem> musicQueueSmall = new ArrayList<>();
+    private int musicQueueSmallOffset = 0; // Offset of musicQueueSmall[0] in queueIndexToId (and therefore musicQueueFull's items)
     private boolean splittingMidi = false;
     private MidiManager midiManager;
     private NotificationManager notificationManager;
@@ -361,7 +363,8 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
         mediaSession.setCallback(new MediaCallback());
         mediaSession.setFlags(
                 MediaSessionCompat.FLAG_HANDLES_MEDIA_BUTTONS |
-                MediaSessionCompat.FLAG_HANDLES_TRANSPORT_CONTROLS
+                MediaSessionCompat.FLAG_HANDLES_TRANSPORT_CONTROLS |
+                MediaSessionCompat.FLAG_HANDLES_QUEUE_COMMANDS
         ); // End mediaSession flags
         playbackStateBuilder = new PlaybackStateCompat.Builder()
                 .setActions(
@@ -1460,12 +1463,20 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
             }
             else { id = ID_INCREMENT; }
 
+            boolean loadSmallList;
             synchronized (musicQueueFull) {
                 musicQueueFull.put(id, new MediaSessionCompat.QueueItem(description, id));
                 queueIndexToId.add(id);
-            }
+                loadSmallList = queueIndexToId.size() < musicQueueSmallOffset + QUEUE_SIZE;
+                if (loadSmallList) {
+                    musicQueueSmall.clear();
+                    for (int i = musicQueueSmallOffset; i < queueIndexToId.size(); ++i) {
+                        musicQueueSmall.add(musicQueueFull.get(queueIndexToId.get(i)));
+                    }
+                }
+            } // End sync(musicQueueFull)
 
-            // TODO: If necessary update small list and load
+            if (loadSmallList) { mediaSession.setQueue(musicQueueSmall); }
 
             super.onAddQueueItem(description);
         } // End onAddQueueItem(MediaDescriptionCompat) method
@@ -1490,12 +1501,20 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
                     synchronized (musicQueueFull) {
                         Map<Long, QueueItem> musicQueueClone = new HashMap<>(musicQueueFull);
                         musicQueueFull.clear();
+
+                        // Calculate and reassign IDs
                         for (int i = 0; i < queueIndexToId.size(); ++i) {
                             musicQueueFull.put((i + 1) * ID_INCREMENT, musicQueueClone.get(queueIndexToId.get(i)));
                             queueIndexToId.set(i, (i + 1) * ID_INCREMENT);
                         } // End for(i < queueIndexToId.size)
-                        // TODO: Update small list
+
+                        // Update small list
+                        musicQueueSmall.clear();
+                        for (int i = musicQueueSmallOffset; i < queueIndexToId.size(); ++i) {
+                            musicQueueSmall.add(musicQueueFull.get(queueIndexToId.get(i)));
+                        }
                     } // End sync(musicQueueFull)
+                    mediaSession.setQueue(musicQueueSmall);
                 } // End if(id == previousIndexId && ++id == currentIndexId)
             } // End if(queueIndexToId.size > index)
             else {
@@ -1509,12 +1528,20 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
                 else { id = ID_INCREMENT; }
             } // End if(queueIndexToId.size > index) {} else
 
+            boolean loadSmallList = musicQueueSmallOffset <= index && index < musicQueueSmallOffset + QUEUE_SIZE;
+
             synchronized (musicQueueFull) {
                 musicQueueFull.put(id, new MediaSessionCompat.QueueItem(description, id));
                 queueIndexToId.add(index, id);
-            }
+                if (loadSmallList) {
+                    musicQueueSmall.clear();
+                    for (int i = musicQueueSmallOffset; i < queueIndexToId.size(); ++i) {
+                        musicQueueSmall.add(musicQueueFull.get(queueIndexToId.get(i)));
+                    }
+                }
+            } // End sync(musicQueueFull)
 
-            // TODO: If necessary update small list and load
+            if (loadSmallList) { mediaSession.setQueue(musicQueueSmall); }
 
             super.onAddQueueItem(description, index);
         } // End onAddQueueItem(MediaDescriptionCompat, int) method
@@ -1524,13 +1551,22 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
             // Find the first item with the specified description
             QueueItem item = musicQueueFull.values().stream().filter((q) -> q.getDescription().equals(description)).findFirst().orElse(null);
             if (item == null) { return; } // Not found
+            int index = queueIndexToId.indexOf(item.getQueueId());
+
+            boolean loadSmallList = musicQueueSmallOffset <= index && index < musicQueueSmallOffset + QUEUE_SIZE;
 
             synchronized (musicQueueFull) {
                 musicQueueFull.remove(item.getQueueId());
-                queueIndexToId.remove((Long)item.getQueueId());
-            }
+                queueIndexToId.remove(index);
+                if (loadSmallList) {
+                    musicQueueSmall.clear();
+                    for (int i = musicQueueSmallOffset; i < queueIndexToId.size(); ++i) {
+                        musicQueueSmall.add(musicQueueFull.get(queueIndexToId.get(i)));
+                    }
+                }
+            } // End sync(musicQueueFull)
 
-            // TODO: If necessary update small list and load
+            if (loadSmallList) { mediaSession.setQueue(musicQueueSmall); }
 
             super.onRemoveQueueItem(description);
         } // End onRemoveQueueItem method
