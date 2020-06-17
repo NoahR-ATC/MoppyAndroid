@@ -1080,82 +1080,8 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
         String mediaId = extras.getString(EXTRA_MEDIA_ID);
         boolean setToPlaying = extras.getBoolean(EXTRA_PLAY, false);
 
-        PlaybackStateCompat playbackState = mediaController.getPlaybackState();
-
-        // Create the MIDI library if needed and retrieve the requested file
-        if (midiLibrary == null) {
-            // Don't want to hold up UI thread creating a MidiLibrary that may not be created successfully,
-            // so we will just trigger creation and if failed send an error
-            result.detach();
-            MidiLibrary.getMidiLibraryAsync(MoppyMediaService.this, (midiLibraryResult) -> {
-                if (midiLibraryResult == null) {
-                    Bundle errorBundle = new Bundle();
-                    errorBundle.putString(EXTRA_ERROR_REASON, "Unable to create MIDI Library");
-                    // How did the Browser get a media ID if no library exists and can't be created? Something wacky here
-                    errorBundle.putBoolean(EXTRA_ERROR_INFORMATIONAL, false);
-                    errorBundle.putString(EXTRA_MEDIA_ID, mediaId);
-                    result.sendError(errorBundle);
-                    return;
-                } // End if(midiLibraryResult == null)
-                MoppyMediaService.this.midiLibrary = midiLibraryResult;
-                onLoadAction(extras, result); // Retry
-            }); // End MidiLibrary.Callback lambda
-            return;
-        } // End if(midiLibrary == null)
-        MidiLibrary.MapNode node = midiLibrary.get(mediaId);
-        if (!(node instanceof MidiLibrary.MidiFile)) {
-            Log.w(MoppyMediaService.class.getName() + "->onLoadAction", "File " + mediaId + " doesn't exist");
-            Bundle errorBundle = new Bundle();
-            errorBundle.putString(EXTRA_ERROR_REASON, "The media ID " + mediaId + " does not correspond to a MidiLibray.MidiFile");
-            errorBundle.putBoolean(EXTRA_ERROR_INFORMATIONAL, false); // Browser item list bad?
-            errorBundle.putString(EXTRA_MEDIA_ID, mediaId);
-            result.sendError(errorBundle);
-            return;
-        } // End if(node ∉ MidiFile)
-
-        // Sequence loading done before media session loading in case the file is invalid or can't be read
-        try {
-            moppyManager.load((MidiLibrary.MidiFile) node, MoppyMediaService.this);
-        } // End try {load(node)}
-        catch (InvalidMidiDataException | IOException e) {
-            Log.e(MoppyMediaService.class.getName() + "->onLoadAction", "Unable to load file" + mediaId, e);
-            Bundle errorBundle = new Bundle();
-            errorBundle.putString(EXTRA_ERROR_REASON, "Loading failed for media ID " + mediaId);
-            errorBundle.putSerializable(EXTRA_EXCEPTION, e);
-            errorBundle.putBoolean(EXTRA_ERROR_INFORMATIONAL, false); // File bad or no read access?
-            errorBundle.putString(EXTRA_MEDIA_ID, mediaId);
-            result.sendError(errorBundle);
-            return;
-        } // End try {load(node)} catch(InvalidMidiData|IO Exception)
-
-        // Load in the file's metadata, and update the notification and playback state
-        mediaSession.setMetadata(node.getMetadata());
-        playbackStateBuilder.setActions(playbackState.getActions() | PlaybackStateCompat.ACTION_SEEK_TO);
-        if (setToPlaying) {
-            moppyManager.play();
-            playbackStateBuilder.setState(
-                    PlaybackStateCompat.STATE_PLAYING,
-                    moppyManager.getMillisecondsPosition(),
-                    1
-            );
-            togglePlayPauseMediaButton(true, node.getMetadata());
-        } // End if(setToPlaying)
-        else {
-            updateNotificationText(node.getMetadata(), true);
-            playbackStateBuilder.setState(
-                    (playbackState.getState() == PlaybackStateCompat.STATE_NONE ?
-                            PlaybackStateCompat.STATE_STOPPED : playbackState.getState()
-                    ), // End state ternary
-                    moppyManager.getMillisecondsPosition(),
-                    1
-            );
-            mediaSession.setPlaybackState(playbackStateBuilder.build());
-        } // End if(setToPlaying) {} else
-
-        Bundle resultBundle = new Bundle();
-        resultBundle.putString(EXTRA_MEDIA_ID, mediaId);
-        resultBundle.putParcelable(EXTRA_MEDIA_MIDI_FILE, (MidiLibrary.MidiFile) node);
-        result.sendResult(resultBundle);
+        // Attempt to load the file and call result.sendError/result.sendResult appropriately
+        load(mediaId, result, setToPlaying);
     } // End onLoadAction method
 
     // Disconnects the current MIDI in device
@@ -1199,6 +1125,95 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
             midiOutDevice = null;
         }
     } // End disconnectMidiOut method
+
+    // Finds and loads a MidiLibrary.MidiFile from its media ID. sendError/sendResult called if result isn't null
+    private void load(String mediaId, Result<Bundle> result, boolean setToPlaying) {
+        PlaybackStateCompat playbackState = mediaController.getPlaybackState();
+
+        // Create the MIDI library if needed and retrieve the requested file
+        if (midiLibrary == null) {
+            // Don't want to hold up UI thread creating a MidiLibrary that may not be created successfully,
+            // so we will just trigger creation and if failed send an error
+            if (result != null) { result.detach(); }
+            MidiLibrary.getMidiLibraryAsync(MoppyMediaService.this, (midiLibraryResult) -> {
+                if (midiLibraryResult == null) {
+                    Log.e(MoppyMediaService.class.getName() + "->load", "Unable to create MidiLibrary");
+                    if (result != null) {
+                        Bundle errorBundle = new Bundle();
+                        errorBundle.putString(EXTRA_ERROR_REASON, "Unable to create MIDI Library");
+                        // How did the Browser get a media ID if no library exists and can't be created? Something wacky here
+                        errorBundle.putBoolean(EXTRA_ERROR_INFORMATIONAL, false);
+                        errorBundle.putString(EXTRA_MEDIA_ID, mediaId);
+                        result.sendError(errorBundle);
+                    }
+                    return;
+                } // End if(midiLibraryResult == null)
+                MoppyMediaService.this.midiLibrary = midiLibraryResult;
+                load(mediaId, result, setToPlaying); // Retry
+            }); // End MidiLibrary.Callback lambda
+            return;
+        } // End if(midiLibrary == null)
+        MidiLibrary.MapNode node = midiLibrary.get(mediaId);
+        if (!(node instanceof MidiLibrary.MidiFile)) {
+            Log.w(MoppyMediaService.class.getName() + "->load", "File " + mediaId + " doesn't exist");
+            if (result != null) {
+                Bundle errorBundle = new Bundle();
+                errorBundle.putString(EXTRA_ERROR_REASON, "The media ID " + mediaId + " does not correspond to a MidiLibray.MidiFile");
+                errorBundle.putBoolean(EXTRA_ERROR_INFORMATIONAL, false); // Browser item list bad?
+                errorBundle.putString(EXTRA_MEDIA_ID, mediaId);
+                result.sendError(errorBundle);
+            }
+            return;
+        } // End if(node ∉ MidiFile)
+
+        // Sequence loading done before media session loading in case the file is invalid or can't be read
+        try {
+            moppyManager.load((MidiLibrary.MidiFile) node, MoppyMediaService.this);
+        } // End try {load(node)}
+        catch (InvalidMidiDataException | IOException e) {
+            Log.e(MoppyMediaService.class.getName() + "->load", "Unable to load file" + mediaId, e);
+            if (result != null) {
+                Bundle errorBundle = new Bundle();
+                errorBundle.putString(EXTRA_ERROR_REASON, "Loading failed for media ID " + mediaId);
+                errorBundle.putSerializable(EXTRA_EXCEPTION, e);
+                errorBundle.putBoolean(EXTRA_ERROR_INFORMATIONAL, false); // File bad or no read access?
+                errorBundle.putString(EXTRA_MEDIA_ID, mediaId);
+                result.sendError(errorBundle);
+            }
+            return;
+        } // End try {moppyManager.load(node)} catch(InvalidMidiData|IO Exception)
+
+        // Load in the file's metadata, and update the notification and playback state
+        mediaSession.setMetadata(node.getMetadata());
+        playbackStateBuilder.setActions(playbackState.getActions() | PlaybackStateCompat.ACTION_SEEK_TO);
+        if (setToPlaying) {
+            moppyManager.play();
+            playbackStateBuilder.setState(
+                    PlaybackStateCompat.STATE_PLAYING,
+                    moppyManager.getMillisecondsPosition(),
+                    1
+            );
+            togglePlayPauseMediaButton(true, node.getMetadata());
+        } // End if(setToPlaying)
+        else {
+            updateNotificationText(node.getMetadata(), true);
+            playbackStateBuilder.setState(
+                    (playbackState.getState() == PlaybackStateCompat.STATE_NONE ?
+                            PlaybackStateCompat.STATE_STOPPED : playbackState.getState()
+                    ), // End state ternary
+                    moppyManager.getMillisecondsPosition(),
+                    1
+            );
+            mediaSession.setPlaybackState(playbackStateBuilder.build());
+        } // End if(setToPlaying) {} else
+
+        if (result != null) {
+            Bundle resultBundle = new Bundle();
+            resultBundle.putString(EXTRA_MEDIA_ID, mediaId);
+            resultBundle.putParcelable(EXTRA_MEDIA_MIDI_FILE, (MidiLibrary.MidiFile) node);
+            result.sendResult(resultBundle);
+        }
+    } // End load method
 
     // Method to toggle the notification between playing (pause icon) and not-playing (play icon) modes.
     //
@@ -1304,34 +1319,9 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
                 return;
             }
 
-            // Create the MIDI library if needed and retrieve the requested file
-            if (midiLibrary == null) {
-                // Don't want to hold up UI thread creating a MidiLibrary that may not be created successfully,
-                // so we will just trigger creation and skip the play event
-                MidiLibrary.getMidiLibraryAsync(
-                        MoppyMediaService.this,
-                        midiLibraryResult -> MoppyMediaService.this.midiLibrary = midiLibraryResult
-                );
-                return;
-            } // End if(midiLibrary == null)
-            MidiLibrary.MapNode node = midiLibrary.get(mediaId);
-            if (!(node instanceof MidiLibrary.MidiFile)) { return; }
+            // Load in the file
+            load(mediaId, null, true);
 
-            // Sequence loading done before media session loading in case the file is invalid or can't be read
-            try {
-                moppyManager.load((MidiLibrary.MidiFile) node, MoppyMediaService.this);
-                moppyManager.play();
-            } // End try {load(node); play}
-            catch (InvalidMidiDataException | IOException e) {
-                Log.e(MediaCallback.class.getName() + "->onPlayFromMediaID", "Unable to load file", e);
-                return;
-            } // End try {load(node); play} catch(InvalidMidiData|IO Exception)
-
-            // Load in the file's metadata. Note: playback state updated in onPlay
-            mediaSession.setMetadata(node.getMetadata());
-            playbackStateBuilder.setActions(playbackState.getActions() | PlaybackStateCompat.ACTION_SEEK_TO);
-
-            onPlay();
             super.onPlayFromMediaId(mediaId, extras);
         } // End onPlayFromMediaId method
 
