@@ -1115,7 +1115,7 @@ public class MidiLibrary implements Map<String, MidiLibrary.MapNode> {
             Collection<MapNode> nodes = children.values();
             for (MapNode node : nodes) {
                 if (node.hasChildren()) { keys.addAll(node.getKeysRecursive()); }
-                else { keys.add(node.getName()); }
+                else { keys.add(node.getNameGlobal()); }
             } // End for(node : nodes)
             return keys;
         } // End getKeysRecursive method
