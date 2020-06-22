@@ -1186,6 +1186,7 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
     } // End disconnectMidiOut method
 
     // Finds and loads a MidiLibrary.MidiFile from its media ID. sendError/sendResult called if result isn't null
+    // TODO: Write accessor for bound clients
     private void load(String mediaId, Result<Bundle> result, boolean setToPlaying) {
         PlaybackStateCompat playbackState = mediaController.getPlaybackState();
 
@@ -1314,16 +1315,18 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
         playbackStateBuilder.setActions(0);
         mediaSession.setPlaybackState(playbackStateBuilder.build());
 
-        // Remove the current item from the small queue
-        musicQueueWindow.remove(0);
+        synchronized (musicQueueWindow) {
+            // Remove the current item from the small queue
+            musicQueueWindow.remove(0);
 
-        // Slide currentWindowIndex to the middle of musicQueueWindow
-        if (currentWindowIndex / 2 < musicQueueWindow.size()) { currentWindowIndex++; }
-        // Attempt to increment offset and slide musicQueueSmall along musicQueueFull if there are items after musicQueueWindow ends,
-        // and if the window has hit the end of the queue slide currentWindowIndex to one passed the end of musicQueueWindow
-        else if (!slideMusicQueueWindow()) {
-            if (currentWindowIndex <= musicQueueWindow.size()) { currentWindowIndex++; }
-        }
+            // Slide currentWindowIndex to the middle of musicQueueWindow
+            if (currentWindowIndex / 2 < musicQueueWindow.size()) { currentWindowIndex++; }
+            // Attempt to increment offset and slide musicQueueSmall along musicQueueFull if there are items after musicQueueWindow ends,
+            // and if the window has hit the end of the queue slide currentWindowIndex to one passed the end of musicQueueWindow
+            else if (!slideMusicQueueWindow()) {
+                if (currentWindowIndex <= musicQueueWindow.size()) { currentWindowIndex++; }
+            }
+        } // End sync(musicQueueWindow)
 
         loadQueueItem();
     } // End loadNext method
@@ -1331,12 +1334,49 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
     // Attempts to slide musicQueueWindow one item down musicQueueFull, returning false if there are no items after musicQueueWindow ends
     private boolean slideMusicQueueWindow() {
         if (musicQueueWindowOffset + QUEUE_SIZE < queueIndexToId.size()) {
-            ++musicQueueWindowOffset;
-            musicQueueWindow.add(musicQueueFull.get(queueIndexToId.get(musicQueueWindowOffset + QUEUE_SIZE)));
+            synchronized (musicQueueWindow) {
+                ++musicQueueWindowOffset;
+                musicQueueWindow.add(musicQueueFull.get(queueIndexToId.get(musicQueueWindowOffset + QUEUE_SIZE)));
+            }
             return true;
         }
         else { return false; }
-    } // End slideMusicQueueWindow
+    } // End slideMusicQueueWindow method
+
+    // Moves musicQueueWindow to center on the provided index, or if not possible, moves the window to make
+    // the provided index as close to center as possible
+    private void moveMusicQueueWindow(int index) {
+        if (index < 0 || index >= queueIndexToId.size()) {
+            throw new IndexOutOfBoundsException("index: " + index + ", size: " + queueIndexToId.size());
+        }
+
+        // Check if index is able to be the center of a window
+        synchronized (musicQueueWindow) {
+            if (index > QUEUE_SIZE / 2 && index < queueIndexToId.size() - QUEUE_SIZE / 2) {
+                // Put index in center of window
+                currentWindowIndex = QUEUE_SIZE / 2;
+                musicQueueWindowOffset = index - currentWindowIndex;
+            }
+            else if (index > queueIndexToId.size() - QUEUE_SIZE / 2) {
+                // lastPossibleWindowOffset + QUEUE_SIZE/2 < index < queueIndexToId.size
+                // Put index on right side of window
+                musicQueueWindowOffset = queueIndexToId.size() - QUEUE_SIZE;
+                currentWindowIndex = index - musicQueueWindowOffset;
+            }
+            else { // 0 < index < QUEUE_SIZE/2
+                // Put index on left side of window
+                musicQueueWindowOffset = 0;
+                currentWindowIndex = index;
+            }
+
+            // Rebuild the window now that the new offset and index has been chosen
+            musicQueueWindow.clear();
+            int toIndex = musicQueueWindowOffset + QUEUE_SIZE;
+            for (int i = musicQueueWindowOffset; i < toIndex; ++i) {
+                musicQueueWindow.add(musicQueueFull.get(queueIndexToId.get(i)));
+            }
+        } // End sync(musicQueueWindow)
+    } // End moveMusicQueueWindow method
 
     // Method to toggle the notification between playing (pause icon) and not-playing (play icon) modes.
     //
@@ -1582,10 +1622,12 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
                 queueIndexToId.add(id);
                 loadSmallList = musicQueueWindow.size() <= QUEUE_SIZE && queueIndexToId.size() <= musicQueueWindowOffset + QUEUE_SIZE;
                 if (loadSmallList) {
-                    musicQueueWindow.clear();
-                    for (int i = musicQueueWindowOffset; i < queueIndexToId.size(); ++i) {
-                        musicQueueWindow.add(musicQueueFull.get(queueIndexToId.get(i)));
-                    }
+                    synchronized (musicQueueWindow) {
+                        musicQueueWindow.clear();
+                        for (int i = musicQueueWindowOffset; i < musicQueueWindowOffset + QUEUE_SIZE; ++i) {
+                            musicQueueWindow.add(musicQueueFull.get(queueIndexToId.get(i)));
+                        }
+                    } // End sync(musicQueueWindow)
                 }
             } // End sync(musicQueueFull)
 
@@ -1622,10 +1664,12 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
                         } // End for(i < queueIndexToId.size)
 
                         // Update small list
-                        musicQueueWindow.clear();
-                        for (int i = musicQueueWindowOffset; i < queueIndexToId.size(); ++i) {
-                            musicQueueWindow.add(musicQueueFull.get(queueIndexToId.get(i)));
-                        }
+                        synchronized (musicQueueWindow) {
+                            musicQueueWindow.clear();
+                            for (int i = musicQueueWindowOffset; i < musicQueueWindowOffset + QUEUE_SIZE; ++i) {
+                                musicQueueWindow.add(musicQueueFull.get(queueIndexToId.get(i)));
+                            }
+                        } // End sync(musicQueueWindow)
                     } // End sync(musicQueueFull)
                     mediaSession.setQueue(new ArrayList<>(musicQueueWindow));
                 } // End if(id == previousIndexId && ++id == currentIndexId)
@@ -1646,31 +1690,34 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
             synchronized (musicQueueFull) {
                 musicQueueFull.put(id, new MediaSessionCompat.QueueItem(description, id));
                 queueIndexToId.add(index, id);
-                if (loadSmallList) {
-                    musicQueueWindow.clear();
-                    for (int i = musicQueueWindowOffset; i < queueIndexToId.size(); ++i) {
-                        musicQueueWindow.add(musicQueueFull.get(queueIndexToId.get(i)));
-                    }
-                }
 
-                // Increment the current index if the new item appears before musicQueueSmall starts
-                if (index < musicQueueWindowOffset) { ++musicQueueWindowOffset; }
-                // If the new item is inserted where the playing item is then load in the new item
-                else if (index == musicQueueWindowOffset) { loadQueueItem(); }
-                // If the new item is after the window starts but before currentWindowIndex slide musicQueueWindow or currentWindowIndex
-                else if (index - musicQueueWindowOffset < currentWindowIndex) {
-                    // If possible slide musicQueueWindow, otherwise slide currentWindowIndex
-                    if (currentWindowIndex + 1 > musicQueueWindow.size()) {
-                        // Try to slide the window, setting currentWindowIndex to one passed the end of
-                        // musicQueueWindow if there are no items after the end of musicQueueWindow
-                        if (!slideMusicQueueWindow()) {
-                            if (currentWindowIndex != musicQueueWindow.size()) {
-                                currentWindowIndex = musicQueueWindow.size();
-                            }
-                        } // End if(musicQueueWindow.atEnd)
-                    } // End if(currentWindowIndex + 1 > musicQueueWindow.size)
-                    else { ++currentWindowIndex; }
-                } // End if(index < musicQueueWindowOffset) {} else if(index == musicQueueWindowOffset) {} else if(index < currentWindowIndex)
+                synchronized (musicQueueWindow) {
+                    if (loadSmallList) {
+                        musicQueueWindow.clear();
+                        for (int i = musicQueueWindowOffset; i < musicQueueWindowOffset + QUEUE_SIZE; ++i) {
+                            musicQueueWindow.add(musicQueueFull.get(queueIndexToId.get(i)));
+                        }
+                    }
+
+                    // Increment the current index if the new item appears before musicQueueSmall starts
+                    if (index < musicQueueWindowOffset) { ++musicQueueWindowOffset; }
+                    // If the new item is inserted where the playing item is then load in the new item
+                    else if (index == musicQueueWindowOffset) { loadQueueItem(); }
+                    // If the new item is after the window starts but before currentWindowIndex slide musicQueueWindow or currentWindowIndex
+                    else if (index - musicQueueWindowOffset < currentWindowIndex) {
+                        // If possible slide musicQueueWindow, otherwise slide currentWindowIndex
+                        if (currentWindowIndex + 1 > musicQueueWindow.size()) {
+                            // Try to slide the window, setting currentWindowIndex to one passed the end of
+                            // musicQueueWindow if there are no items after the end of musicQueueWindow
+                            if (!slideMusicQueueWindow()) {
+                                if (currentWindowIndex != musicQueueWindow.size()) {
+                                    currentWindowIndex = musicQueueWindow.size();
+                                }
+                            } // End if(musicQueueWindow.atEnd)
+                        } // End if(currentWindowIndex + 1 > musicQueueWindow.size)
+                        else { ++currentWindowIndex; }
+                    } // End if(index < musicQueueWindowOffset) {} else if(index == musicQueueWindowOffset) {} else if(index < currentWindowIndex)
+                } // End sync(musicQueueWindow)
             } // End sync(musicQueueFull)
 
             if (loadSmallList) { mediaSession.setQueue(new ArrayList<>(musicQueueWindow)); }
@@ -1712,6 +1759,49 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
 
             super.onRemoveQueueItem(description);
         } // End onRemoveQueueItem method
+
+        @Override
+        public void onSkipToQueueItem(long id) {
+            PlaybackStateCompat playbackState = mediaController.getPlaybackState();
+            if ((playbackState.getActions() & PlaybackStateCompat.ACTION_SKIP_TO_QUEUE_ITEM) == 0) {
+                return;
+            }
+
+            int index = queueIndexToId.indexOf(id);
+            if (index < 0) { return; } // IDs outside of window are valid
+
+            moveMusicQueueWindow(index);
+            super.onSkipToQueueItem(id);
+        }
+
+        @Override
+        public void onSkipToNext() {
+            // TODO: Make sure playback state is accurate
+            PlaybackStateCompat playbackState = mediaController.getPlaybackState();
+            if ((playbackState.getActions() & PlaybackStateCompat.ACTION_SKIP_TO_NEXT) == 0) {
+                return;
+            }
+            if (currentWindowIndex + 1 > musicQueueWindow.size()) { return; }
+
+            ++currentWindowIndex;
+            loadQueueItem();
+
+            super.onSkipToNext();
+        }
+
+        @Override
+        public void onSkipToPrevious() {
+            PlaybackStateCompat playbackState = mediaController.getPlaybackState();
+            if ((playbackState.getActions() & PlaybackStateCompat.ACTION_SKIP_TO_PREVIOUS) == 0) {
+                return;
+            }
+            if (currentWindowIndex < 1) { return; }
+
+            --currentWindowIndex;
+            loadQueueItem();
+
+            super.onSkipToPrevious();
+        }
 
         /**
          * Called when a {@link MediaControllerCompat} wants a
