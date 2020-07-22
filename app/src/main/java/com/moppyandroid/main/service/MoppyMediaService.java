@@ -680,6 +680,32 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
      */
     public boolean removeReceiver(Receiver receiver) { return moppyManager.removeReceiver(receiver); }
 
+    /**
+     * Loads a {@link com.moppyandroid.main.service.MidiLibrary.MidiFile} by its media ID into Moppy.
+     *
+     * @param mediaId      the media ID of the song to load
+     * @param setToPlaying {@code true} if the song is to be immediately played, {@code false} if the sequencer is to wait for a play action
+     * @return {@code false} if there was an error loading, otherwise {@code true} (unless mediaId is invalid, it's likely a dev issue - check Logcat for details)
+     */
+    public boolean load(String mediaId, boolean setToPlaying) {
+        // Create the MIDI library if needed and retrieve the requested file
+        if (midiLibrary == null) {
+            Log.w(MoppyMediaService.class.getName() + "->load (public)", "midiLibrary uninitialized");
+            // We don't want to hold up UI thread creating a MidiLibrary that may not be created successfully,
+            // so instead just trigger creation asynchronously and send a failure
+            MidiLibrary.getMidiLibraryAsync(MoppyMediaService.this, null);
+            return false;
+        } // End if(midiLibrary == null)
+
+        // Verify valid media ID
+        if (!(midiLibrary.get(mediaId) instanceof MidiLibrary.MidiFile)) {
+            Log.w(MoppyMediaService.class.getName() + "->load (public)", "File '" + mediaId + "' doesn't exist");
+            return false;
+        }
+
+        return load(mediaId, null, setToPlaying, true);
+    } // End load(String, boolean) method
+
     // Triggered by ACTION_ADD_DEVICE
     private void onAddDevice(Bundle extras, Result<Bundle> result) {
         if (extras == null || extras.getString(EXTRA_PORT_NAME) == null) {
@@ -1121,8 +1147,7 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
     } // End disconnectMidiOut method
 
     // Finds and loads a MidiLibrary.MidiFile from its media ID. sendError/sendResult called if result isn't null
-    // TODO: Write accessor for bound clients
-    private void load(String mediaId, Result<Bundle> result, boolean setToPlaying, boolean addToQueue) {
+    private boolean load(String mediaId, Result<Bundle> result, boolean setToPlaying, boolean addToQueue) {
         PlaybackStateCompat playbackState = mediaController.getPlaybackState();
 
         // Put into STATE_BUFFERING if not in a skipping state
@@ -1157,11 +1182,11 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
                 MoppyMediaService.this.midiLibrary = midiLibraryResult;
                 load(mediaId, result, setToPlaying, addToQueue); // Retry
             }); // End MidiLibrary.Callback lambda
-            return;
+            return false;
         } // End if(midiLibrary == null)
         MidiLibrary.MapNode node = midiLibrary.get(mediaId);
         if (!(node instanceof MidiLibrary.MidiFile)) {
-            Log.w(MoppyMediaService.class.getName() + "->load", "File " + mediaId + " doesn't exist");
+            Log.w(MoppyMediaService.class.getName() + "->load", "File '" + mediaId + "' doesn't exist");
             if (result != null) {
                 Bundle errorBundle = new Bundle();
                 errorBundle.putString(EXTRA_ERROR_REASON, "The media ID " + mediaId + " does not correspond to a MidiLibray.MidiFile");
@@ -1169,7 +1194,7 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
                 errorBundle.putString(EXTRA_MEDIA_ID, mediaId);
                 result.sendError(errorBundle);
             }
-            return; // TODO: Update state at each return
+            return false; // TODO: Update state at each return
         } // End if(node ∉ MidiFile)
 
         // Sequence loading done before media session loading in case the file is invalid or can't be read
@@ -1186,7 +1211,7 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
                 errorBundle.putString(EXTRA_MEDIA_ID, mediaId);
                 result.sendError(errorBundle);
             }
-            return;
+            return false;
         } // End try {moppyManager.load(node)} catch(InvalidMidiData|IO Exception)
 
         if (addToQueue) { musicQueue.addToQueue(node.getMetadata().getDescription()); }
@@ -1221,7 +1246,8 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
             resultBundle.putParcelable(EXTRA_MEDIA_MIDI_FILE, (MidiLibrary.MidiFile) node);
             result.sendResult(resultBundle);
         }
-    } // End load method
+        return true;
+    } // End load(String, Result<Bundle>, boolean, boolean) method
 
     // Attempts to load the first item in the queue without popping it, returning false if queue empty
     private boolean loadQueueItem() {
@@ -1252,10 +1278,9 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
         playbackStateBuilder.setActions(0);
         mediaSession.setPlaybackState(playbackStateBuilder.build());
 
-        if (musicQueue.nextSongAvailable()) {
+        if (musicQueue.checkNextSongAvailable()) {
             load(musicQueue.skipToNext().getDescription().getMediaId(), null, true, false);
         }
-        // TODO: Mark queue ended if false?
     } // End loadNext method
 
     // Method to toggle the notification between playing (pause icon) and not-playing (play icon) modes.
@@ -1408,7 +1433,10 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
             // Interpret the search parameters to select the file to load
             if (query != null && mediaFocus == null) { mediaFocus = ""; } // Set to unstructured
             if (query == null) { // 'Any' request
-                // TODO: Play last played song here
+                if (musicQueue != null && musicQueue.checkPreviousSongAvailable()) {
+                    musicQueue.skipToPrevious();
+                    loadQueueItem();
+                }
                 return;
             }
             switch (mediaFocus) { // https://developer.android.com/guide/components/intents-common#PlaySearch
@@ -1572,7 +1600,7 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
 
             if (musicQueue != null) {
                 musicQueue.skipToPrevious();
-                loadQueueItem();
+                loadQueueItem(); // Reloads current song if no previous songs available
             }
             super.onSkipToPrevious();
         }

@@ -298,7 +298,7 @@ public class MusicQueue {
      * @see #skipToNext()
      */
     public MediaSessionCompat.QueueItem peekNextSong() {
-        if (nextSongAvailable()) {
+        if (checkNextSongAvailable()) {
             return musicQueueFull.get(queueIndexToId.get(windowOffset + windowIndex + 1));
         }
         else { return null; }
@@ -311,7 +311,7 @@ public class MusicQueue {
      * @see #skipToPrevious()
      */
     public MediaSessionCompat.QueueItem peekPreviousSong() {
-        if (previousSongAvailable()) {
+        if (checkPreviousSongAvailable()) {
             return musicQueueFull.get(queueIndexToId.get(windowOffset + windowIndex - 1));
         }
         else { return null; }
@@ -348,14 +348,14 @@ public class MusicQueue {
      *
      * @return {@code true} if another song is available, otherwise {@code false}
      */
-    public boolean nextSongAvailable() { return ((lastAvailableActions & PlaybackStateCompat.ACTION_SKIP_TO_NEXT) > 0); }
+    public boolean checkNextSongAvailable() { return ((lastAvailableActions & PlaybackStateCompat.ACTION_SKIP_TO_NEXT) > 0); }
 
     /**
      * Checks if there are any previous songs in the queue that can be played with {@link #skipToPrevious()}.
      *
      * @return {@code true} if another song is available, otherwise {@code false}
      */
-    public boolean previousSongAvailable() { return ((lastAvailableActions & PlaybackStateCompat.ACTION_SKIP_TO_PREVIOUS) > 0); }
+    public boolean checkPreviousSongAvailable() { return ((lastAvailableActions & PlaybackStateCompat.ACTION_SKIP_TO_PREVIOUS) > 0); }
 
     /**
      * Gets the currently available {@link PlaybackStateCompat} actions.
