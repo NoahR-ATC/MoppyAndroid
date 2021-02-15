@@ -73,6 +73,7 @@
         android:visibility="gone">
 
         <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/queue_recycler"
             android:layout_width="match_parent"
             android:layout_height="match_parent" />
     </LinearLayout>
