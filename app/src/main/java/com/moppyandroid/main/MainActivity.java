@@ -10,14 +10,11 @@ Known problems:
     - Hard to use track slider in slide menu (adjust slide menu sensitivity?)
     - Must connect to device, disconnect, and connect again for connection to work... sometimes
     - Sheet music shading is a little weird sometimes, particularly during seeks or while scrolling music
+    - Playback state is not retained through queue operations
 
 
 Features to implement:
-    - Playlist/file queue
-
-
-Scope creep is getting really bad... let's make a list of nice-to-have-but-slightly-out-of-scope features:
-    - Visualization
+    - Playlists
 
 
 Regexes:

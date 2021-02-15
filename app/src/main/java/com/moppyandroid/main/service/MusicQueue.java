@@ -242,7 +242,6 @@ public class MusicQueue {
      * @return {@code null} if the queue couldn't be skipped as requested, otherwise the song that was skipped to
      */
     public MediaSessionCompat.QueueItem skipToPrevious(int times) {
-        // TODO: Restart song/first song if true
         if (times < 1 || windowOffset + windowIndex - times < 0) { return null; }
         moveWindow(windowOffset + windowIndex - times);
 

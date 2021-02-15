@@ -35,6 +35,7 @@ import com.moppy.core.comms.bridge.BridgeSerial;
 import com.moppyandroid.main.R;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
@@ -43,6 +44,7 @@ import java.util.Set;
 import jp.kshoji.javax.sound.midi.InvalidMidiDataException;
 import jp.kshoji.javax.sound.midi.MidiUnavailableException;
 import jp.kshoji.javax.sound.midi.Receiver;
+import jp.kshoji.javax.sound.midi.Sequence;
 
 /**
  * The media service that controls Moppy playback.
@@ -682,13 +684,15 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
     public boolean removeReceiver(Receiver receiver) { return moppyManager.removeReceiver(receiver); }
 
     /**
-     * Loads a {@link com.moppyandroid.main.service.MidiLibrary.MidiFile} by its media ID into Moppy.
+     * Loads a {@link com.moppyandroid.main.service.MidiLibrary.MidiFile} by its media ID into Moppy. If loading is unsuccessful {@code false} will be returned.
+     * Under expected conditions the sequencer state will not be affected unless the load action is valid. The only event that may jeopardize the sequencer state
+     * is if and {@link InvalidMidiDataException} is thrown when calliing {@link jp.kshoji.javax.sound.midi.Sequencer#setSequence(Sequence)} but is not thrown
+     * when calling {@link jp.kshoji.javax.sound.midi.spi.MidiFileReader#getSequence(InputStream)}.
      *
      * @param mediaId      the media ID of the song to load
      * @param setToPlaying {@code true} if the song is to be immediately played, {@code false} if the sequencer is to load the song and pause
      * @return {@code false} if there was an error loading, otherwise {@code true} (unless mediaId is invalid, it's likely a dev issue - check Logcat for details)
      */
-    // TODO: Update docs to describe what happens internally if loading fails
     public boolean load(String mediaId, boolean setToPlaying) {
         // Create the MIDI library if needed and retrieve the requested file
         if (midiLibrary == null) {
@@ -1400,14 +1404,14 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
         return previousActions;
     } // End setPlaybackAction method
 
-    // Method to toggle the notification between playing (pause icon) and not-playing (play icon) modes.
+    // Method to toggle the notification between playing (pause icon) and not-playing (play icon) modes. The playback
+    // state should be posted prior to calling this method. Set the playback state STATE_PAUSED or STATE_STOPPED to get a
+    // play button, otherwise a pause button will appear
     //
-    // Set metadata to null to put the notification in not-playing mode
     // Set changeText to true to update the notification text to "No song loaded" or the song name
-    //
     @SuppressLint("RestrictedApi") // IDE doesn't want us to access notificationBuilder.mActions
     private void togglePlayPauseMediaButton(boolean changeText, MediaMetadataCompat metadata) {
-        // TODO: Is it really applicable to do this here?
+        //
         int state = (mediaController != null) ? mediaController.getPlaybackState().getState() : PlaybackStateCompat.STATE_NONE;
         setPlaybackActions(calculatePlaybackActions(state), true);
 
@@ -1662,7 +1666,6 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
 
         @Override
         public void onSkipToNext() {
-            // TODO: Make sure playback state is accurate
             PlaybackStateCompat playbackState = mediaController.getPlaybackState();
             if ((playbackState.getActions() & PlaybackStateCompat.ACTION_SKIP_TO_NEXT) == 0) {
                 return;
@@ -1676,7 +1679,6 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
 
         @Override
         public void onSkipToPrevious() {
-            // TODO: Make sure playback state is accurate
             PlaybackStateCompat playbackState = mediaController.getPlaybackState();
             if ((playbackState.getActions() & PlaybackStateCompat.ACTION_SKIP_TO_PREVIOUS) == 0) {
                 return;
