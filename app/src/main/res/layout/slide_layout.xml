@@ -14,53 +14,65 @@
         android:minHeight="?attr/actionBarSize"
         android:theme="?attr/actionBarTheme">
 
-        <TextView
-            android:id="@+id/song_title"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_gravity="start|center_vertical"
-            android:layout_marginVertical="?attr/listPreferredItemPaddingStart"
-            android:ellipsize="marquee"
-            android:marqueeRepeatLimit="marquee_forever"
-            android:singleLine="true"
-            android:text="@string/song_title"
-            android:textColor="@android:color/white" />
+        <RelativeLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent">
 
-        <LinearLayout
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_gravity="center_vertical|end"
-            android:orientation="horizontal"
-            android:paddingHorizontal="10dp">
-
-            <ImageView
-                android:id="@+id/playlist_switch_imageview"
-                android:layout_width="0dp"
-                android:layout_height="match_parent"
-                android:layout_weight="1"
-                android:contentDescription="@string/playlist_switch_imageview_description"
-                android:scaleX="1.2"
-                android:scaleY="1.2"
-                app:srcCompat="@drawable/ic_playlist_light" />
-
-            <Switch
-                android:id="@+id/playlist_switch"
+            <TextView
+                android:id="@+id/song_title"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:checked="true"
-                android:gravity="center_vertical|end"
-                android:paddingHorizontal="2dp"
-                android:theme="@style/ActionBarAppTheme" />
+                android:layout_alignParentStart="true"
+                android:layout_alignParentBottom="false"
+                android:layout_centerVertical="true"
+                android:layout_gravity="start|center_vertical"
+                android:layout_marginVertical="?attr/listPreferredItemPaddingStart"
+                android:layout_toStartOf="@id/playlist_switch_layout"
+                android:ellipsize="marquee"
+                android:marqueeRepeatLimit="marquee_forever"
+                android:singleLine="true"
+                android:text="@string/song_title"
+                android:textColor="@android:color/white" />
 
-            <ImageView
-                android:id="@+id/sheet_music_switch_imageview"
-                android:layout_width="0dp"
-                android:layout_height="match_parent"
-                android:layout_weight="1"
-                android:contentDescription="@string/sheet_music_switch_imageview_description"
-                app:srcCompat="@drawable/ic_midifile_light" />
-        </LinearLayout>
+            <LinearLayout
+                android:id="@+id/playlist_switch_layout"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_alignParentEnd="true"
+                android:layout_alignParentBottom="false"
+                android:layout_centerVertical="true"
+                android:layout_gravity="center_vertical|end"
+                android:orientation="horizontal"
+                android:paddingHorizontal="10dp">
 
+                <ImageView
+                    android:id="@+id/playlist_switch_imageview"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1"
+                    android:contentDescription="@string/playlist_switch_imageview_description"
+                    android:scaleX="1.2"
+                    android:scaleY="1.2"
+                    app:srcCompat="@drawable/ic_playlist_light" />
+
+                <Switch
+                    android:id="@+id/playlist_switch"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:checked="true"
+                    android:gravity="center_vertical|end"
+                    android:paddingHorizontal="2dp"
+                    android:theme="@style/ActionBarAppTheme" />
+
+                <ImageView
+                    android:id="@+id/sheet_music_switch_imageview"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1"
+                    android:contentDescription="@string/sheet_music_switch_imageview_description"
+                    app:srcCompat="@drawable/ic_midifile_light" />
+            </LinearLayout>
+        </RelativeLayout>
     </androidx.appcompat.widget.Toolbar>
 
     <LinearLayout
