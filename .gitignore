@@ -14,3 +14,5 @@
 .externalNativeBuild
 .cxx
 /javax.sound.midi/build/
+/.idea/jarRepositories.xml
+/.idea/inspectionProfiles/Project_Default.xml
