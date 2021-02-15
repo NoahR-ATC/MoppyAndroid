@@ -366,7 +366,6 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
                         PlaybackStateCompat.ACTION_PLAY_PAUSE |
                         PlaybackStateCompat.ACTION_PLAY_FROM_MEDIA_ID |
                         PlaybackStateCompat.ACTION_PLAY_FROM_SEARCH |
-                        PlaybackStateCompat.ACTION_PLAY |
                         PlaybackStateCompat.ACTION_STOP
                 ) // End setActions call
                 .setState(
@@ -1177,7 +1176,7 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
                     if (result != null) {
                         Bundle errorBundle = new Bundle();
                         errorBundle.putString(EXTRA_ERROR_REASON, "Unable to create MIDI Library");
-                        // How did the Browser get a media ID if no library exists and can't be created? Something wacky here
+                        // How did the Browser get a media ID if no library exists and can't be created? Something shady going on here
                         errorBundle.putBoolean(EXTRA_ERROR_INFORMATIONAL, false);
                         errorBundle.putString(EXTRA_MEDIA_ID, mediaId);
                         result.sendError(errorBundle);
@@ -1281,15 +1280,14 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
         // Load in the file's metadata, and update the notification and playback state
         mediaSession.setMetadata(node.getMetadata());
         setPlaybackActions(playbackState.getActions() | PlaybackStateCompat.ACTION_SEEK_TO, false);
-        // Note: New playback state gets posted during togglePlayPauseMediaButton call
         if (setToPlaying) {
             moppyManager.play();
-            setPlaybackState(PlaybackStateCompat.STATE_PLAYING, moppyManager.getMillisecondsPosition(), false);
+            setPlaybackState(PlaybackStateCompat.STATE_PLAYING, moppyManager.getMillisecondsPosition(), true);
             togglePlayPauseMediaButton(true, node.getMetadata());
         } // End if(setToPlaying)
         else {
             moppyManager.pause();
-            setPlaybackState(PlaybackStateCompat.STATE_PAUSED, moppyManager.getMillisecondsPosition(), false);
+            setPlaybackState(PlaybackStateCompat.STATE_PAUSED, moppyManager.getMillisecondsPosition(), true);
             togglePlayPauseMediaButton(true, null);
         } // End if(setToPlaying) {} else
 
@@ -1304,9 +1302,13 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
 
     // Attempts to load the first item in the queue without popping it, returning false if queue empty
     private boolean loadQueueItem() {
-        // TODO: Move to after availability check?
         setPlaybackState(PlaybackStateCompat.STATE_SKIPPING_TO_NEXT, 0, false);
-        setPlaybackActions(0, true);
+        setPlaybackActions(PlaybackStateCompat.ACTION_PLAY_PAUSE | // Set limited action package to only loading songs
+                           PlaybackStateCompat.ACTION_PLAY_FROM_MEDIA_ID |
+                           PlaybackStateCompat.ACTION_PLAY_FROM_SEARCH |
+                           musicQueue.getActions(),
+                true
+        );
 
         // Load the next item if it exists
         QueueItem item = musicQueue.getCurrentSong();
@@ -1316,33 +1318,44 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
         }
         else { // Queue exhausted
             setPlaybackState(PlaybackStateCompat.STATE_STOPPED, 0, false);
-            setPlaybackActions(calculatePlaybackActions(false), true);
+            setPlaybackActions(calculatePlaybackActions(PlaybackStateCompat.STATE_STOPPED), true);
             return false;
         }
     } // End loadQueueItem method
 
     // Attempts to load the next song in the queue
-    private void loadNext() {
-        // TODO: Move to after availability check?
+    private void loadNext(boolean songEnded) {
+        int previousState = mediaController.getPlaybackState().getState();
+        long previousPosition = mediaController.getPlaybackState().getPosition();
+        long previousActions = mediaController.getPlaybackState().getActions();
         setPlaybackState(PlaybackStateCompat.STATE_SKIPPING_TO_NEXT, 0, false);
-        setPlaybackActions(0, true);
+        setPlaybackActions(PlaybackStateCompat.ACTION_PLAY_PAUSE | // Set limited action package to only loading songs
+                           PlaybackStateCompat.ACTION_PLAY_FROM_MEDIA_ID |
+                           PlaybackStateCompat.ACTION_PLAY_FROM_SEARCH |
+                           musicQueue.getActions(),
+                true
+        );
 
+        // Load next if queue not exhausted
         if (musicQueue.checkNextSongAvailable()) {
             load(musicQueue.skipToNext().getDescription().getMediaId(), null, true, false);
         }
         else {
-            setPlaybackActions(calculatePlaybackActions(false), true);
-        }
+            // If the current song just ended stop playback, otherwise continue with previous state
+            if (songEnded) {
+                setPlaybackState(PlaybackStateCompat.STATE_STOPPED, 0, false);
+                setPlaybackActions(calculatePlaybackActions(PlaybackStateCompat.STATE_STOPPED), true);
+            }
+            else {
+                setPlaybackState(previousState, previousPosition, false);
+                setPlaybackActions(previousActions, true);
+            }
+        } // End if(musicQueue.checkNextSongAvailable()) {} else
     } // End loadNext method
 
-    private int setPlaybackState(int state, long position, boolean postState) {
-        int previousState = mediaController.getPlaybackState().getState();
-        playbackStateBuilder.setState(state, position, 1);
-        if (postState) { mediaSession.setPlaybackState(playbackStateBuilder.build()); }
-        return previousState;
-    }
-
-    private long calculatePlaybackActions(boolean playing) {
+    // Calculates which playback actions are available from on the current state and file status
+    private long calculatePlaybackActions(int state) {
+        // Set base actions package
         long actions = PlaybackStateCompat.ACTION_STOP |
                        PlaybackStateCompat.ACTION_PLAY_FROM_MEDIA_ID |
                        PlaybackStateCompat.ACTION_PLAY_FROM_SEARCH |
@@ -1351,39 +1364,56 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
                                0
                        );
         if (moppyManager != null && moppyManager.getLoadedFile() != null) {
-            actions |=
-                    PlaybackStateCompat.ACTION_SEEK_TO |
-                    PlaybackStateCompat.ACTION_PLAY_PAUSE |
-                    (playing ?
-                            PlaybackStateCompat.ACTION_PLAY :
-                            PlaybackStateCompat.ACTION_PAUSE
-                    );
+            actions |= PlaybackStateCompat.ACTION_SEEK_TO | PlaybackStateCompat.ACTION_PLAY_PAUSE;
+            // Check if the playback state is applicable to a play or pause button
+            if (
+                    state != PlaybackStateCompat.STATE_NONE &&
+                    state != PlaybackStateCompat.STATE_ERROR &&
+                    state != PlaybackStateCompat.STATE_SKIPPING_TO_NEXT &&
+                    state != PlaybackStateCompat.STATE_SKIPPING_TO_PREVIOUS &&
+                    state != PlaybackStateCompat.STATE_SKIPPING_TO_QUEUE_ITEM &&
+                    state != PlaybackStateCompat.STATE_BUFFERING
+            ) {
+                // Enable the pause button if playing otherwise enable the play button
+                actions |= ((state == PlaybackStateCompat.STATE_PLAYING) ?
+                        PlaybackStateCompat.ACTION_PAUSE :
+                        PlaybackStateCompat.ACTION_PLAY
+                );
+            }
         }
         return actions;
     } // End calculatePlaybackActions method
 
+    // Consolidates all playback state changes to run through this method
+    private int setPlaybackState(int state, long position, boolean postState) {
+        int previousState = mediaController.getPlaybackState().getState();
+        playbackStateBuilder.setState(state, position, 1);
+        if (postState) { mediaSession.setPlaybackState(playbackStateBuilder.build()); }
+        return previousState;
+    } // End setPlaybackState method
+
+    // Consolidates all playback action changes to run through this method
     private long setPlaybackActions(long actions, boolean postState) {
         long previousActions = mediaController.getPlaybackState().getActions();
         playbackStateBuilder.setActions(actions);
         if (postState) { mediaSession.setPlaybackState(playbackStateBuilder.build()); }
         return previousActions;
-    }
+    } // End setPlaybackAction method
 
     // Method to toggle the notification between playing (pause icon) and not-playing (play icon) modes.
     //
     // Set metadata to null to put the notification in not-playing mode
     // Set changeText to true to update the notification text to "No song loaded" or the song name
     //
-    // Note: Recommended to call setPlaybackState before this method to avoid having to post the
-    //      new playback state to the media session twice
     @SuppressLint("RestrictedApi") // IDE doesn't want us to access notificationBuilder.mActions
     private void togglePlayPauseMediaButton(boolean changeText, MediaMetadataCompat metadata) {
         // TODO: Is it really applicable to do this here?
-        setPlaybackActions(calculatePlaybackActions(metadata != null), true);
+        int state = (mediaController != null) ? mediaController.getPlaybackState().getState() : PlaybackStateCompat.STATE_NONE;
+        setPlaybackActions(calculatePlaybackActions(state), true);
 
         // Replace button icon
         notificationBuilder.mActions.remove(NOTIFICATION_PLAY_PAUSE_INDEX);
-        if (metadata == null) { // Not-playing mode
+        if (state == PlaybackStateCompat.STATE_PAUSED || state == PlaybackStateCompat.STATE_STOPPED) { // Not-playing mode
             notificationBuilder.setOngoing(false);
             notificationBuilder.mActions.add(
                     NOTIFICATION_PLAY_PAUSE_INDEX,
@@ -1433,8 +1463,7 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
         if (mediaController != null) {
             long actions = mediaController.getPlaybackState().getActions();
             setPlaybackActions(
-                    // Extract the ACTION_PAUSE bit since it is only toggled if a song is playing
-                    calculatePlaybackActions((actions & PlaybackStateCompat.ACTION_PAUSE) != 0),
+                    calculatePlaybackActions(mediaController.getPlaybackState().getState()),
                     true
             );
         } // End if(mediaController != null)
@@ -1456,8 +1485,8 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
             if (mediaController.getMetadata() == null) { return; } // Do nothing unless file loaded
 
             // Update notification
-            setPlaybackState(PlaybackStateCompat.STATE_PLAYING, playbackState.getPosition(), false);
-            togglePlayPauseMediaButton(true, mediaController.getMetadata()); // Posts new state
+            setPlaybackState(PlaybackStateCompat.STATE_PLAYING, playbackState.getPosition(), true);
+            togglePlayPauseMediaButton(true, mediaController.getMetadata());
 
             moppyManager.play();
             super.onPlay();
@@ -1543,8 +1572,8 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
             if ((playbackState.getActions() & PlaybackStateCompat.ACTION_PAUSE) == 0) { return; }
 
             // Update notification and playback state
-            setPlaybackState(PlaybackStateCompat.STATE_PAUSED, playbackState.getPosition(), false);
-            togglePlayPauseMediaButton(false, null); // Posts new state
+            setPlaybackState(PlaybackStateCompat.STATE_PAUSED, playbackState.getPosition(), true);
+            togglePlayPauseMediaButton(false, null);
 
             moppyManager.pause();
             super.onPause();
@@ -1557,8 +1586,8 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
 
             // Update notification and playback state
             if (mediaController.getMetadata() != null) {
-                setPlaybackState(PlaybackStateCompat.STATE_STOPPED, 0, false);
-                togglePlayPauseMediaButton(false, null); // Posts new state
+                setPlaybackState(PlaybackStateCompat.STATE_STOPPED, 0, true);
+                togglePlayPauseMediaButton(false, null);
             }
 
             moppyManager.stop();
@@ -1617,7 +1646,12 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
                 return;
             }
             setPlaybackState(PlaybackStateCompat.STATE_SKIPPING_TO_QUEUE_ITEM, 0, false);
-            setPlaybackActions(0, true);
+            setPlaybackActions(PlaybackStateCompat.ACTION_PLAY_PAUSE | // Set limited action package to only loading songs
+                               PlaybackStateCompat.ACTION_PLAY_FROM_MEDIA_ID |
+                               PlaybackStateCompat.ACTION_PLAY_FROM_SEARCH |
+                               musicQueue.getActions(),
+                    true
+            );
 
             if (musicQueue != null) {
                 musicQueue.skipToSong(id);
@@ -1635,7 +1669,7 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
             }
 
             if (musicQueue != null) {
-                loadNext();
+                loadNext(false);
             }
             super.onSkipToNext();
         }
@@ -1650,10 +1684,15 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
 
             if (musicQueue != null) {
                 setPlaybackState(PlaybackStateCompat.STATE_SKIPPING_TO_PREVIOUS, 0, false);
-                setPlaybackActions(0, true);
-                // TODO: WIP: Migrating to setPlaybackState/Actions, ensuring playback state doesn't get stuck in skipping or actions disabled
+                setPlaybackActions(PlaybackStateCompat.ACTION_PLAY_PAUSE | // Set limited action package to only loading songs
+                                   PlaybackStateCompat.ACTION_PLAY_FROM_MEDIA_ID |
+                                   PlaybackStateCompat.ACTION_PLAY_FROM_SEARCH |
+                                   musicQueue.getActions(),
+                        true
+                );
                 musicQueue.skipToPrevious();
-                loadQueueItem(); // Reloads current song if no previous songs available
+                loadQueueItem(); // Reloads current song if no previous songs available as musicQueue.getCurrentSong is guaranteed to be
+                // non-null if at least one song is loaded
             }
             super.onSkipToPrevious();
         }
@@ -1692,7 +1731,9 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
                     setPlaybackState(PlaybackStateCompat.STATE_STOPPED, 0, true);
                     togglePlayPauseMediaButton(false, null);
                 }
-                else { loadNext(); }
+                else {
+                    loadNext(true);
+                }
             } // End if(fileLoaded && currentState == PLAYING | PAUSED)
             super.onSongEnd(reset);
         } // End onSongEnd method
