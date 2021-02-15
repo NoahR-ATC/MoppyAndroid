@@ -70,7 +70,7 @@
                     android:layout_height="match_parent"
                     android:layout_weight="1"
                     android:contentDescription="@string/sheet_music_switch_imageview_description"
-                    app:srcCompat="@drawable/ic_midifile_light" />
+                    app:srcCompat="@drawable/ic_musicfile_light" />
             </LinearLayout>
         </RelativeLayout>
     </androidx.appcompat.widget.Toolbar>
