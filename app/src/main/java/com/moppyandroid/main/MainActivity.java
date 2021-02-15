@@ -60,10 +60,12 @@ import android.support.v4.media.session.PlaybackStateCompat;
 import android.util.Log;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.CompoundButton;
 import android.widget.ImageButton;
 import android.widget.LinearLayout;
 import android.widget.RelativeLayout;
 import android.widget.SeekBar;
+import android.widget.Switch;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
@@ -132,6 +134,8 @@ public class MainActivity extends AppCompatActivity implements SeekBar.OnSeekBar
     private MediaMetadataCompat metadata;
     private MidiFile midiFile;
     private DeviceSelectorDialogManager deviceDialogManager;
+    private LinearLayout queuePanel;
+    private LinearLayout sheetPanel;
     private SheetMusic sheetMusic;
 
     // Define the receiver to process relevant intent messages
@@ -208,6 +212,11 @@ public class MainActivity extends AppCompatActivity implements SeekBar.OnSeekBar
         panelLayout.setDragView(R.id.toolbar_layout);
         toolbarLayout.measure(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
         panelLayout.setPanelHeight(toolbarLayout.getMeasuredHeight());
+        ((Switch) findViewById(R.id.playlist_switch)).setOnCheckedChangeListener((CompoundButton v, boolean isChecked) -> onPlaylistSwitchChanged(isChecked));
+
+        // Get the panels for swapping between sheet music and queue views
+        queuePanel = findViewById(R.id.queue_panel);
+        sheetPanel = findViewById(R.id.sheet_panel);
 
         // Set this activity to be called when the song slider is moved
         songSlider.setOnSeekBarChangeListener(this);
@@ -343,6 +352,18 @@ public class MainActivity extends AppCompatActivity implements SeekBar.OnSeekBar
         }
         else { transportControls.stop(); }
     } // End onPauseButton method
+
+    // Method triggered when music queue/sheet music switch changed
+    private void onPlaylistSwitchChanged(boolean isChecked) {
+        if (isChecked){
+            queuePanel.setVisibility(View.GONE);
+            sheetPanel.setVisibility(View.VISIBLE);
+        }
+        else {
+            sheetPanel.setVisibility(View.GONE);
+            queuePanel.setVisibility(View.VISIBLE);
+        }
+    } // End onPlaylistSwitchChanged method
 
     // Initialize non-MoppyLib objects of the class and start the Moppy initialization chain
     @SuppressLint("UseSparseArrays")
@@ -528,8 +549,8 @@ public class MainActivity extends AppCompatActivity implements SeekBar.OnSeekBar
         currentPulseTime = time * pulsesPerMs;
         if (sheetMusic != null && shadeSheetMusic) {
             if (time == 0) {
-                sheetMusic.ShadeNotes(-10, (int)prevPulseTime, SheetMusic.DontScroll);
-                sheetMusic.ShadeNotes(-10, (int)currentPulseTime, SheetMusic.DontScroll);
+                sheetMusic.ShadeNotes(-10, (int) prevPulseTime, SheetMusic.DontScroll);
+                sheetMusic.ShadeNotes(-10, (int) currentPulseTime, SheetMusic.DontScroll);
             }
             else {
                 sheetMusic.ShadeNotes((int) currentPulseTime, (int) prevPulseTime, SheetMusic.GradualScroll);
