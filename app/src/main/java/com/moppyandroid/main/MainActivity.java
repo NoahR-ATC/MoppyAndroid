@@ -56,6 +56,7 @@ import android.provider.MediaStore;
 import android.support.v4.media.MediaBrowserCompat;
 import android.support.v4.media.MediaMetadataCompat;
 import android.support.v4.media.session.MediaControllerCompat;
+import android.support.v4.media.session.MediaSessionCompat;
 import android.support.v4.media.session.PlaybackStateCompat;
 import android.util.Log;
 import android.view.View;
@@ -70,6 +71,7 @@ import android.widget.TextView;
 
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.google.android.flexbox.FlexDirection;
@@ -87,6 +89,7 @@ import com.moppyandroid.main.service.MoppyMediaService;
 import com.sothree.slidinguppanel.SlidingUpPanelLayout;
 import com.sothree.slidinguppanel.SlidingUpPanelLayout.PanelState;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Timer;
 import java.util.TimerTask;
@@ -119,6 +122,7 @@ public class MainActivity extends AppCompatActivity implements SeekBar.OnSeekBar
     private SlidingUpPanelLayout panelLayout;
     private SeekBar songSlider;
     private RecyclerView libraryRecycler;
+    private RecyclerView queueRecycler;
     private SongTimerTask songTimerTask;
     private Handler uiHandler;
     private boolean movingSlider;
@@ -128,10 +132,10 @@ public class MainActivity extends AppCompatActivity implements SeekBar.OnSeekBar
     private double pulsesPerMs;
     private double currentPulseTime;
     private MediaBrowserCompat mediaBrowser;
+    private MediaControllerCompat mediaController;
     private MediaControllerCallback mediaControllerCallback;
     private MediaControllerCompat.TransportControls transportControls;
     private PlaybackStateCompat playbackState;
-    private MediaMetadataCompat metadata;
     private MidiFile midiFile;
     private DeviceSelectorDialogManager deviceDialogManager;
     private LinearLayout queuePanel;
@@ -225,6 +229,7 @@ public class MainActivity extends AppCompatActivity implements SeekBar.OnSeekBar
         findViewById(R.id.play_button).setOnClickListener((View v) -> onPlayButton());
         findViewById(R.id.pause_button).setOnClickListener((View v) -> onPauseButton());
 
+        // Set up the library recycler
         libraryRecycler = findViewById(R.id.library_recycler);
         FlexboxLayoutManager libraryLayout = new FlexboxLayoutManager(this);
         libraryLayout.setFlexDirection(FlexDirection.ROW_REVERSE);
@@ -238,10 +243,17 @@ public class MainActivity extends AppCompatActivity implements SeekBar.OnSeekBar
         findViewById(R.id.song_time_text).setSelected(true);
         findViewById(R.id.song_title).setSelected(true);
 
+        // Connect to the service
         mediaBrowser.connect();
 
+        // Set up the devices dialog
         deviceDialogManager = new DeviceSelectorDialogManager(this, getSupportFragmentManager(), TAG_DEVICE_DIALOG);
         findViewById(R.id.devices_button).setOnClickListener((view) -> deviceDialogManager.show());
+
+        // Set up the queue
+        queueRecycler = findViewById(R.id.queue_recycler);
+        queueRecycler.setLayoutManager(new LinearLayoutManager(this));
+        queueRecycler.setAdapter(new QueueAdapter(null, null, null)); // Dummy adapter until connected to service
     } // End onCreate method
 
     /**
@@ -353,9 +365,14 @@ public class MainActivity extends AppCompatActivity implements SeekBar.OnSeekBar
         else { transportControls.stop(); }
     } // End onPauseButton method
 
+    // Method triggered when an item in the queue is clicked
+    private void onQueueItemClicked(MediaSessionCompat.QueueItem song) {
+        transportControls.skipToQueueItem(song.getQueueId());
+    } // End onQueueItemClicked method
+
     // Method triggered when music queue/sheet music switch changed
     private void onPlaylistSwitchChanged(boolean isChecked) {
-        if (isChecked){
+        if (isChecked) {
             queuePanel.setVisibility(View.GONE);
             sheetPanel.setVisibility(View.VISIBLE);
         }
@@ -519,7 +536,7 @@ public class MainActivity extends AppCompatActivity implements SeekBar.OnSeekBar
         } // End if(forceDisable)
         else {
             enablePauseButton(true);
-            if (metadata != null) {
+            if (mediaController != null && mediaController.getMetadata() != null) {
                 enablePlayButton(true);
                 enableSongSlider(true);
             } // End if(sequenceLoaded)
@@ -615,7 +632,6 @@ public class MainActivity extends AppCompatActivity implements SeekBar.OnSeekBar
             // Run the initializer
             if (!initialized) { init(); }
 
-            MediaControllerCompat mediaController;
             try {
                 mediaController = new MediaControllerCompat(
                         MainActivity.this,
@@ -637,6 +653,14 @@ public class MainActivity extends AppCompatActivity implements SeekBar.OnSeekBar
 
             // Load in the current metadata and enable controls accordingly
             mediaControllerCallback.onMetadataChanged(mediaController.getMetadata());
+
+            // Load in the current music queue
+            String currentMediaId;
+            if (mediaController.getMetadata() != null && mediaController.getMetadata().getDescription() != null) {
+                currentMediaId = mediaController.getMetadata().getDescription().getMediaId();
+            }
+            else { currentMediaId = null; }
+            queueRecycler.setAdapter(new QueueAdapter(mediaController.getQueue(), currentMediaId, MainActivity.this::onQueueItemClicked));
 
             super.onConnected();
         } // End onConnected method
@@ -701,7 +725,6 @@ public class MainActivity extends AppCompatActivity implements SeekBar.OnSeekBar
 
         @Override
         public void onMetadataChanged(MediaMetadataCompat metadata) {
-            MainActivity.this.metadata = metadata;
             setControlState(false);
 
             long duration;
@@ -734,7 +757,38 @@ public class MainActivity extends AppCompatActivity implements SeekBar.OnSeekBar
             if (metadata == null) { setSongName(getString(R.string.song_title)); }
             else { setSongName(metadata.getString(MediaMetadataCompat.METADATA_KEY_TITLE)); }
 
+            // Update the queue
+            // Note: If a song is added to the end of the queue the adapter will be recreated here and in onQueueChanged, but c'est la vie it's only up to 50 songs
+            String currentMediaId;
+            if (metadata == null || metadata.getDescription() == null) { currentMediaId = null; }
+            else { currentMediaId = metadata.getDescription().getMediaId(); }
+            List<MediaSessionCompat.QueueItem> queue = new ArrayList<>();
+            if (mediaController != null) { queue = mediaController.getQueue(); }
+            queueRecycler.setAdapter(new QueueAdapter(queue, currentMediaId, MainActivity.this::onQueueItemClicked));
+
             super.onMetadataChanged(metadata);
         } // End onMetadataChanged method
+
+        /**
+         * Override to handle changes to items in the queue.
+         *
+         * @param queue A list of items in the current play queue. It should
+         *              include the currently playing item as well as previous and
+         * @see MediaSessionCompat.QueueItem
+         */
+        @Override
+        public void onQueueChanged(List<MediaSessionCompat.QueueItem> queue) {
+            // Load in the current music queue
+            String currentMediaId = null;
+            if (mediaController != null) {
+                MediaMetadataCompat metadata = mediaController.getMetadata();
+                if (metadata != null && metadata.getDescription() != null) {
+                    currentMediaId = metadata.getDescription().getMediaId();
+                }
+            }
+            queueRecycler.setAdapter(new QueueAdapter(queue, currentMediaId, MainActivity.this::onQueueItemClicked));
+
+            super.onQueueChanged(queue);
+        }
     } // End MediaControllerCallback class
 } // End MainActivity class
