@@ -5,6 +5,7 @@ Author: Noah Reeder, noahreederatc@gmail.com
 
 Known bugs:
 TODO: "W/ActivityThread: handleWindowVisibilty: no activity for token" in log when starting BrowserActivity, unable to find reason
+TODO: Issue with Moppy device not appearing in list after replugging, suggests disconnection mechanism is broken
 
 Known problems:
     - Hard to use track slider in slide menu (adjust slide menu sensitivity?)

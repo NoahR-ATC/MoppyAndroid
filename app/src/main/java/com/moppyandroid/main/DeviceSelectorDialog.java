@@ -302,7 +302,7 @@ public class DeviceSelectorDialog extends DialogFragment implements Spinner.OnIt
                             noDevicesText.setVisibility(View.VISIBLE);
                             emptyShowing = true;
                         } // End if(size < 1 && selectorDialog.showing)
-                        else if (list.size() > 1 && emptyShowing) {
+                        else if (list.size() >= 1 && emptyShowing) {
                             deviceRecycler.setVisibility(View.VISIBLE);
                             noDevicesText.setVisibility(View.GONE);
                             emptyShowing = false;
