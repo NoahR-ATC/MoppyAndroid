@@ -12,6 +12,7 @@ Known problems:
     - Hard to use track slider in slide menu (adjust slide menu sensitivity?)
     - Must connect to device, disconnect, and connect again for connection to work... sometimes
     - Sheet music shading is a little weird sometimes, particularly during seeks or while scrolling music
+    - When the same song is added twice a playing icon appears for both in the queue view, no reliable way to differentiate them available
 
 
 Features to implement:
