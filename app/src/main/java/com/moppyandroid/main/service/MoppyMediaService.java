@@ -1305,7 +1305,7 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
     } // End load(String, Result<Bundle>, boolean, boolean) method
 
     // Attempts to load the first item in the queue without popping it, returning false if queue empty
-    private boolean loadQueueItem() {
+    private boolean loadQueueItem(boolean setToPlaying) {
         setPlaybackState(PlaybackStateCompat.STATE_SKIPPING_TO_NEXT, 0, false);
         setPlaybackActions(PlaybackStateCompat.ACTION_PLAY_PAUSE | // Set limited action package to only loading songs
                            PlaybackStateCompat.ACTION_PLAY_FROM_MEDIA_ID |
@@ -1317,7 +1317,7 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
         // Load the next item if it exists
         QueueItem item = musicQueue.getCurrentSong();
         if (item != null) {
-            load(item.getDescription().getMediaId(), null, true, false);
+            load(item.getDescription().getMediaId(), null, setToPlaying, false);
             return true;
         }
         else { // Queue exhausted
@@ -1342,7 +1342,8 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
 
         // Load next if queue not exhausted
         if (musicQueue.checkNextSongAvailable()) {
-            load(musicQueue.skipToNext().getDescription().getMediaId(), null, true, false);
+            boolean setToPlaying = songEnded || previousState == PlaybackStateCompat.STATE_PLAYING;
+            load(musicQueue.skipToNext().getDescription().getMediaId(), null, setToPlaying, false);
         }
         else {
             // If the current song just ended stop playback, otherwise continue with previous state
@@ -1535,7 +1536,7 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
             if (query == null) { // 'Any' request
                 if (musicQueue != null && musicQueue.checkPreviousSongAvailable()) {
                     musicQueue.skipToPrevious();
-                    loadQueueItem();
+                    loadQueueItem(true);
                 }
                 return;
             }
@@ -1626,9 +1627,10 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
         @Override
         public void onAddQueueItem(MediaDescriptionCompat description, int index) {
             if (description == null || index < 0) { return; }
+            boolean play = mediaController.getPlaybackState().getState() == PlaybackStateCompat.STATE_PLAYING;
 
             if (musicQueue != null) {
-                if (musicQueue.addToQueue(description, index)) { loadQueueItem(); }
+                if (musicQueue.addToQueue(description, index)) { loadQueueItem(play); }
             }
             super.onAddQueueItem(description, index);
         } // End onAddQueueItem(MediaDescriptionCompat, int) method
@@ -1636,9 +1638,10 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
         @Override
         public void onRemoveQueueItem(MediaDescriptionCompat description) {
             if (description == null) { return; }
+            boolean play = mediaController.getPlaybackState().getState() == PlaybackStateCompat.STATE_PLAYING;
 
             if (musicQueue != null) {
-                if (musicQueue.removeFromQueue(description)) { loadQueueItem(); }
+                if (musicQueue.removeFromQueue(description)) { loadQueueItem(play); }
             }
             super.onRemoveQueueItem(description);
         } // End onRemoveQueueItem method
@@ -1659,7 +1662,7 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
 
             if (musicQueue != null) {
                 musicQueue.skipToSong(id);
-                loadQueueItem();
+                loadQueueItem(playbackState.getState() == PlaybackStateCompat.STATE_PLAYING);
             }
             super.onSkipToQueueItem(id);
         }
@@ -1693,8 +1696,9 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
                         true
                 );
                 musicQueue.skipToPrevious();
-                loadQueueItem(); // Reloads current song if no previous songs available as musicQueue.getCurrentSong is guaranteed to be
-                // non-null if at least one song is loaded
+                // Reloads current song if no previous songs available as musicQueue.getCurrentSong is guaranteed to be non-null
+                //if at least one song is loaded
+                loadQueueItem(playbackState.getState() == PlaybackStateCompat.STATE_PLAYING);
             }
             super.onSkipToPrevious();
         }

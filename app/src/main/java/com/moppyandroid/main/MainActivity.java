@@ -12,7 +12,6 @@ Known problems:
     - Hard to use track slider in slide menu (adjust slide menu sensitivity?)
     - Must connect to device, disconnect, and connect again for connection to work... sometimes
     - Sheet music shading is a little weird sometimes, particularly during seeks or while scrolling music
-    - Playback state is not retained through queue operations
 
 
 Features to implement:
