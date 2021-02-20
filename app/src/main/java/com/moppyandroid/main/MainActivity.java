@@ -5,7 +5,8 @@ Author: Noah Reeder, noahreederatc@gmail.com
 
 Known bugs:
 TODO: "W/ActivityThread: handleWindowVisibilty: no activity for token" in log when starting BrowserActivity, unable to find reason
-TODO: Issue with Moppy device not appearing in list after replugging, suggests disconnection mechanism is broken
+TODO: Issue with Moppy device not appearing if powered before plugging into Android
+ ^ Caused by Android not detecting USB device - Only occurs in some devices, may be hardware/Android issue. Unaffected by switching Arduino boards
 
 Known problems:
     - Hard to use track slider in slide menu (adjust slide menu sensitivity?)
