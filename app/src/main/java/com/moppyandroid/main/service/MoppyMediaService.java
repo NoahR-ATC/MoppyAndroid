@@ -1725,6 +1725,20 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
     // Callback for MoppyManager events
     private class MoppyCallback extends MoppyManager.Callback {
         @Override
+        void onStop() {
+            PlaybackStateCompat currentState = mediaController.getPlaybackState();
+            if (
+                    mediaController.getMetadata() != null &&
+                    (currentState.getState() == PlaybackStateCompat.STATE_PLAYING ||
+                     currentState.getState() == PlaybackStateCompat.STATE_PAUSED)
+            ) {
+                setPlaybackState(PlaybackStateCompat.STATE_STOPPED, 0, true);
+                togglePlayPauseMediaButton(false, null);
+            } // End if(fileLoaded && currentState == PLAYING | PAUSED)
+            super.onStop();
+        } // End onStop method
+
+        @Override
         void onSongEnd(boolean reset) {
             PlaybackStateCompat currentState = mediaController.getPlaybackState();
             if (
@@ -1732,7 +1746,7 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
                     (currentState.getState() == PlaybackStateCompat.STATE_PLAYING ||
                      currentState.getState() == PlaybackStateCompat.STATE_PAUSED)
             ) {
-                // Assuming auto-reset isn't enabled (not possible at programming), if reset is false then this is a song end not a stop
+                // If auto-reset is enabled (not possible at programming), don't skip to the next song
                 if (reset) {
                     setPlaybackState(PlaybackStateCompat.STATE_STOPPED, 0, true);
                     togglePlayPauseMediaButton(false, null);

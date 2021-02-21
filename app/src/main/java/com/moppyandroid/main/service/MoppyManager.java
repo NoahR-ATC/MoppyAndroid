@@ -87,6 +87,9 @@ public class MoppyManager implements com.moppy.core.status.StatusConsumer, AutoC
                     callback.onSongEnd((boolean) update.getData().orElse(false))
             ); // End callbackList.forEach lambda
         } // End if(update == SEQUENCE_END)
+        else if (update.getType() == StatusType.SEQUENCE_STOPPED) {
+            callbackList.forEach(Callback::onStop);
+        }
     } // End receiveUpdate method
 
     /**
@@ -129,7 +132,7 @@ public class MoppyManager implements com.moppy.core.status.StatusConsumer, AutoC
     } // End pause method
 
     /**
-     * Stops and resets playback. A {@link com.moppy.core.status.StatusType#SEQUENCE_END}
+     * Stops and resets playback. A {@link com.moppy.core.status.StatusType#SEQUENCE_STOPPED}
      * message is broadcasted to all registered {@link com.moppy.core.status.StatusConsumer}s,
      * and connected Moppy devices are sent a {@link com.moppy.core.comms.MoppyMessage#SYS_RESET}
      * message.
@@ -293,9 +296,7 @@ public class MoppyManager implements com.moppy.core.status.StatusConsumer, AutoC
         void onPause() {}
 
         /**
-         * Triggered after a successful {@link #stop()} call. Also triggers {@link #onSongEnd(boolean)},
-         * see the linked javadoc for an explanation. Not guaranteed to be called before nor after
-         * {@code onSongEnd(boolean)}.
+         * Triggered after a successful {@link #stop()} call.
          */
         void onStop() {}
 
@@ -307,19 +308,7 @@ public class MoppyManager implements com.moppy.core.status.StatusConsumer, AutoC
         void onLoad(MidiLibrary.MidiFile file) {}
 
         /**
-         * <p>
-         * Triggered when a song ends or {@link #stop()} is called. This is due to {@code stop()} internally
-         * being handled an early end to the song.
-         * </p>
-         * <p>
-         * The parameter {@code reset} can sometimes be used to tell the difference between a natural
-         * song ending and a {@code stop()} call. If the sequencer is not configured to automatically
-         * reset with {@link MoppyMIDISequencer#setAutoReset(boolean)}, then if {@code reset} is
-         * {@code true} {@code stop()} was called, otherwise the ending is natural. If the sequencer
-         * has been set to automatically reset, then detecting if {@code stop()} triggered the sequence
-         * end is non-trivial and out-of-scope for a {@link MoppyManager}. Neither {@code onStop}
-         * nor this method are guaranteed to be called in a predictable order.
-         * </p>
+         * Triggered when a song ends.
          *
          * @param reset {@code true} if the song progress is to be reset, otherwise {@code false}
          */
