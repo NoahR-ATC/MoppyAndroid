@@ -7,6 +7,8 @@ Known bugs:
 TODO: "W/ActivityThread: handleWindowVisibilty: no activity for token" in log when starting BrowserActivity, unable to find reason
 TODO: Issue with Moppy device not appearing if powered before plugging into Android
  ^ Caused by Android not detecting USB device - Only occurs in some devices, may be hardware/Android issue. Unaffected by switching Arduino boards
+TODO: If current song in queue is switched back and forth quickly sometimes the incorrect song length will be displayed
+ ^ Likely due to metadata change events being received in wrong order, nothing we can do
 
 Known problems:
     - Hard to use track slider in slide menu (adjust slide menu sensitivity?)
@@ -17,6 +19,7 @@ Known problems:
 
 Features to implement:
     - Playlists
+    - Save last folder viewed in each category
 
 
 Regexes:
@@ -445,10 +448,15 @@ public class MainActivity extends AppCompatActivity implements SeekBar.OnSeekBar
     // Requests the MoppyMediaService to load a MediaItem
     private void loadItem(MediaBrowserCompat.MediaItem item) {
         if (item == null) { return; }
+        boolean setToPlaying = false;
+        if (mediaController != null && mediaController.getPlaybackState().getState() == PlaybackStateCompat.STATE_PLAYING) {
+            setToPlaying = true;
+        }
 
         // Request the load action
         Bundle loadExtras = new Bundle();
         loadExtras.putString(MoppyMediaService.EXTRA_MEDIA_ID, item.getMediaId());
+        loadExtras.putBoolean(MoppyMediaService.EXTRA_PLAY, setToPlaying);
         mediaBrowser.sendCustomAction(MoppyMediaService.ACTION_LOAD_ITEM, loadExtras, new MediaBrowserCompat.CustomActionCallback() {
             @Override
             public void onResult(String action, Bundle extras, Bundle resultData) {
@@ -690,7 +698,7 @@ public class MainActivity extends AppCompatActivity implements SeekBar.OnSeekBar
                     songTimerTask.unpause();
                     setControlState(false);
                     ((ImageButton) findViewById(R.id.pause_button)).setImageResource(R.drawable.ic_pause);
-                    // TODO: Update seekbar position
+                    updateSongProgress(true); // See below note on delta
                     break;
                 } // End STATE_PLAYING case
                 case PlaybackStateCompat.STATE_PAUSED: // Fall through to STATE_STOPPED case
