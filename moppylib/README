@@ -11,3 +11,4 @@ Changes:
 Merged to commit 09e7738b97d719517d09f0a46b203ad5c33acfc3 on 2021-02-21
 Notes:
     - Would have had to update com.moppy.core.device.DeviceDescriptor by hand due to issues delomboking, but no changes were made upstream
+    - Manually merged com.moppy.core.comms.bridge.BridgeSerial due to extensive local changes
