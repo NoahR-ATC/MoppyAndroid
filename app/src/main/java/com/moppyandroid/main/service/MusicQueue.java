@@ -1,3 +1,20 @@
+/*
+ * Copyright (C) 2021 Noah Reeder
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU Public License
+ * along with this program. If not, see <https://www.gnu.org/licenses/>.
+ */
+
 package com.moppyandroid.main.service;
 
 import android.support.v4.media.MediaDescriptionCompat;
@@ -242,7 +259,6 @@ public class MusicQueue {
      * @return {@code null} if the queue couldn't be skipped as requested, otherwise the song that was skipped to
      */
     public MediaSessionCompat.QueueItem skipToPrevious(int times) {
-        // TODO: Restart song/first song if true
         if (times < 1 || windowOffset + windowIndex - times < 0) { return null; }
         moveWindow(windowOffset + windowIndex - times);
 

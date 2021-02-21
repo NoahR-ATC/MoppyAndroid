@@ -1,4 +1,5 @@
 // Originally written by Sam Archer https://github.com/SammyIAm/Moppy2, heavily modified to be compatible with Android by Noah Reeder
+// Last merged 2021-02-21
 
 /*
  * To change this license header, choose License Headers in Project Properties.
@@ -28,11 +29,13 @@ import java.util.logging.Logger;
 /**
  * A Serial connection for Moppy devices.
  */
-public class BridgeSerial extends NetworkBridge {
+public class BridgeSerial extends NetworkBridge<Integer> {
     private static UsbManager usbManager;
+    private final static List<Integer> SUPPORTED_BAUDS = Arrays.asList(9600,14400,19200,28800,38400,57600,115200);
     private final UsbDevice device;
     private UsbSerialDevice serialPort;
     private Thread listenerThread = null;
+    private int baudRate = 0; // Set to 0 until connection established
 
     /**
      * Assigns static variables. Must be called before use of BridgeSerial objects.
@@ -81,11 +84,12 @@ public class BridgeSerial extends NetworkBridge {
     }
 
     @Override
-    public void connect() throws IOException {
+    public void connect(Integer newBaudRate) throws IOException {
         // Attempt to open the connection, assigning options if successful
         if (serialPort.syncOpen()) {
             serialPort.setPortName(device.getDeviceName());
-            serialPort.setBaudRate(57600);
+            serialPort.setBaudRate(newBaudRate);
+            baudRate = newBaudRate;
             serialPort.setDataBits(UsbSerialDevice.DATA_BITS_8);
             serialPort.setStopBits(UsbSerialDevice.STOP_BITS_1);
             serialPort.setFlowControl(UsbSerialDevice.FLOW_CONTROL_OFF);
@@ -112,6 +116,11 @@ public class BridgeSerial extends NetworkBridge {
         SerialListener listener = new SerialListener(serialPort, this);
         listenerThread = new Thread(listener);
         listenerThread.start();
+    }
+
+    @Override
+    public void connect() throws IOException {
+        connect(57600); // Sets baudRate
     }
 
     @Override
@@ -149,6 +158,17 @@ public class BridgeSerial extends NetworkBridge {
     @Override
     public boolean isConnected() {
         return serialPort.isOpen();
+    }
+
+    @Override
+    public List<Integer> getConnectionOptions() {
+        return SUPPORTED_BAUDS;
+    }
+
+    // Returns 0 if connection not established
+    @Override
+    public Integer currentConnectionOption() {
+        return baudRate;
     }
 
     /**

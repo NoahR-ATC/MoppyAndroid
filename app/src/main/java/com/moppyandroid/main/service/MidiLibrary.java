@@ -1,3 +1,20 @@
+/*
+ * Copyright (C) 2021 Noah Reeder
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU Public License
+ * along with this program. If not, see <https://www.gnu.org/licenses/>.
+ */
+
 package com.moppyandroid.main.service;
 
 import android.Manifest;
@@ -9,6 +26,7 @@ import android.content.Context;
 import android.content.pm.PackageManager;
 import android.database.Cursor;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Parcel;
 import android.os.Parcelable;
 import android.provider.MediaStore;
@@ -159,7 +177,15 @@ public class MidiLibrary implements Map<String, MidiLibrary.MapNode> {
                     String path = cursor.getString(pathColumn);
                     String artist = cursor.getString(artistColumn);
                     String album = cursor.getString(albumColumn);
-                    Uri contentUri = ContentUris.withAppendedId(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, id);
+                    // Android 10 changed how file system access works; see https://stackoverflow.com/questions/63111091/java-lang-illegalargumentexception-volume-external-primary-not-found-in-android
+                    // While using EXTERNAL_CONTENT_URI works, it causes the service to crash when the device is rebooted
+                    Uri contentUri;
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                        contentUri = ContentUris.withAppendedId(MediaStore.Audio.Media.getContentUri(MediaStore.VOLUME_EXTERNAL), id);
+                    }
+                    else {
+                        contentUri = ContentUris.withAppendedId(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, id);
+                    }
 
                     // Use the retrieved information to create a MidiFile in each folder category
                     createFileInFolder(pathFolder, path, contentUri, name, duration, artist, album, path);
@@ -742,7 +768,7 @@ public class MidiLibrary implements Map<String, MidiLibrary.MapNode> {
             return uri.equals(((MidiFile) o).getUri()) &&
                    name.equals(((MidiFile) o).getName()) &&
                    duration == ((MidiFile) o).getDuration() &&
-                   artist.equals( ((MidiFile) o).getArtist()) &&
+                   artist.equals(((MidiFile) o).getArtist()) &&
                    album.equals(((MidiFile) o).getAlbum()) &&
                    parentName.equals(((MidiFile) o).getParentName()) &&
                    globalName.equals(((MidiFile) o).getNameGlobal()) &&

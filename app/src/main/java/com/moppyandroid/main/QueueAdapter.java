@@ -1,3 +1,20 @@
+/*
+ * Copyright (C) 2021 Noah Reeder
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU Public License
+ * along with this program. If not, see <https://www.gnu.org/licenses/>.
+ */
+
 package com.moppyandroid.main;
 
 import android.support.v4.media.MediaDescriptionCompat;
@@ -14,14 +31,18 @@ import androidx.recyclerview.widget.RecyclerView;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * {@link List}{@code <}{@link android.support.v4.media.session.MediaSessionCompat.QueueItem}{@code >} adapter for a
+ * {@link RecyclerView} that each item's title, duration, and a play icon if it is the playing item.
+ */
 public class QueueAdapter extends RecyclerView.Adapter<QueueAdapter.Holder> {
     private List<MediaSessionCompat.QueueItem> dataset;
     private String currentMediaId;
     private ClickListener clickListener;
 
     /**
-     * Constructs a {@code BrowserAdapter} with a {@link List} of
-     * {@link android.support.v4.media.MediaBrowserCompat.MediaItem}s to display.
+     * Constructs a {@code QueueAdapter} with a {@link List} of
+     * {@link android.support.v4.media.session.MediaSessionCompat.QueueItem}s to display.
      *
      * @param dataset the {@link List} to show
      */
@@ -30,7 +51,7 @@ public class QueueAdapter extends RecyclerView.Adapter<QueueAdapter.Holder> {
         else { this.dataset = dataset; }
         this.currentMediaId = currentMediaId;
         this.clickListener = clickListener;
-    } // End BrowserAdapter(List<MediaItem>) constructor
+    } // End QueueAdapter(List<QueueItem>) constructor
 
     /**
      * Method triggered when a {@link androidx.recyclerview.widget.RecyclerView.ViewHolder} is created.
@@ -98,9 +119,9 @@ public class QueueAdapter extends RecyclerView.Adapter<QueueAdapter.Holder> {
         public TextView lengthView;
 
         /**
-         * Constructs a {@code BrowserAdapter.Holder} using an inflated {@code browser_entry_layout}.
+         * Constructs a {@code QueueAdapter.Holder} using an inflated {@code queue_entry_layout}.
          *
-         * @param v the {@code browser_entry_layout}
+         * @param v the {@code queue_entry_layout}
          */
         public Holder(LinearLayout v) {
             super(v);
@@ -109,10 +130,10 @@ public class QueueAdapter extends RecyclerView.Adapter<QueueAdapter.Holder> {
             nameView = v.findViewById(R.id.entry_name_text);
             lengthView = v.findViewById(R.id.entry_length_text);
             v.setOnClickListener(this);
-        } // End BrowserAdapter.Holder(LinearLayout) constructor
+        } // End QueueAdapter.Holder(LinearLayout) constructor
 
         /**
-         * Method triggered when a {@code BrowserAdapter.Holder} is clicked.
+         * Method triggered when a {@code QueueAdapter.Holder} is clicked.
          */
         @Override
         public void onClick(View v) {

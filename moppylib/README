@@ -1,0 +1,15 @@
+Original Author: Sam Archer
+README and MoppyAndroid author: Noah Reeder
+
+Code pulled from the Java/MoppyLib folder of https://github.com/Sammy1Am/Moppy2 on 2019-09-21.
+Changes:
+    - delomboked com.moppy.core.MoppyMIDISequencer and com.moppy.core.device.DeviceDescriptor
+    - Modified to use jp.kshoji.javax.sound.midi instead of javax.sound.midi to allow for Android support
+    - Heavily modified com.moppy.core.comms.bride.BridgeSerial to use UsbSerial instead of jSerialComm to allow for Android support
+    - Modified com.moppy.core.midi.MoppyMIDISequencer to be compatible with Android and javax.sound.midi port, see file for details
+    - com.moppy.core.events.mapper.MIDIScriptMapper removed as it is unused in MoppyAndroid and wasn't worth porting
+Merged to commit 09e7738b97d719517d09f0a46b203ad5c33acfc3 on 2021-02-21
+Notes:
+    - Would have had to update com.moppy.core.device.DeviceDescriptor by hand due to issues delomboking, but no changes were made upstream
+    - Manually merged com.moppy.core.comms.bridge.BridgeSerial due to extensive local changes
+    - Manually merged com.moppy.core.midi.MoppyMIDISequencer due to issues delomboking and local changes

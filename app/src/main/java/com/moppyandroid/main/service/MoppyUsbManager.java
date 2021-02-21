@@ -1,3 +1,20 @@
+/*
+ * Copyright (C) 2021 Noah Reeder
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU Public License
+ * along with this program. If not, see <https://www.gnu.org/licenses/>.
+ */
+
 // A streamlined version of com.moppy.control.NetworkManager from Moppy2 adapted to run on Android.
 // NetworkManager author: Sam Archer https://github.com/SammyIAm
 
@@ -25,7 +42,7 @@ import java.util.List;
 public class MoppyUsbManager {
     private final StatusBus statusBus;
     private final MultiBridge multiBridge;
-    private final HashMap<String, NetworkBridge> networkBridges;
+    private final HashMap<String, NetworkBridge<Integer>> networkBridges;
     private final List<String> bridgeIdentifiers;
     private final UsbManager androidUsbManager;
     private List<String> connectedIdentifiers;
@@ -56,7 +73,7 @@ public class MoppyUsbManager {
     public void connectBridge(String bridgeIdentifier) throws IOException {
         try {
             // Check if the bridge has already been created
-            NetworkBridge currentBridge = networkBridges.get(bridgeIdentifier);
+            NetworkBridge<Integer> currentBridge = networkBridges.get(bridgeIdentifier);
             if (currentBridge != null) { currentBridge.connect(); }
             else {
                 BridgeSerial newBridge = new BridgeSerial(bridgeIdentifier);
@@ -80,7 +97,7 @@ public class MoppyUsbManager {
      * @throws IOException if unable to send the close message to the device
      */
     public void closeBridge(String bridgeIdentifier) throws IOException {
-        NetworkBridge bridge = networkBridges.get(bridgeIdentifier);
+        NetworkBridge<Integer> bridge = networkBridges.get(bridgeIdentifier);
         if (bridge == null) { return; }
         multiBridge.removeBridge(bridge);
         bridge.deregisterMessageReceiver(multiBridge); // Just in case a message gets sent mid-closing
@@ -114,7 +131,7 @@ public class MoppyUsbManager {
      * @param bridgeIdentifier the identifier of the bridge to check connection status
      */
     public boolean isConnected(String bridgeIdentifier) {
-        NetworkBridge bridge = networkBridges.get(bridgeIdentifier);
+        NetworkBridge<Integer> bridge = networkBridges.get(bridgeIdentifier);
         return (bridge != null && bridge.isConnected());
     } // End isConnected method
 
@@ -133,7 +150,7 @@ public class MoppyUsbManager {
                 newConnectedIdentifiers.add(connectedIdentifiers.get(i));
             } // End if(bridgeIdentifiers ∋ currentConnectedIdentifier)
             else {
-                NetworkBridge bridge = networkBridges.get(connectedIdentifiers.get(i));
+                NetworkBridge<Integer> bridge = networkBridges.get(connectedIdentifiers.get(i));
                 if (bridge == null) { continue; }
                 multiBridge.removeBridge(bridge);
                 bridge.deregisterMessageReceiver(multiBridge);
@@ -150,7 +167,7 @@ public class MoppyUsbManager {
      *
      * @return the managed {@code MultiBridge}
      */
-    public NetworkBridge getPrimaryBridge() { return multiBridge; }
+    public NetworkBridge<Object> getPrimaryBridge() { return multiBridge; }
 
     /**
      * Retrieves the list of bridge identifiers that are available for connection. The list used by {@link #connectBridge(String)} is
