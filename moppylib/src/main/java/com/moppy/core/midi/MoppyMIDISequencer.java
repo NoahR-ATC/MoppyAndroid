@@ -94,7 +94,7 @@ public class MoppyMIDISequencer implements MetaEventListener, Closeable {
     public void stop() {
         seq.stop();
         seq.setTickPosition(0);
-        statusBus.receiveUpdate(StatusUpdate.sequenceEnd(true)); // Always reset when stop button is pressed
+        statusBus.receiveUpdate(StatusUpdate.SEQUENCE_STOPPED); // Always reset when stop button is pressed
     }
 
     public boolean isPlaying() {
@@ -104,7 +104,14 @@ public class MoppyMIDISequencer implements MetaEventListener, Closeable {
     public void loadSequence(Sequence sequenceToLoad) throws InvalidMidiDataException {
         seq.setSequence(sequenceToLoad);
         statusBus.receiveUpdate(StatusUpdate.sequenceLoaded(sequenceToLoad));
-        LOG.info(String.format("Loaded sequence with %s tracks", sequenceToLoad.getTracks().length - 1)); // -1 for system track?
+        statusBus.receiveUpdate(StatusUpdate.tempoChange(seq.getTempoInBPM()));
+
+        // Source says "Loaded sequence with %s tracks at %s BMP", typo fixed here
+        LOG.info(String.format("Loaded sequence with %s tracks at %s BPM", sequenceToLoad.getTracks().length - 1, seq.getTempoInBPM())); // -1 for system track?
+    }
+
+    public boolean isSequenceLoaded() {
+        return seq.getSequence() != null;
     }
 
     public long getSecondsLength() {
