@@ -1,7 +1,7 @@
 Original authors: Madhav Vaidy and Diaa J.
 README and MoppyAndroid author: Noah Reeder
 
-Code pulled from app module of https://github.com/ditek/MidiSheetMusic-Android on 2020-05-30.
+Code pulled from app module of https://github.com/ditek/MidiSheetMusic-Android on 2020-05-30, last merged 2021-02-20
 Changes:
     - Removed all activities
     - Removed com.midisheetmusic.drawerItems package and source files
