@@ -25,7 +25,7 @@ import java.util.List;
 public class MoppyUsbManager {
     private final StatusBus statusBus;
     private final MultiBridge multiBridge;
-    private final HashMap<String, NetworkBridge> networkBridges;
+    private final HashMap<String, NetworkBridge<Integer>> networkBridges;
     private final List<String> bridgeIdentifiers;
     private final UsbManager androidUsbManager;
     private List<String> connectedIdentifiers;
@@ -56,7 +56,7 @@ public class MoppyUsbManager {
     public void connectBridge(String bridgeIdentifier) throws IOException {
         try {
             // Check if the bridge has already been created
-            NetworkBridge currentBridge = networkBridges.get(bridgeIdentifier);
+            NetworkBridge<Integer> currentBridge = networkBridges.get(bridgeIdentifier);
             if (currentBridge != null) { currentBridge.connect(); }
             else {
                 BridgeSerial newBridge = new BridgeSerial(bridgeIdentifier);
@@ -80,7 +80,7 @@ public class MoppyUsbManager {
      * @throws IOException if unable to send the close message to the device
      */
     public void closeBridge(String bridgeIdentifier) throws IOException {
-        NetworkBridge bridge = networkBridges.get(bridgeIdentifier);
+        NetworkBridge<Integer> bridge = networkBridges.get(bridgeIdentifier);
         if (bridge == null) { return; }
         multiBridge.removeBridge(bridge);
         bridge.deregisterMessageReceiver(multiBridge); // Just in case a message gets sent mid-closing
@@ -114,7 +114,7 @@ public class MoppyUsbManager {
      * @param bridgeIdentifier the identifier of the bridge to check connection status
      */
     public boolean isConnected(String bridgeIdentifier) {
-        NetworkBridge bridge = networkBridges.get(bridgeIdentifier);
+        NetworkBridge<Integer> bridge = networkBridges.get(bridgeIdentifier);
         return (bridge != null && bridge.isConnected());
     } // End isConnected method
 
@@ -133,7 +133,7 @@ public class MoppyUsbManager {
                 newConnectedIdentifiers.add(connectedIdentifiers.get(i));
             } // End if(bridgeIdentifiers ∋ currentConnectedIdentifier)
             else {
-                NetworkBridge bridge = networkBridges.get(connectedIdentifiers.get(i));
+                NetworkBridge<Integer> bridge = networkBridges.get(connectedIdentifiers.get(i));
                 if (bridge == null) { continue; }
                 multiBridge.removeBridge(bridge);
                 bridge.deregisterMessageReceiver(multiBridge);
@@ -150,7 +150,7 @@ public class MoppyUsbManager {
      *
      * @return the managed {@code MultiBridge}
      */
-    public NetworkBridge getPrimaryBridge() { return multiBridge; }
+    public NetworkBridge<Object> getPrimaryBridge() { return multiBridge; }
 
     /**
      * Retrieves the list of bridge identifiers that are available for connection. The list used by {@link #connectBridge(String)} is
