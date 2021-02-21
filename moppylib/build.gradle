@@ -34,10 +34,10 @@ dependencies {
     //implementation 'jp.kshoji:javax-sound-midi:0.0.3:@aar'
     //implementation 'com.github.kyosherlock:mididriver:master'
     implementation 'com.github.felHR85:UsbSerial:6.1.0'
-    implementation 'androidx.appcompat:appcompat:1.1.0'
+    implementation 'androidx.appcompat:appcompat:1.2.0'
     testImplementation 'junit:junit:4.12'
-    androidTestImplementation 'androidx.test.ext:junit:1.1.1'
-    androidTestImplementation 'androidx.test.espresso:espresso-core:3.2.0'
+    androidTestImplementation 'androidx.test.ext:junit:1.1.2'
+    androidTestImplementation 'androidx.test.espresso:espresso-core:3.3.0'
     implementation 'org.jetbrains:annotations:15.0'
     implementation project(path: ':javax.sound.midi')
     implementation project(path: ':realtimesequencer')
