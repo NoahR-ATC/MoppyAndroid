@@ -1,0 +1,15 @@
+com.moppy.core.comms
+com.moppy.core.comms.bridge
+com.moppy.core.device
+com.moppy.core.events.mapper
+com.moppy.core.events.mapper.scripts
+com.moppy.core.events.postprocessor
+com.moppy.core.midi
+com.moppy.core.status
+com.moppy.core.util
+com.moppyandroid.main
+com.moppyandroid.main.service
+jp.kshoji.javax.sound.midi
+jp.kshoji.javax.sound.midi.impl
+jp.kshoji.javax.sound.midi.io
+jp.kshoji.javax.sound.midi.spi
