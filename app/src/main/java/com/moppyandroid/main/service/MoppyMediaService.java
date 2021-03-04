@@ -1069,7 +1069,10 @@ public class MoppyMediaService extends MediaBrowserServiceCompat {
                     resultBundle.putBoolean(EXTRA_ERROR_INFORMATIONAL, false); // Permission not available?
                     result.sendError(resultBundle);
                 }
-                else { result.sendResult(resultBundle); }
+                else {
+                    notifyChildrenChanged(MidiLibrary.ROOT_ID);
+                    result.sendResult(resultBundle);
+                }
             }); // End MidiLibrary.Callback lambda
         } // End if(midiLibrary == null)
         else {

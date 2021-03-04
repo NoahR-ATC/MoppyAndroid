@@ -15,7 +15,7 @@ android {
         applicationId "com.moppyandroid.main"
         minSdkVersion 29
         targetSdkVersion 29
-        versionCode 3
+        versionCode 301
         versionName "2.1"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
     }
