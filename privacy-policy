@@ -1,0 +1,3 @@
+This app does not collect or store any user data.
+
+Your device's media library is scanned for playable MIDI files when you start the app, but this information does not leave the device and is destroyed when the app closes.
